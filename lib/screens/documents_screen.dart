@@ -4,12 +4,12 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:flutter_slidable/flutter_slidable.dart';
 import 'package:intl/intl.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../theme.dart';
 import '../models/document_model.dart';
 import '../services/database_service.dart';
 import 'document_viewer_screen.dart';
 import 'import_documents_screen.dart';
-import 'camscanner_features_screen.dart';
 
 class DocumentsScreen extends StatefulWidget {
   final VoidCallback? onRefresh;
@@ -32,6 +32,13 @@ class _DocumentsScreenState extends State<DocumentsScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadDocs();
+    _syncGridFromSettings();
+  }
+
+  Future<void> _syncGridFromSettings() async {
+    final p = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() => _isGridView = p.getBool('gridView') ?? false);
   }
 
   @override
@@ -114,37 +121,6 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                         Text('My Documents',
                           style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white)),
                         const Spacer(),
-                        // All Features button
-                        GestureDetector(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(builder: (_) => const CamScannerFeaturesScreen()),
-                            );
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.15),
-                              borderRadius: BorderRadius.circular(10),
-                              border: Border.all(color: Colors.white24),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Iconsax.grid_2, color: Colors.white, size: 18),
-                                const SizedBox(width: 6),
-                                Text('Features',
-                                  style: GoogleFonts.nunito(
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                  )),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
                         // Import button
                         IconButton(
                           onPressed: () {
@@ -157,7 +133,11 @@ class _DocumentsScreenState extends State<DocumentsScreen>
                         ),
                         // Grid/List toggle
                         IconButton(
-                          onPressed: () => setState(() => _isGridView = !_isGridView),
+                          onPressed: () async {
+                            setState(() => _isGridView = !_isGridView);
+                            final p = await SharedPreferences.getInstance();
+                            await p.setBool('gridView', _isGridView);
+                          },
                           icon: Icon(
                             _isGridView ? Iconsax.row_vertical : Iconsax.grid_2,
                             color: Colors.white, size: 22),

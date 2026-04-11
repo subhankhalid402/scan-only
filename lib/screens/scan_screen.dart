@@ -1,15 +1,14 @@
 import 'dart:io';
+import 'package:camera/camera.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:camera/camera.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../services/image_enhancement_service.dart';
 import '../theme.dart';
-import '../models/document_model.dart';
-import '../services/database_service.dart';
-import '../services/pdf_service.dart';
 import 'edit_scan_screen.dart';
 
 // ── Scan mode model ──────────────────────────────────────────────────────────
@@ -28,17 +27,13 @@ class _ScanMode {
   });
 }
 
+/// Core scanner modes only (matches home shortcuts).
 const List<_ScanMode> _kScanModes = [
-  _ScanMode(id: 'document',   icon: Iconsax.document_text, label: 'Document',   color: Color(0xFFD4A017)),
-  _ScanMode(id: 'id_card',    icon: Iconsax.card,          label: 'ID Card',    color: Color(0xFF3B82F6)),
-  _ScanMode(id: 'receipt',    icon: Iconsax.receipt,       label: 'Receipt',    color: Color(0xFF22C55E)),
-  _ScanMode(id: 'qr',         icon: Iconsax.scan_barcode,  label: 'QR Code',    color: Color(0xFF6366F1)),
-  _ScanMode(id: 'book',       icon: Iconsax.book,          label: 'Book',       color: Color(0xFFF97316)),
-  _ScanMode(id: 'photo',      icon: Iconsax.camera,        label: 'Photo',      color: Color(0xFFA855F7)),
-  _ScanMode(id: 'gallery',    icon: Iconsax.gallery,       label: 'Gallery',    color: Color(0xFFEF4444)),
-  _ScanMode(id: 'whiteboard', icon: Iconsax.text_block,    label: 'Whiteboard', color: Color(0xFF06B6D4)),
-  _ScanMode(id: 'table',      icon: Iconsax.element_3,     label: 'Table',      color: Color(0xFF84CC16)),
-  _ScanMode(id: 'passport',   icon: Iconsax.personalcard,  label: 'Passport',   color: Color(0xFFF43F5E)),
+  _ScanMode(id: 'document', icon: Iconsax.document_text, label: 'Document', color: Color(0xFFD4A017)),
+  _ScanMode(id: 'id_card', icon: Iconsax.card, label: 'ID Card', color: Color(0xFF3B82F6)),
+  _ScanMode(id: 'receipt', icon: Iconsax.receipt, label: 'Receipt', color: Color(0xFF22C55E)),
+  _ScanMode(id: 'qr', icon: Iconsax.scan_barcode, label: 'QR Code', color: Color(0xFF6366F1)),
+  _ScanMode(id: 'gallery', icon: Iconsax.gallery, label: 'Gallery', color: Color(0xFFEF4444)),
 ];
 
 // ── Frame type enum ──────────────────────────────────────────────────────────
@@ -47,7 +42,7 @@ enum _FrameType { document, card, qr }
 
 _FrameType _frameTypeFor(String modeId) {
   if (modeId == 'qr') return _FrameType.qr;
-  if (modeId == 'id_card' || modeId == 'passport') return _FrameType.card;
+  if (modeId == 'id_card') return _FrameType.card;
   return _FrameType.document;
 }
 
@@ -67,9 +62,21 @@ class _ScanScreenState extends State<ScanScreen>
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
   bool _isCameraReady = false;
-  bool _isFlashOn = false;
+  /// 0 = off, 1 = auto, 2 = torch (CamScanner-style cycle on same button).
+  int _flashMode = 0;
   bool _isCapturing = false;
   int _currentCameraIndex = 0;
+
+  final GlobalKey _previewKey = GlobalKey();
+  double _minZoom = 1.0;
+  double _maxZoom = 1.0;
+  double _currentZoom = 1.0;
+  double _pinchStartZoom = 1.0;
+  /// Double-tap preview: alignment grid (no extra toolbar buttons).
+  bool _showAlignmentGrid = false;
+
+  bool _prefAutoEnhance = true;
+  String _prefQuality = 'High';
 
   // Pages
   final List<String> _capturedPages = [];
@@ -90,9 +97,10 @@ class _ScanScreenState extends State<ScanScreen>
   @override
   void initState() {
     super.initState();
-    _selectedMode = widget.scanType;
+    _selectedMode = _kScanModes.any((m) => m.id == widget.scanType)
+        ? widget.scanType
+        : 'document';
 
-    // Scan-line animation
     _scanLineCtrl = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 2400),
@@ -103,9 +111,34 @@ class _ScanScreenState extends State<ScanScreen>
       curve: Curves.easeInOut,
     );
 
-    _initCamera();
+    _bootstrapCamera();
 
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
+  }
+
+  Future<void> _bootstrapCamera() async {
+    final p = await SharedPreferences.getInstance();
+    if (!mounted) return;
+    setState(() {
+      _prefAutoEnhance = p.getBool('autoEnhance') ?? true;
+      _prefQuality = p.getString('defaultQuality') ?? 'High';
+    });
+    await _initCamera();
+  }
+
+  ResolutionPreset _primaryResolutionPreset() {
+    switch (_prefQuality) {
+      case 'Ultra':
+        return ResolutionPreset.ultraHigh;
+      case 'High':
+        return ResolutionPreset.veryHigh;
+      case 'Medium':
+        return ResolutionPreset.high;
+      case 'Low':
+        return ResolutionPreset.medium;
+      default:
+        return ResolutionPreset.veryHigh;
+    }
   }
 
   // ── Camera ─────────────────────────────────────────────────────────────────
@@ -126,34 +159,101 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   Future<void> _setupCamera(CameraDescription camera) async {
-    final controller = CameraController(
-      camera,
-      ResolutionPreset.high,
-      enableAudio: false,
-    );
+    CameraController? controller;
+    Future<bool> tryInit(ResolutionPreset preset) async {
+      final c = CameraController(camera, preset, enableAudio: false);
+      try {
+        await c.initialize();
+        controller = c;
+        return true;
+      } catch (e) {
+        debugPrint('Camera preset $preset failed: $e');
+        await c.dispose();
+        return false;
+      }
+    }
+
+    if (!await tryInit(_primaryResolutionPreset())) {
+      if (!await tryInit(ResolutionPreset.high)) {
+        await tryInit(ResolutionPreset.medium);
+      }
+    }
+    if (controller == null) return;
+
+    final c = controller!;
     try {
-      await controller.initialize();
-      if (mounted) {
-        setState(() {
-          _cameraController = controller;
-          _isCameraReady = true;
-        });
+      await c.setFocusMode(FocusMode.auto);
+      try {
+        _minZoom = await c.getMinZoomLevel();
+        _maxZoom = await c.getMaxZoomLevel();
+        _currentZoom = _minZoom;
+        await c.setZoomLevel(_currentZoom);
+      } catch (_) {
+        _minZoom = 1.0;
+        _maxZoom = 1.0;
+        _currentZoom = 1.0;
+      }
+      await _applyFlashMode(c);
+    } catch (e) {
+      debugPrint('Camera post-init: $e');
+    }
+
+    if (mounted) {
+      setState(() {
+        _cameraController = c;
+        _isCameraReady = true;
+      });
+    }
+  }
+
+  Future<void> _applyFlashMode([CameraController? c]) async {
+    final ctrl = c ?? _cameraController;
+    if (ctrl == null) return;
+    try {
+      switch (_flashMode % 3) {
+        case 0:
+          await ctrl.setFlashMode(FlashMode.off);
+          break;
+        case 1:
+          await ctrl.setFlashMode(FlashMode.auto);
+          break;
+        case 2:
+          await ctrl.setFlashMode(FlashMode.torch);
+          break;
       }
     } catch (e) {
-      debugPrint('Camera setup error: $e');
+      debugPrint('Flash mode: $e');
     }
+  }
+
+  Future<void> _cycleFlash() async {
+    if (_cameraController == null) return;
+    HapticFeedback.lightImpact();
+    setState(() => _flashMode = (_flashMode + 1) % 3);
+    await _applyFlashMode();
   }
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
   Future<void> _captureImage() async {
-    if (_cameraController == null || !_isCameraReady || _isCapturing) return;
+    if (_isCapturing) return;
+    if (_selectedMode == 'gallery') {
+      await _pickFromGallery();
+      return;
+    }
+    if (_cameraController == null || !_isCameraReady) return;
     HapticFeedback.mediumImpact();
     setState(() => _isCapturing = true);
     try {
       final image = await _cameraController!.takePicture();
+      var outPath = image.path;
+      if (_prefAutoEnhance) {
+        outPath = await ImageEnhancementService.instance
+            .polishCaptureForScanMode(image.path, _selectedMode);
+      }
+      if (!mounted) return;
       setState(() {
-        _capturedPages.add(image.path);
+        _capturedPages.add(outPath);
         _isCapturing = false;
       });
       // Auto-scroll thumbnail strip to end
@@ -196,13 +296,47 @@ class _ScanScreenState extends State<ScanScreen>
     }
   }
 
-  Future<void> _toggleFlash() async {
-    if (_cameraController == null) return;
+  Future<void> _onPreviewTapUp(TapUpDetails d) async {
+    final ctx = _previewKey.currentContext;
+    if (ctx == null || _cameraController == null || !_isCameraReady) return;
+    final rb = ctx.findRenderObject() as RenderBox?;
+    if (rb == null) return;
+    final local = rb.globalToLocal(d.globalPosition);
+    final size = rb.size;
+    if (size.width <= 0 || size.height <= 0) return;
+    final nx = (local.dx / size.width).clamp(0.0, 1.0);
+    final ny = (local.dy / size.height).clamp(0.0, 1.0);
+    try {
+      await _cameraController!.setFocusPoint(Offset(nx, ny));
+      await _cameraController!.setExposurePoint(Offset(nx, ny));
+      HapticFeedback.selectionClick();
+    } catch (e) {
+      debugPrint('Focus tap: $e');
+    }
+  }
+
+  void _toggleAlignmentGrid() {
     HapticFeedback.lightImpact();
-    setState(() => _isFlashOn = !_isFlashOn);
-    await _cameraController!.setFlashMode(
-      _isFlashOn ? FlashMode.torch : FlashMode.off,
-    );
+    setState(() => _showAlignmentGrid = !_showAlignmentGrid);
+  }
+
+  void _onPinchStart(ScaleStartDetails details) {
+    _pinchStartZoom = _currentZoom;
+  }
+
+  Future<void> _onPinchUpdate(ScaleUpdateDetails details) async {
+    if (_cameraController == null || !_isCameraReady) return;
+    if (_maxZoom <= _minZoom) return;
+    if (details.pointerCount < 2) return;
+    final target = (_pinchStartZoom * details.scale)
+        .clamp(_minZoom, _maxZoom);
+    if ((target - _currentZoom).abs() < 0.01) return;
+    try {
+      await _cameraController!.setZoomLevel(target);
+      if (mounted) setState(() => _currentZoom = target);
+    } catch (e) {
+      debugPrint('Zoom: $e');
+    }
   }
 
   Future<void> _flipCamera() async {
@@ -305,9 +439,19 @@ class _ScanScreenState extends State<ScanScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Camera preview
+          // 1. Camera preview (tap = focus/exposure, pinch = zoom, double-tap = grid)
           if (_isCameraReady && _cameraController != null)
-            Positioned.fill(child: CameraPreview(_cameraController!))
+            Positioned.fill(
+              child: GestureDetector(
+                key: _previewKey,
+                behavior: HitTestBehavior.opaque,
+                onTapUp: _onPreviewTapUp,
+                onDoubleTap: _toggleAlignmentGrid,
+                onScaleStart: _onPinchStart,
+                onScaleUpdate: _onPinchUpdate,
+                child: CameraPreview(_cameraController!),
+              ),
+            )
           else
             const Center(
               child: CircularProgressIndicator(color: AppColors.gold),
@@ -327,6 +471,7 @@ class _ScanScreenState extends State<ScanScreen>
                       )
                       .color,
                   scanLineProgress: _scanLineAnim.value,
+                  showAlignmentGrid: _showAlignmentGrid,
                 ),
               ),
             ),
@@ -384,12 +529,12 @@ class _ScanScreenState extends State<ScanScreen>
             ),
             const Spacer(),
             _iconBtn(
-              _isFlashOn ? Icons.flash_on_rounded : Icons.flash_off_rounded,
-              _toggleFlash,
-              color: _isFlashOn ? AppColors.gold : Colors.white,
-              bgColor: _isFlashOn
-                  ? AppColors.gold.withOpacity(0.2)
-                  : Colors.black45,
+              _flashIcon(),
+              _cycleFlash,
+              color: _flashMode == 0 ? Colors.white : AppColors.gold,
+              bgColor: _flashMode == 0
+                  ? Colors.black45
+                  : AppColors.gold.withOpacity(0.2),
             ),
           ],
         ),
@@ -493,6 +638,7 @@ class _ScanScreenState extends State<ScanScreen>
         itemBuilder: (context, i) {
           return GestureDetector(
             onTap: _proceedToEdit,
+            onLongPress: () => _confirmRemoveThumbnail(i),
             child: Container(
               width: 52,
               height: 52,
@@ -672,6 +818,68 @@ class _ScanScreenState extends State<ScanScreen>
     );
   }
 
+  void _confirmRemoveThumbnail(int index) {
+    HapticFeedback.mediumImpact();
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A2A40),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          'Remove page?',
+          style: GoogleFonts.nunito(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        content: Text(
+          'Page ${index + 1} will be removed from this scan.',
+          style: GoogleFonts.nunito(color: Colors.white70),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(
+              'Cancel',
+              style: GoogleFonts.nunito(color: Colors.white54),
+            ),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.gold,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(10),
+              ),
+            ),
+            onPressed: () {
+              Navigator.pop(ctx);
+              setState(() => _capturedPages.removeAt(index));
+            },
+            child: Text(
+              'Remove',
+              style: GoogleFonts.nunito(
+                color: AppColors.navyDark,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  IconData _flashIcon() {
+    switch (_flashMode % 3) {
+      case 0:
+        return Icons.flash_off_rounded;
+      case 1:
+        return Icons.flash_auto_rounded;
+      case 2:
+      default:
+        return Icons.flash_on_rounded;
+    }
+  }
+
   String _scanTypeLabel() {
     return _kScanModes
         .firstWhere(
@@ -714,11 +922,13 @@ class _ScanFramePainter extends CustomPainter {
   final _FrameType frameType;
   final Color frameColor;
   final double scanLineProgress; // 0.0 → 1.0
+  final bool showAlignmentGrid;
 
   const _ScanFramePainter({
     required this.frameType,
     required this.frameColor,
     required this.scanLineProgress,
+    this.showAlignmentGrid = false,
   });
 
   @override
@@ -822,11 +1032,26 @@ class _ScanFramePainter extends CustomPainter {
       ..style = PaintingStyle.stroke;
 
     canvas.drawLine(Offset(left + 4, scanY), Offset(right - 4, scanY), scanPaint);
+
+    if (showAlignmentGrid) {
+      final gridPaint = Paint()
+        ..color = Colors.white.withOpacity(0.22)
+        ..strokeWidth = 1;
+      final gw = right - left;
+      final gh = bottom - top;
+      for (var i = 1; i <= 2; i++) {
+        final gx = left + gw * i / 3;
+        canvas.drawLine(Offset(gx, top), Offset(gx, bottom), gridPaint);
+        final gy = top + gh * i / 3;
+        canvas.drawLine(Offset(left, gy), Offset(right, gy), gridPaint);
+      }
+    }
   }
 
   @override
   bool shouldRepaint(covariant _ScanFramePainter old) =>
       old.frameType != frameType ||
       old.frameColor != frameColor ||
-      old.scanLineProgress != scanLineProgress;
+      old.scanLineProgress != scanLineProgress ||
+      old.showAlignmentGrid != showAlignmentGrid;
 }

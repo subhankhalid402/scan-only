@@ -2,25 +2,13 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import '../app_theme_controller.dart';
+import '../services/database_service.dart';
 import '../theme.dart';
 
-// ══════════════════════════════════════════════════════════════
-//  SettingsScreen  –  CamScanner-style settings
-//
-//  Working features:
-//  ✅ All prefs load before UI renders (no flicker)
-//  ✅ Section: Scan Settings  (format, quality, auto-enhance, grid view)
-//  ✅ Section: Storage        (storage used, clear cache, clear all docs)
-//  ✅ Section: Appearance     (dark mode toggle, language selector)
-//  ✅ Section: Privacy        (offline mode, analytics toggle)
-//  ✅ Section: About          (version info, full about screen)
-//  ✅ Clear cache  → deletes temp dir, shows freed MB
-//  ✅ Clear documents → confirmation dialog, deletes app docs
-//  ✅ Language bottom sheet  (Urdu, English, Arabic, etc.)
-//  ✅ Changes auto-saved to SharedPreferences
-// ══════════════════════════════════════════════════════════════
+// Scanner-focused settings; toggles are wired to prefs / theme / DB where applicable.
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -32,8 +20,6 @@ class SettingsScreen extends StatefulWidget {
 class _SettingsScreenState extends State<SettingsScreen> {
   // ── Prefs state ───────────────────────────────────────────────
   bool _autoEnhance = true;
-  bool _offlineMode = true;
-  bool _analyticsEnabled = false;
   bool _darkMode = false;
   bool _gridView = false;
   String _defaultFormat = 'PDF';
@@ -47,7 +33,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   bool _prefsLoaded = false;
 
-  static const _formats  = ['PDF', 'JPG', 'PNG', 'DOCX'];
+  static const _formats = ['PDF', 'JPG'];
+
+  static String _normalizeFormat(String? v) {
+    if (v == 'JPG' || v == 'PDF') return v!;
+    return 'PDF';
+  }
   static const _qualities = ['Low', 'Medium', 'High', 'Ultra'];
   static const _languages = [
     ('English',  '🇬🇧'),
@@ -73,11 +64,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (!mounted) return;
     setState(() {
       _autoEnhance       = prefs.getBool('autoEnhance')       ?? true;
-      _offlineMode       = prefs.getBool('offlineMode')       ?? true;
-      _analyticsEnabled  = prefs.getBool('analyticsEnabled')  ?? false;
       _darkMode          = prefs.getBool('darkMode')          ?? false;
       _gridView          = prefs.getBool('gridView')          ?? false;
-      _defaultFormat     = prefs.getString('defaultFormat')   ?? 'PDF';
+      _defaultFormat     = _normalizeFormat(prefs.getString('defaultFormat') ?? 'PDF');
       _defaultQuality    = prefs.getString('defaultQuality')  ?? 'High';
       _language          = prefs.getString('language')        ?? 'English';
       _prefsLoaded       = true;
@@ -139,17 +128,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _clearAllDocuments() async {
     final confirmed = await _confirm(
       title: 'Sare Documents Delete Karein?',
-      body: 'Yeh action undo nahi ho sakta. Sare saved documents permanently delete ho jaayenge.',
+      body: 'Yeh action undo nahi ho sakta. Library se sare scans aur database entries delete ho jaayengi.',
       confirmLabel: 'Delete Karein',
       danger: true,
     );
     if (!confirmed) return;
 
     try {
-      final docs = await getApplicationDocumentsDirectory();
-      await for (final f in docs.list()) {
-        try { await f.delete(recursive: true); } catch (_) {}
-      }
+      await DatabaseService.instance.deleteAllDocumentsWithFiles();
       await _calculateStorage();
       _showSuccess('Sare documents delete ho gaye.');
     } catch (e) {
@@ -188,7 +174,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
               setState(() => _language = l.$1);
               _save((p) => p.setString('language', _language));
               Navigator.pop(context);
-              _showSuccess('Zaban: ${l.$1}');
+              _showSuccess(
+                'Zaban save ho gayi. Poori app ke liye app ek dafa band karke kholein.',
+              );
             },
           )),
           const SizedBox(height: 12),
@@ -360,7 +348,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onChanged: (v) {
                     setState(() => _darkMode = v);
                     _save((p) => p.setBool('darkMode', v));
-                    // TODO: apply ThemeMode via your state management
+                    AppThemeController.setDarkMode(v);
                   },
                 ),
                 _navTile(
@@ -373,34 +361,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
                 const SizedBox(height: 20),
 
-                // ── 4. Privacy ────────────────────────────────
-                _sectionLabel('Privacy', Iconsax.shield_tick, AppColors.green),
-                _toggleTile(
-                  icon: Iconsax.wifi_square,
-                  color: AppColors.navyMid,
-                  title: 'Offline Mode',
-                  subtitle: 'Internet ke baghair kaam karein',
-                  value: _offlineMode,
-                  onChanged: (v) {
-                    setState(() => _offlineMode = v);
-                    _save((p) => p.setBool('offlineMode', v));
-                  },
-                ),
-                _toggleTile(
-                  icon: Iconsax.chart_2,
-                  color: AppColors.green,
-                  title: 'Analytics',
-                  subtitle: 'Anonymous usage data share karein',
-                  value: _analyticsEnabled,
-                  onChanged: (v) {
-                    setState(() => _analyticsEnabled = v);
-                    _save((p) => p.setBool('analyticsEnabled', v));
-                  },
-                ),
-
-                const SizedBox(height: 20),
-
-                // ── 5. About ──────────────────────────────────
+                // ── 4. About ──────────────────────────────────
                 _sectionLabel('About', Iconsax.info_circle, AppColors.navyMid),
                 _navTile(
                   icon: Iconsax.mobile,

@@ -1,5 +1,8 @@
-import 'package:sqflite/sqflite.dart';
+import 'dart:io';
+
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
+
 import '../models/document_model.dart';
 
 class DatabaseService {
@@ -167,6 +170,24 @@ class DatabaseService {
   Future<int> deleteDocument(int id) async {
     final db = await instance.database;
     return await db.delete('documents', where: 'id = ?', whereArgs: [id]);
+  }
+
+  /// Deletes every row and removes referenced files from disk.
+  Future<void> deleteAllDocumentsWithFiles() async {
+    final db = await instance.database;
+    final rows = await db.query('documents');
+    for (final row in rows) {
+      final fp = row['filePath'] as String?;
+      final tp = row['thumbnailPath'] as String?;
+      for (final path in [fp, tp]) {
+        if (path == null || path.isEmpty) continue;
+        try {
+          final f = File(path);
+          if (f.existsSync()) await f.delete();
+        } catch (_) {}
+      }
+    }
+    await db.delete('documents');
   }
 
   Future<int> getDocumentCount() async {

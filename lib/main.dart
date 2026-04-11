@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'app_theme_controller.dart';
 import 'theme.dart';
 import 'screens/splash_screen.dart';
 
@@ -16,6 +17,8 @@ void main() async {
     statusBarIconBrightness: Brightness.light,
   ));
 
+  await AppThemeController.init();
+
   runApp(const ScanOnlyApp());
 }
 
@@ -24,11 +27,18 @@ class ScanOnlyApp extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'ScanOnly',
-      debugShowCheckedModeBanner: false,
-      theme: AppTheme.theme,
-      home: const SplashScreen(),
+    return ValueListenableBuilder<ThemeMode>(
+      valueListenable: AppThemeController.themeMode,
+      builder: (_, mode, __) {
+        return MaterialApp(
+          title: 'ScanOnly',
+          debugShowCheckedModeBanner: false,
+          theme: AppTheme.theme,
+          darkTheme: AppTheme.darkTheme,
+          themeMode: mode,
+          home: const SplashScreen(),
+        );
+      },
     );
   }
 }

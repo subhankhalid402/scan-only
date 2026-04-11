@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -7,6 +8,22 @@ import 'package:path/path.dart' as path;
 class ImageEnhancementService {
   static final ImageEnhancementService instance = ImageEnhancementService._init();
   ImageEnhancementService._init();
+
+  /// After camera capture: light document-style polish (CamScanner-like), image v4–safe.
+  Future<String> polishCaptureForScanMode(String imagePath, String modeId) async {
+    const skip = {'qr', 'photo', 'gallery'};
+    if (skip.contains(modeId)) return imagePath;
+    try {
+      var image = await _load(imagePath);
+      if (image == null) return imagePath;
+      image = img.adjustColor(image, brightness: 1.04, saturation: 0.93);
+      image = img.contrast(image, contrast: 112);
+      return await _save(image, imagePath, suffix: '_polish');
+    } catch (e) {
+      debugPrint('polishCaptureForScanMode: $e');
+      return imagePath;
+    }
+  }
 
   Future<String> autoEnhance(String imagePath) async {
     try {

@@ -11,7 +11,6 @@ import 'documents_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'document_viewer_screen.dart';
-import 'camscanner_features_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -159,68 +158,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // Scan type grid — 2 rows of 4
+            // Scanner shortcuts (essentials only)
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              child: Row(
                 children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _scanTile(Iconsax.document_text, 'Document',  'document',   AppColors.gold),
-                      _scanTile(Iconsax.card,          'ID Card',   'id_card',    const Color(0xFF3B82F6)),
-                      _scanTile(Iconsax.receipt,       'Receipt',   'receipt',    const Color(0xFF22C55E)),
-                      _scanTile(Iconsax.scan_barcode,  'QR Code',   'qr',         const Color(0xFF6366F1)),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _scanTile(Iconsax.book,          'Book',       'book',       const Color(0xFFF97316)),
-                      _scanTile(Iconsax.camera,        'Photo',      'photo',      const Color(0xFFA855F7)),
-                      _scanTile(Iconsax.gallery,       'Gallery',    'gallery',    const Color(0xFFEF4444)),
-                      _scanTile(Iconsax.text_block,    'Whiteboard', 'whiteboard', const Color(0xFF06B6D4)),
-                    ],
-                  ),
+                  Expanded(child: _scanTile(Iconsax.document_text, 'Document', 'document', AppColors.gold)),
+                  Expanded(child: _scanTile(Iconsax.card, 'ID', 'id_card', const Color(0xFF3B82F6))),
+                  Expanded(child: _scanTile(Iconsax.receipt, 'Receipt', 'receipt', const Color(0xFF22C55E))),
+                  Expanded(child: _scanTile(Iconsax.scan_barcode, 'QR', 'qr', const Color(0xFF6366F1))),
+                  Expanded(child: _scanTile(Iconsax.gallery, 'Import', 'gallery', const Color(0xFFEF4444))),
                 ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // All Features button
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: GestureDetector(
-                onTap: () => Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const CamScannerFeaturesScreen()),
-                ),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 13),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.10),
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(color: Colors.white12),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Text(
-                        'All Features',
-                        style: GoogleFonts.nunito(
-                          fontSize: 14,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
-                      const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 20),
-                    ],
-                  ),
-                ),
               ),
             ),
 
