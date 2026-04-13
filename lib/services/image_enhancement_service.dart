@@ -1,5 +1,4 @@
 import 'dart:io';
-import 'dart:typed_data';
 import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
@@ -9,18 +8,265 @@ class ImageEnhancementService {
   static final ImageEnhancementService instance = ImageEnhancementService._init();
   ImageEnhancementService._init();
 
-  /// After camera capture: light document-style polish (CamScanner-like), image v4–safe.
-  Future<String> polishCaptureForScanMode(String imagePath, String modeId) async {
+  /// After camera capture: light document-style polish, image v4–safe.
+  Future<String> polishCaptureForScanMode(
+    String imagePath,
+    String modeId, {
+    String filter = 'auto',
+  }) async {
     const skip = {'qr', 'photo', 'gallery'};
     if (skip.contains(modeId)) return imagePath;
     try {
       var image = await _load(imagePath);
       if (image == null) return imagePath;
-      image = img.adjustColor(image, brightness: 1.04, saturation: 0.93);
-      image = img.contrast(image, contrast: 112);
-      return await _save(image, imagePath, suffix: '_polish');
+      final resolved = filter.toLowerCase();
+
+      switch (resolved) {
+        case 'bw':
+          image = _applyBw(image);
+          break;
+        case 'color':
+          image = _applyColorBoost(image);
+          break;
+        case 'grayscale':
+          image = img.grayscale(image);
+          break;
+        case 'whitening':
+          image = _applyWhitening(image);
+          break;
+        case 'contrast':
+          image = img.contrast(image, contrast: 150);
+          break;
+        case 'thermal':
+          image = _applyThermalReceipt(image);
+          break;
+        case 'brighten':
+          image = img.adjustColor(image, brightness: 1.16);
+          break;
+        case 'flatten':
+          image = _applyFlattenNormalize(image);
+          break;
+        case 'warm':
+          image = _applyWarm(image);
+          break;
+        case 'cool':
+          image = _applyCool(image);
+          break;
+        case 'vivid':
+          image = _applyVivid(image);
+          break;
+        case 'id_clear':
+          image = _applyIdClear(image);
+          break;
+        case 'mrz':
+          image = _applyMrzBoost(image);
+          break;
+        case 'enhanced':
+          image = _applyEnhanced(image);
+          break;
+        case 'deblur':
+          image = _applyDeblur(image);
+          break;
+        case 'grid':
+          image = _applyGridEnhance(image);
+          break;
+        case 'none':
+          return imagePath;
+        case 'auto':
+        default:
+          image = _applyAutoByMode(image, modeId);
+          break;
+      }
+      return await _save(image, imagePath, suffix: '_${resolved}_polish');
     } catch (e) {
       debugPrint('polishCaptureForScanMode: $e');
+      return imagePath;
+    }
+  }
+
+  img.Image _applyAutoByMode(img.Image image, String modeId) {
+    switch (modeId) {
+      case 'document':
+      case 'whiteboard':
+        return _applyWhitening(image);
+      case 'receipt':
+        return _applyThermalReceipt(image);
+      case 'id_card':
+        return _applyIdClear(image);
+      case 'passport':
+        return _applyMrzBoost(image);
+      case 'table':
+        return _applyGridEnhance(image);
+      case 'book':
+        return _applyFlattenNormalize(image);
+      default:
+        return _applyEnhanced(image);
+    }
+  }
+
+  img.Image _applyBw(img.Image image) {
+    final gray = img.grayscale(image);
+    return img.contrast(gray, contrast: 145);
+  }
+
+  img.Image _applyColorBoost(img.Image image) {
+    var out = img.adjustColor(image, saturation: 1.20, brightness: 1.03);
+    out = img.contrast(out, contrast: 120);
+    return out;
+  }
+
+  img.Image _applyWhitening(img.Image image) {
+    var out = img.adjustColor(image, brightness: 1.15, saturation: 0.88);
+    out = img.contrast(out, contrast: 138);
+    out = img.contrast(out, contrast: 145);
+    return out;
+  }
+
+  img.Image _applyThermalReceipt(img.Image image) {
+    var out = img.grayscale(image);
+    out = img.contrast(out, contrast: 165);
+    out = img.adjustColor(out, brightness: 1.08);
+    return out;
+  }
+
+  img.Image _applyFlattenNormalize(img.Image image) {
+    // Perspective warp requires corner points; normalize exposure/contrast here.
+    var out = img.adjustColor(image, brightness: 1.10, saturation: 0.95);
+    out = img.contrast(out, contrast: 132);
+    out = img.contrast(out, contrast: 140);
+    return out;
+  }
+
+  img.Image _applyWarm(img.Image image) {
+    final w = image.width;
+    final h = image.height;
+    final out = img.Image(width: w, height: h);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        final p = image.getPixel(x, y);
+        out.setPixelRgb(
+          x,
+          y,
+          (p.r * 1.12).round().clamp(0, 255),
+          (p.g * 1.04).round().clamp(0, 255),
+          (p.b * 0.88).round().clamp(0, 255),
+        );
+      }
+    }
+    return out;
+  }
+
+  img.Image _applyCool(img.Image image) {
+    final w = image.width;
+    final h = image.height;
+    final out = img.Image(width: w, height: h);
+    for (var y = 0; y < h; y++) {
+      for (var x = 0; x < w; x++) {
+        final p = image.getPixel(x, y);
+        out.setPixelRgb(
+          x,
+          y,
+          (p.r * 0.90).round().clamp(0, 255),
+          (p.g * 0.96).round().clamp(0, 255),
+          (p.b * 1.14).round().clamp(0, 255),
+        );
+      }
+    }
+    return out;
+  }
+
+  img.Image _applyVivid(img.Image image) {
+    var out = img.adjustColor(image, saturation: 1.32, brightness: 1.04);
+    out = img.contrast(out, contrast: 130);
+    return out;
+  }
+
+  img.Image _applyIdClear(img.Image image) {
+    var out = img.gaussianBlur(image, radius: 1);
+    out = _unsharpMask(out, amount: 0.85);
+    out = img.contrast(out, contrast: 145);
+    return out;
+  }
+
+  img.Image _applyMrzBoost(img.Image image) {
+    var out = img.grayscale(image);
+    out = img.contrast(out, contrast: 176);
+    out = _unsharpMask(out, amount: 1.0);
+    return out;
+  }
+
+  img.Image _applyEnhanced(img.Image image) {
+    var out = _unsharpMask(image, amount: 0.7);
+    out = img.contrast(out, contrast: 142);
+    return out;
+  }
+
+  img.Image _applyDeblur(img.Image image) {
+    return _unsharpMask(image, amount: 1.2);
+  }
+
+  img.Image _applyGridEnhance(img.Image image) {
+    var out = img.grayscale(image);
+    out = _unsharpMask(out, amount: 0.8);
+    out = img.contrast(out, contrast: 175);
+    return out;
+  }
+
+  img.Image _unsharpMask(img.Image image, {double amount = 0.8}) {
+    final blurred = img.gaussianBlur(image, radius: 1);
+    final out = img.Image(width: image.width, height: image.height);
+    for (var y = 0; y < image.height; y++) {
+      for (var x = 0; x < image.width; x++) {
+        final s = image.getPixel(x, y);
+        final b = blurred.getPixel(x, y);
+        final r = (s.r + (s.r - b.r) * amount).round().clamp(0, 255);
+        final g = (s.g + (s.g - b.g) * amount).round().clamp(0, 255);
+        final bl = (s.b + (s.b - b.b) * amount).round().clamp(0, 255);
+        out.setPixelRgba(x, y, r, g, bl, s.a);
+      }
+    }
+    return out;
+  }
+
+  /// CamScanner-style “clear document”: whiter paper, sharper text, mild desaturation.
+  Future<String> polishDocumentCamScannerStyle(String imagePath) async {
+    try {
+      var image = await _load(imagePath);
+      if (image == null) return imagePath;
+      image = img.adjustColor(image, brightness: 1.08, saturation: 0.82);
+      image = img.contrast(image, contrast: 124);
+      return await _save(image, imagePath, suffix: '_docscan');
+    } catch (e) {
+      debugPrint('polishDocumentCamScannerStyle: $e');
+      return imagePath;
+    }
+  }
+
+  /// “Magic color” — punchy color retention + contrast (document pages).
+  Future<String> magicColorDocument(String imagePath) async {
+    try {
+      var image = await _load(imagePath);
+      if (image == null) return imagePath;
+      image = img.adjustColor(image, brightness: 1.05, saturation: 1.12);
+      image = img.contrast(image, contrast: 128);
+      return await _save(image, imagePath, suffix: '_magic');
+    } catch (e) {
+      debugPrint('magicColorDocument: $e');
+      return imagePath;
+    }
+  }
+
+  /// High-contrast black & white scan.
+  Future<String> documentBlackAndWhite(String imagePath) async {
+    try {
+      var image = await _load(imagePath);
+      if (image == null) return imagePath;
+      image = img.grayscale(image);
+      image = img.adjustColor(image, brightness: 1.04);
+      image = img.contrast(image, contrast: 135);
+      return await _save(image, imagePath, suffix: '_docbw');
+    } catch (e) {
+      debugPrint('documentBlackAndWhite: $e');
       return imagePath;
     }
   }

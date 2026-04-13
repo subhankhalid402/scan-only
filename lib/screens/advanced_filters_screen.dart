@@ -243,7 +243,6 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
   bool    _isProcessing   = false;
   String? _previewPath;
   String? _errorMsg;
-  bool    _showOriginal   = false; // for compare press-and-hold
 
   DateTime _lastSliderChange = DateTime.now();
 
@@ -427,7 +426,7 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
   // ── Image preview ──────────────────────────────────────────────────────────
 
   Widget _buildImagePreview() {
-    final displayPath = _showOriginal ? widget.imagePath : (_previewPath ?? widget.imagePath);
+    final displayPath = _previewPath ?? widget.imagePath;
     return Stack(
       alignment: Alignment.center,
       children: [
@@ -463,36 +462,6 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
               ),
             ),
           ),
-
-        // Compare button (bottom center of preview)
-        Positioned(
-          bottom: 12,
-          child: GestureDetector(
-            onLongPressStart: (_) => setState(() => _showOriginal = true),
-            onLongPressEnd:   (_) => setState(() => _showOriginal = false),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
-              decoration: BoxDecoration(
-                color: Colors.black54,
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(color: Colors.white24),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.compare_rounded, color: Colors.white60, size: 15),
-                  const SizedBox(width: 6),
-                  Text(
-                    _showOriginal ? 'Original' : 'Hold to compare',
-                    style: GoogleFonts.nunito(
-                      color: Colors.white60, fontSize: 12, fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
 
         // Error
         if (_errorMsg != null)
@@ -566,7 +535,7 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
           const SizedBox(height: 12),
 
           SizedBox(
-            height: _tabCtrl.index == 0 ? 90 : 148,
+            height: _tabCtrl.index == 0 ? 120 : 148,
             child: AnimatedBuilder(
               animation: _tabCtrl,
               builder: (_, __) => _tabCtrl.index == 0
@@ -617,41 +586,92 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
       scrollDirection: Axis.horizontal,
       padding: const EdgeInsets.symmetric(horizontal: 16),
       itemCount: _kPresets.length,
-      separatorBuilder: (_, __) => const SizedBox(width: 8),
+      separatorBuilder: (_, __) => const SizedBox(width: 10),
       itemBuilder: (_, i) {
         final p = _kPresets[i];
         final sel = _selectedPreset == i;
+
+        // For each preset, show the processed thumbnail if available,
+        // otherwise show original image with a color overlay
         return GestureDetector(
           onTap: () => _applyPreset(p, i),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 200),
-            width: 72,
+            width: 80,
             decoration: BoxDecoration(
-              color: sel
-                  ? p.color.withOpacity(0.18)
-                  : Colors.white.withOpacity(0.06),
-              borderRadius: BorderRadius.circular(16),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
-                color: sel ? p.color : Colors.white.withOpacity(0.12),
-                width: sel ? 1.8 : 1,
+                color: sel ? AppColors.gold : Colors.white.withOpacity(0.15),
+                width: sel ? 2.5 : 1.0,
               ),
             ),
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Icon(p.icon,
-                    color: sel ? p.color : Colors.white38, size: 22),
-                const SizedBox(height: 5),
-                Text(
-                  p.name,
-                  style: GoogleFonts.nunito(
-                    fontSize: 10,
-                    fontWeight: sel ? FontWeight.w800 : FontWeight.w500,
-                    color: sel ? p.color : Colors.white38,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(13),
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // Image — show filtered preview for selected, original for others
+                  Image.file(
+                    File(
+                      sel && _previewPath != null ? _previewPath! : widget.imagePath,
+                    ),
+                    fit: BoxFit.cover,
+                    // Apply a simple color filter hint for non-selected presets
+                    color: i == 0 ? null : p.color.withOpacity(0.18),
+                    colorBlendMode: i == 0 ? null : BlendMode.overlay,
                   ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+
+                  // Dark gradient at bottom for label
+                  Positioned(
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          vertical: 6, horizontal: 4),
+                      decoration: BoxDecoration(
+                        gradient: LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: [
+                            Colors.transparent,
+                            Colors.black.withOpacity(0.75),
+                          ],
+                        ),
+                      ),
+                      child: Text(
+                        p.name,
+                        textAlign: TextAlign.center,
+                        style: GoogleFonts.nunito(
+                          fontSize: 10,
+                          fontWeight: sel ? FontWeight.w800 : FontWeight.w600,
+                          color: sel ? AppColors.gold : Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Gold checkmark on selected
+                  if (sel)
+                    Positioned(
+                      top: 5,
+                      right: 5,
+                      child: Container(
+                        width: 18,
+                        height: 18,
+                        decoration: const BoxDecoration(
+                          color: AppColors.gold,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.check_rounded,
+                          color: AppColors.navyDark,
+                          size: 12,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
           ),
         );

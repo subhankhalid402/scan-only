@@ -18,6 +18,7 @@ import 'import_documents_screen.dart';
 import 'search_screen.dart';
 import 'documents_screen.dart';
 import 'edit_scan_screen.dart';
+import 'settings_screen.dart';
 
 class ComprehensiveFeaturesScreen extends StatefulWidget {
   const ComprehensiveFeaturesScreen({super.key});
@@ -64,7 +65,7 @@ class _ComprehensiveFeaturesScreenState extends State<ComprehensiveFeaturesScree
     _Feature(icon: Iconsax.text,            title: 'Extract Text',    subtitle: 'OCR — copy text',           color: AppColors.purple,  cat: 'ai',        action: _extractText),
     _Feature(icon: Iconsax.translate,       title: 'Translate',       subtitle: 'Translate document text',   color: AppColors.orange,  cat: 'ai',        action: _extractText),
     _Feature(icon: Iconsax.scan_barcode,    title: 'Barcode Reader',  subtitle: 'Advanced barcode scan',     color: AppColors.green,   cat: 'ai',        action: _scanQr),
-    _Feature(icon: Iconsax.face_happy,      title: 'Face Detection',  subtitle: 'Detect faces',              color: AppColors.purple,  cat: 'ai',        action: _extractText),
+    _Feature(icon: Iconsax.people,          title: 'Face Detection',  subtitle: 'Detect faces',              color: AppColors.purple,  cat: 'ai',        action: _extractText),
     _Feature(icon: Iconsax.eye,             title: 'Object Detect',   subtitle: 'Identify objects',          color: AppColors.blue,    cat: 'ai',        action: _extractText),
 
     // DOCUMENTS
@@ -75,7 +76,7 @@ class _ComprehensiveFeaturesScreenState extends State<ComprehensiveFeaturesScree
     _Feature(icon: Iconsax.convert_3d_cube, title: 'Convert PDF',     subtitle: 'PDF to Word, Excel...',     color: AppColors.red,     cat: 'documents', action: _convertPdf),
     _Feature(icon: Iconsax.document_download, title: 'Export',        subtitle: 'Save as PDF or image',      color: AppColors.gold,    cat: 'documents', action: _exportDoc),
     _Feature(icon: Iconsax.edit_2,          title: 'Batch Rename',    subtitle: 'Rename multiple docs',      color: AppColors.blue,    cat: 'documents', action: _myDocuments),
-    _Feature(icon: Iconsax.compare,         title: 'Compare Docs',    subtitle: 'Compare two documents',     color: AppColors.navyMid, cat: 'documents', action: _myDocuments),
+    _Feature(icon: Iconsax.arrow_swap_horizontal, title: 'Compare Docs', subtitle: 'Compare two documents', color: AppColors.navyMid, cat: 'documents', action: _myDocuments),
     _Feature(icon: Iconsax.document_copy,   title: 'PDF Editing',     subtitle: 'Advanced PDF tools',        color: AppColors.purple,  cat: 'documents', action: _exportDoc),
     _Feature(icon: Iconsax.document_download, title: 'Excel Export',    subtitle: 'Export to Excel format',    color: AppColors.green,   cat: 'documents', action: _exportDoc),
 
@@ -267,25 +268,11 @@ class _ComprehensiveFeaturesScreenState extends State<ComprehensiveFeaturesScree
   }
 
   void _biometric() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Biometric lock: Settings mein ja ke enable karein',
-            style: GoogleFonts.nunito()),
-        backgroundColor: AppColors.navyMid,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    _go(const SettingsScreen());
   }
 
   void _notifications() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Notifications Settings mein configure karein',
-            style: GoogleFonts.nunito()),
-        backgroundColor: AppColors.navyMid,
-        behavior: SnackBarBehavior.floating,
-      ),
-    );
+    _go(const SettingsScreen());
   }
 
   // ── Pickers ────────────────────────────────────────────────────────────────

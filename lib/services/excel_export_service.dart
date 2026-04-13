@@ -18,18 +18,30 @@ class ExcelExportService {
       final excel = Excel.createExcel();
       final sheet = excel['Sheet1'];
 
+      TextCellValue cell(dynamic v) => TextCellValue(v?.toString() ?? '');
+
       // Add headers
-      sheet.appendRow(['Document Name', 'Type', 'Size (MB)', 'Pages', 'Created Date', 'Modified Date']);
+      sheet.appendRow([
+        TextCellValue('Document Name'),
+        TextCellValue('Type'),
+        TextCellValue('Size (MB)'),
+        TextCellValue('Pages'),
+        TextCellValue('Created Date'),
+        TextCellValue('Modified Date'),
+      ]);
 
       // Add data
-      for (var doc in documents) {
+      for (final doc in documents) {
+        final size = doc['fileSizeMB'];
         sheet.appendRow([
-          doc['name'] ?? 'Unknown',
-          doc['fileType'] ?? 'N/A',
-          doc['fileSizeMB']?.toStringAsFixed(2) ?? '0',
-          doc['pageCount']?.toString() ?? '0',
-          doc['createdAt']?.toString() ?? 'N/A',
-          doc['modifiedAt']?.toString() ?? 'N/A',
+          cell(doc['name'] ?? 'Unknown'),
+          cell(doc['fileType'] ?? 'N/A'),
+          TextCellValue(
+            size is num ? size.toStringAsFixed(2) : (size?.toString() ?? '0'),
+          ),
+          cell(doc['pageCount'] ?? '0'),
+          cell(doc['createdAt'] ?? 'N/A'),
+          cell(doc['modifiedAt'] ?? 'N/A'),
         ]);
       }
 

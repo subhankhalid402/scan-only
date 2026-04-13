@@ -1,5 +1,6 @@
 import 'package:local_auth/local_auth.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+
+import 'app_local_storage.dart';
 
 class BiometricService {
   static final BiometricService _instance = BiometricService._internal();
@@ -37,17 +38,14 @@ class BiometricService {
   }
 
   Future<void> enableBiometricLock() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('biometric_lock_enabled', true);
+    await AppLocalStorage.setBool('biometric_lock_enabled', true);
   }
 
   Future<void> disableBiometricLock() async {
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setBool('biometric_lock_enabled', false);
+    await AppLocalStorage.setBool('biometric_lock_enabled', false);
   }
 
   Future<bool> isBiometricLockEnabled() async {
-    final prefs = await SharedPreferences.getInstance();
-    return prefs.getBool('biometric_lock_enabled') ?? false;
+    return AppLocalStorage.getBool('biometric_lock_enabled');
   }
 }

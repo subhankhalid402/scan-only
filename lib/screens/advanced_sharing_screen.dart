@@ -1,7 +1,10 @@
 import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme.dart';
 import '../services/email_service.dart';
@@ -24,11 +27,33 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
   final _messageController = TextEditingController();
   bool _isSharing = false;
 
-  void _shareViaApp() async {
-    await Share.shareXFiles(
-      [XFile(widget.filePath)],
-      text: 'Check out this document: ${widget.fileName}',
-    );
+  Future<void> _shareViaApp() async {
+    try {
+      final f = File(widget.filePath);
+      if (!await f.exists()) {
+        if (!mounted) return;
+        _showError('File not found. It may have been moved or deleted.');
+        return;
+      }
+      await Share.shareXFiles(
+        [XFile(widget.filePath, name: widget.fileName)],
+        text: 'Check out this document: ${widget.fileName}',
+      );
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Could not share: $e');
+    }
+  }
+
+  String _formatFileSizeLine() {
+    try {
+      final f = File(widget.filePath);
+      if (!f.existsSync()) return 'Size: —';
+      final mb = f.lengthSync() / (1024 * 1024);
+      return 'Size: ${mb.toStringAsFixed(2)} MB';
+    } catch (_) {
+      return 'Size: —';
+    }
   }
 
   void _shareViaEmail() async {
@@ -58,12 +83,121 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
     }
   }
 
-  void _shareViaLink() {
-    _showInfo('Link sharing feature coming soon');
+  Future<void> _shareViaLink() async {
+    try {
+      final f = File(widget.filePath);
+      if (!await f.exists()) {
+        if (!mounted) return;
+        _showError('File not found. It may have been moved or deleted.');
+        return;
+      }
+      final uri = Uri.file(widget.filePath).toString();
+      await Clipboard.setData(ClipboardData(text: uri));
+      await Share.share(
+        'Document link:\n$uri',
+        subject: widget.fileName,
+      );
+      if (!mounted) return;
+      _showSuccess('Link copied and shared.');
+    } catch (e) {
+      if (!mounted) return;
+      _showError('Could not share link: $e');
+    }
   }
 
-  void _shareViaQR() {
-    _showInfo('QR code sharing feature coming soon');
+  Future<void> _shareViaQR() async {
+    final payload = Uri.file(widget.filePath).toString();
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                'QR Share Data',
+                style: GoogleFonts.nunito(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 12),
+              Center(
+                child: Container(
+                  padding: const EdgeInsets.all(10),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: AppColors.gold.withOpacity(0.5)),
+                  ),
+                  child: QrImageView(
+                    data: payload,
+                    version: QrVersions.auto,
+                    size: 180,
+                    backgroundColor: Colors.white,
+                    eyeStyle: const QrEyeStyle(
+                      eyeShape: QrEyeShape.square,
+                      color: AppColors.navyDark,
+                    ),
+                    dataModuleStyle: const QrDataModuleStyle(
+                      dataModuleShape: QrDataModuleShape.square,
+                      color: AppColors.navyDark,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              SelectableText(
+                payload,
+                style: GoogleFonts.nunito(fontSize: 12),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Expanded(
+                    child: ElevatedButton.icon(
+                      onPressed: () async {
+                        await Clipboard.setData(ClipboardData(text: payload));
+                        if (ctx.mounted) Navigator.pop(ctx);
+                        _showSuccess('QR data copied.');
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.gold,
+                      ),
+                      icon: const Icon(Icons.copy, color: AppColors.navyDark),
+                      label: Text(
+                        'Copy',
+                        style: GoogleFonts.nunito(
+                          color: AppColors.navyDark,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        await Share.share('QR data:\n$payload');
+                        if (ctx.mounted) Navigator.pop(ctx);
+                      },
+                      icon: const Icon(Iconsax.share),
+                      label: const Text('Share'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   void _showError(String msg) {
@@ -105,8 +239,10 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
                 Expanded(
                   child: _shareOption(
                     Iconsax.share,
-                    'Share App',
-                    _shareViaApp,
+                    'Share file',
+                    () {
+                      _shareViaApp();
+                    },
                     AppColors.blue,
                   ),
                 ),
@@ -191,7 +327,7 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
                   Text('File Info', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
                   const SizedBox(height: 8),
                   Text('Name: ${widget.fileName}', style: GoogleFonts.nunito(fontSize: 12)),
-                  Text('Size: ${File(widget.filePath).lengthSync() / 1024 / 1024} MB', style: GoogleFonts.nunito(fontSize: 12)),
+                  Text(_formatFileSizeLine(), style: GoogleFonts.nunito(fontSize: 12)),
                 ],
               ),
             ),

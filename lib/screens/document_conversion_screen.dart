@@ -2,8 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:file_picker/file_picker.dart';
+import 'package:path/path.dart' as p;
 import '../theme.dart';
+import '../models/document_model.dart';
+import '../services/database_service.dart';
 import '../services/document_conversion_service.dart';
+import '../services/pdf_service.dart';
+import 'document_viewer_screen.dart';
 
 class DocumentConversionScreen extends StatefulWidget {
   final String? filePath;
@@ -18,18 +23,44 @@ class _DocumentConversionScreenState extends State<DocumentConversionScreen> {
   bool _isConverting = false;
   String? _selectedFile;
   String _conversionType = 'word_to_pdf';
+  final TextEditingController _textController = TextEditingController();
 
   final _conversionService = DocumentConversionService.instance;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedFile = widget.filePath;
+    if (_selectedFile != null) {
+      _conversionType = _guessTypeFromPath(_selectedFile!);
+    }
+  }
+
+  @override
+  void dispose() {
+    _textController.dispose();
+    super.dispose();
+  }
+
+  String _guessTypeFromPath(String path) {
+    final ext = p.extension(path).toLowerCase();
+    if (ext == '.doc' || ext == '.docx') return 'word_to_pdf';
+    if (ext == '.ppt' || ext == '.pptx') return 'ppt_to_pdf';
+    if (ext == '.txt') return 'text_to_pdf';
+    return 'image_to_pdf';
+  }
 
   Future<void> _pickFile() async {
     try {
       final result = await FilePicker.platform.pickFiles(
         type: FileType.custom,
         allowedExtensions: _conversionType == 'word_to_pdf'
-            ? ['docx']
+            ? ['doc', 'docx']
             : _conversionType == 'ppt_to_pdf'
-                ? ['pptx']
-                : ['jpg', 'jpeg', 'png'],
+                ? ['ppt', 'pptx']
+                : _conversionType == 'text_to_pdf'
+                    ? ['txt']
+                    : ['jpg', 'jpeg', 'png', 'webp'],
       );
 
       if (result != null && result.files.isNotEmpty) {
@@ -41,7 +72,12 @@ class _DocumentConversionScreenState extends State<DocumentConversionScreen> {
   }
 
   Future<void> _convertFile() async {
-    if (_selectedFile == null) {
+    if (_conversionType == 'text_to_pdf') {
+      if (_textController.text.trim().isEmpty) {
+        _showError('Please enter text first');
+        return;
+      }
+    } else if (_selectedFile == null) {
       _showError('Please select a file first');
       return;
     }
@@ -55,13 +91,36 @@ class _DocumentConversionScreenState extends State<DocumentConversionScreen> {
         outputPath = await _conversionService.convertWordToPdf(_selectedFile!);
       } else if (_conversionType == 'ppt_to_pdf') {
         outputPath = await _conversionService.convertPptToPdf(_selectedFile!);
+      } else if (_conversionType == 'text_to_pdf') {
+        outputPath = await _conversionService.convertTextToPdf(
+          _textController.text,
+          fileName: 'typed_text',
+        );
       } else {
         outputPath = await _conversionService.convertImageToPdf(_selectedFile!);
       }
 
       if (mounted) {
-        _showSuccess('Conversion successful!\nFile saved to: $outputPath');
+        final size = await PdfService.instance.getFileSizeMB(outputPath);
+        final newDoc = DocumentModel(
+          name: p.basename(outputPath),
+          filePath: outputPath,
+          fileType: 'pdf',
+          scanType: 'document',
+          pageCount: 1,
+          fileSizeMB: size,
+          createdAt: DateTime.now(),
+          tags: const [],
+        );
+        final id = await DatabaseService.instance.insertDocument(newDoc);
+        final saved = newDoc.copyWith(id: id);
+        _showSuccess('Conversion successful!');
         setState(() => _selectedFile = null);
+        if (!mounted) return;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => DocumentViewerScreen(document: saved)),
+        );
       }
     } catch (e) {
       _showError('Conversion failed: $e');
@@ -138,64 +197,95 @@ class _DocumentConversionScreenState extends State<DocumentConversionScreen> {
               'image_to_pdf',
               AppColors.purple,
             ),
+            const SizedBox(height: 10),
+
+            _conversionTypeCard(
+              'Text to PDF',
+              'Convert typed text to PDF',
+              Iconsax.text,
+              'text_to_pdf',
+              AppColors.navyMid,
+            ),
 
             const SizedBox(height: 30),
 
             // File Selection
-            Text(
-              'Select File',
-              style: GoogleFonts.nunito(
-                fontSize: 16,
-                fontWeight: FontWeight.w800,
-                color: AppColors.textDark,
+            if (_conversionType != 'text_to_pdf') ...[
+              Text(
+                'Select File',
+                style: GoogleFonts.nunito(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
               ),
-            ),
-            const SizedBox(height: 12),
-
-            GestureDetector(
-              onTap: _isConverting ? null : _pickFile,
-              child: Container(
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  border: Border.all(
-                    color: _selectedFile != null ? AppColors.green : Colors.grey[300]!,
-                    width: 2,
+              const SizedBox(height: 12),
+              GestureDetector(
+                onTap: _isConverting ? null : _pickFile,
+                child: Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    border: Border.all(
+                      color: _selectedFile != null ? AppColors.gold : Colors.grey[300]!,
+                      width: 2,
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    color: _selectedFile != null ? AppColors.gold.withOpacity(0.05) : Colors.grey[50],
                   ),
-                  borderRadius: BorderRadius.circular(16),
-                  color: _selectedFile != null ? AppColors.green.withOpacity(0.05) : Colors.grey[50],
-                ),
-                child: Column(
-                  children: [
-                    Icon(
-                      _selectedFile != null ? Iconsax.tick_circle : Iconsax.document_upload,
-                      size: 40,
-                      color: _selectedFile != null ? AppColors.green : Colors.grey,
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      _selectedFile != null ? 'File Selected' : 'Tap to Select File',
-                      style: GoogleFonts.nunito(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w700,
-                        color: _selectedFile != null ? AppColors.green : AppColors.textDark,
+                  child: Column(
+                    children: [
+                      Icon(
+                        _selectedFile != null ? Iconsax.tick_circle : Iconsax.document_upload,
+                        size: 40,
+                        color: _selectedFile != null ? AppColors.gold : Colors.grey,
                       ),
-                    ),
-                    if (_selectedFile != null) ...[
-                      const SizedBox(height: 8),
+                      const SizedBox(height: 12),
                       Text(
-                        _selectedFile!.split('/').last,
+                        _selectedFile != null ? 'File Selected' : 'Tap to Select File',
                         style: GoogleFonts.nunito(
-                          fontSize: 12,
-                          color: AppColors.textMuted,
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: _selectedFile != null ? AppColors.gold : AppColors.textDark,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
                       ),
+                      if (_selectedFile != null) ...[
+                        const SizedBox(height: 8),
+                        Text(
+                          p.basename(_selectedFile!),
+                          style: GoogleFonts.nunito(
+                            fontSize: 12,
+                            color: AppColors.textMuted,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
+            ] else ...[
+              Text(
+                'Type Text',
+                style: GoogleFonts.nunito(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w800,
+                  color: AppColors.textDark,
+                ),
+              ),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _textController,
+                minLines: 6,
+                maxLines: 10,
+                decoration: InputDecoration(
+                  hintText: 'Enter text to convert into PDF...',
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(14)),
+                  filled: true,
+                  fillColor: Colors.white,
+                ),
+              ),
+            ],
 
             const SizedBox(height: 30),
 
@@ -276,7 +366,10 @@ class _DocumentConversionScreenState extends State<DocumentConversionScreen> {
   ) {
     final isSelected = _conversionType == value;
     return GestureDetector(
-      onTap: () => setState(() => _conversionType = value),
+      onTap: () => setState(() {
+        _conversionType = value;
+        _selectedFile = null;
+      }),
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(

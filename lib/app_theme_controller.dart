@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 
-/// Live dark/light theme from Settings (SharedPreferences key `darkMode`).
+import 'services/app_local_storage.dart';
+
+/// Live dark/light theme from Settings (Hive + SharedPreferences key `darkMode`).
 class AppThemeController {
   AppThemeController._();
 
@@ -9,9 +10,9 @@ class AppThemeController {
       ValueNotifier<ThemeMode>(ThemeMode.light);
 
   static Future<void> init() async {
-    final p = await SharedPreferences.getInstance();
-    themeMode.value =
-        p.getBool('darkMode') == true ? ThemeMode.dark : ThemeMode.light;
+    themeMode.value = AppLocalStorage.getBool('darkMode')
+        ? ThemeMode.dark
+        : ThemeMode.light;
   }
 
   static void setDarkMode(bool dark) {

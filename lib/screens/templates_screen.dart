@@ -2,49 +2,56 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import '../theme.dart';
+import 'scan_screen.dart';
 
 class TemplatesScreen extends StatelessWidget {
   const TemplatesScreen({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final templates = [
-      {
-        'name': 'Invoice',
-        'icon': Iconsax.receipt,
-        'color': AppColors.gold,
-        'description': 'Professional invoice template'
-      },
-      {
-        'name': 'Contract',
-        'icon': Iconsax.document_text,
-        'color': AppColors.navyMid,
-        'description': 'Legal contract template'
-      },
-      {
-        'name': 'Business Card',
-        'icon': Iconsax.card,
-        'color': AppColors.blue,
-        'description': 'Business card template'
-      },
-      {
-        'name': 'Receipt',
-        'icon': Iconsax.receipt,
-        'color': AppColors.green,
-        'description': 'Receipt template'
-      },
-      {
-        'name': 'Certificate',
-        'icon': Iconsax.award,
-        'color': AppColors.purple,
-        'description': 'Certificate template'
-      },
-      {
-        'name': 'Form',
-        'icon': Iconsax.document,
-        'color': AppColors.red,
-        'description': 'Form template'
-      },
+    final templates = <_TemplateItem>[
+      const _TemplateItem(
+        name: 'Invoice',
+        icon: Iconsax.receipt,
+        color: AppColors.gold,
+        description: 'Invoice layout with amount fields',
+        scanType: 'document',
+      ),
+      const _TemplateItem(
+        name: 'Contract',
+        icon: Iconsax.document_text,
+        color: AppColors.navyMid,
+        description: 'A4 legal pages, clean text profile',
+        scanType: 'document',
+      ),
+      const _TemplateItem(
+        name: 'Business Card',
+        icon: Iconsax.card,
+        color: AppColors.navyMid,
+        description: 'Card ratio + sharp ID-style enhance',
+        scanType: 'id_card',
+      ),
+      const _TemplateItem(
+        name: 'Receipt',
+        icon: Iconsax.receipt,
+        color: AppColors.gold,
+        description: 'Thermal paper + amount extraction flow',
+        scanType: 'receipt',
+      ),
+      const _TemplateItem(
+        name: 'Whiteboard Notes',
+        icon: Iconsax.text_block,
+        color: AppColors.navyMid,
+        description: 'Glare cleanup + perspective correction',
+        scanType: 'whiteboard',
+      ),
+      const _TemplateItem(
+        name: 'Table Sheet',
+        icon: Iconsax.element_3,
+        color: AppColors.gold,
+        description: 'Table mode with CSV-friendly output',
+        scanType: 'table',
+      ),
     ];
 
     return Scaffold(
@@ -64,7 +71,7 @@ class TemplatesScreen extends StatelessWidget {
         itemBuilder: (_, i) {
           final template = templates[i];
           return GestureDetector(
-            onTap: () => _useTemplate(context, template['name'] as String),
+            onTap: () => _useTemplate(context, template),
             child: Container(
               decoration: BoxDecoration(
                 color: Colors.white,
@@ -80,18 +87,18 @@ class TemplatesScreen extends StatelessWidget {
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
                   Icon(
-                    template['icon'] as IconData,
+                    template.icon,
                     size: 48,
-                    color: template['color'] as Color,
+                    color: template.color,
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    template['name'] as String,
+                    template.name,
                     style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 14),
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    template['description'] as String,
+                    template.description,
                     style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted),
                     textAlign: TextAlign.center,
                   ),
@@ -104,13 +111,31 @@ class TemplatesScreen extends StatelessWidget {
     );
   }
 
-  void _useTemplate(BuildContext context, String templateName) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Using $templateName template'),
-        backgroundColor: AppColors.gold,
+  void _useTemplate(BuildContext context, _TemplateItem template) {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ScanScreen(
+          scanType: template.scanType,
+          templateLabel: template.name,
+        ),
       ),
     );
-    Navigator.pop(context, templateName);
   }
+}
+
+class _TemplateItem {
+  final String name;
+  final IconData icon;
+  final Color color;
+  final String description;
+  final String scanType;
+
+  const _TemplateItem({
+    required this.name,
+    required this.icon,
+    required this.color,
+    required this.description,
+    required this.scanType,
+  });
 }

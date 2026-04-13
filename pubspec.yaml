@@ -1,5 +1,5 @@
 name: ScanOnly
-description: A free document scanner app like CamScanner
+description: A free document scanner app — offline and private
 
 publish_to: 'none'
 
@@ -14,7 +14,6 @@ dependencies:
 
   # Scanning & Document Processing
   camera: ^0.10.5
-  cunning_document_scanner: ^1.0.5
   file_picker: ^8.0.0
   mobile_scanner: ^5.0.0
 
@@ -42,6 +41,9 @@ dependencies:
   flutter_secure_storage: ^9.0.0
   path: ^1.9.0
   shared_preferences: ^2.3.3
+  hive: ^2.2.3
+  hive_flutter: ^1.1.0
+  archive: ^3.6.1
 
   # Security & Authentication
   local_auth: ^2.2.0
@@ -68,6 +70,8 @@ dependencies:
 
   # Email (Optional - for sharing)
   mailer: ^6.1.0
+  url_launcher: ^6.3.2
+  qr_flutter: ^4.1.0
 
 dev_dependencies:
   flutter_test:

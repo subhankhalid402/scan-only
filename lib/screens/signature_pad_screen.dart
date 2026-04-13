@@ -8,7 +8,7 @@ import '../theme.dart';
 import '../services/signature_service.dart';
 
 // ══════════════════════════════════════════════════════════════
-//  SignaturePadScreen  –  CamScanner-style signature pad
+//  SignaturePadScreen  –  signature pad
 //
 //  Working features:
 //  ✅ Smooth signature drawing (velocity-based stroke width)

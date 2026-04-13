@@ -1,13 +1,25 @@
+import 'dart:async';
 import 'dart:io';
+
 import 'package:camera/camera.dart';
+import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:url_launcher/url_launcher.dart';
+import '../models/document_model.dart';
+import '../services/app_local_storage.dart';
+import '../services/database_service.dart';
 import '../services/image_enhancement_service.dart';
+import '../services/ocr_service.dart';
+import '../services/pdf_service.dart';
 import '../theme.dart';
 import 'edit_scan_screen.dart';
 
@@ -27,30 +39,330 @@ class _ScanMode {
   });
 }
 
-/// Core scanner modes only (matches home shortcuts).
+class _FilterOption {
+  final String id;
+  final String label;
+  const _FilterOption({required this.id, required this.label});
+}
+
+/// All capture modes (horizontal scroll).
 const List<_ScanMode> _kScanModes = [
-  _ScanMode(id: 'document', icon: Iconsax.document_text, label: 'Document', color: Color(0xFFD4A017)),
-  _ScanMode(id: 'id_card', icon: Iconsax.card, label: 'ID Card', color: Color(0xFF3B82F6)),
-  _ScanMode(id: 'receipt', icon: Iconsax.receipt, label: 'Receipt', color: Color(0xFF22C55E)),
-  _ScanMode(id: 'qr', icon: Iconsax.scan_barcode, label: 'QR Code', color: Color(0xFF6366F1)),
-  _ScanMode(id: 'gallery', icon: Iconsax.gallery, label: 'Gallery', color: Color(0xFFEF4444)),
+  _ScanMode(id: 'document', icon: Iconsax.document_text, label: 'Document', color: AppColors.gold),
+  _ScanMode(id: 'id_card', icon: Iconsax.card, label: 'ID Card', color: AppColors.gold),
+  _ScanMode(id: 'passport', icon: Iconsax.personalcard, label: 'Passport', color: AppColors.gold),
+  _ScanMode(id: 'receipt', icon: Iconsax.receipt, label: 'Receipt', color: AppColors.gold),
+  _ScanMode(id: 'book', icon: Iconsax.book, label: 'Book', color: AppColors.gold),
+  _ScanMode(id: 'table', icon: Iconsax.element_3, label: 'Table', color: AppColors.gold),
+  _ScanMode(id: 'whiteboard', icon: Iconsax.text_block, label: 'Board', color: AppColors.gold),
+  _ScanMode(id: 'photo', icon: Iconsax.camera, label: 'Photo', color: AppColors.gold),
+  _ScanMode(id: 'qr', icon: Iconsax.scan_barcode, label: 'QR / Bar', color: AppColors.gold),
+  _ScanMode(id: 'gallery', icon: Iconsax.gallery, label: 'Gallery', color: AppColors.gold),
 ];
+
+Set<String> get _kScanModeIds => _kScanModes.map((m) => m.id).toSet();
+
+const Map<String, List<_FilterOption>> _kModeFilters = {
+  'document': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'color', label: 'Color'),
+    _FilterOption(id: 'grayscale', label: 'Grayscale'),
+    _FilterOption(id: 'whitening', label: 'Whitening'),
+    _FilterOption(id: 'none', label: 'No Filter'),
+  ],
+  'id_card': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'color', label: 'Color'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'id_clear', label: 'ID Clear'),
+    _FilterOption(id: 'enhanced', label: 'Enhanced'),
+  ],
+  'passport': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'color', label: 'Color'),
+    _FilterOption(id: 'id_clear', label: 'ID Clear'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'mrz', label: 'MRZ Boost'),
+  ],
+  'receipt': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'contrast', label: 'High Contrast'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'thermal', label: 'Thermal'),
+    _FilterOption(id: 'brighten', label: 'Brighten'),
+  ],
+  'book': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'flatten', label: 'Flatten'),
+    _FilterOption(id: 'warm', label: 'Warm'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'deblur', label: 'Deblur'),
+  ],
+  'table': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'color', label: 'Color'),
+    _FilterOption(id: 'contrast', label: 'High Contrast'),
+    _FilterOption(id: 'grid', label: 'Grid View'),
+  ],
+  'whiteboard': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'whitening', label: 'Whitening'),
+    _FilterOption(id: 'contrast', label: 'High Contrast'),
+    _FilterOption(id: 'color', label: 'Color'),
+  ],
+  'photo': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'vivid', label: 'Vivid'),
+    _FilterOption(id: 'warm', label: 'Warm'),
+    _FilterOption(id: 'cool', label: 'Cool'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+  ],
+  'gallery': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'color', label: 'Color'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'grayscale', label: 'Grayscale'),
+  ],
+  'qr': [
+    _FilterOption(id: 'auto', label: 'Auto Detect'),
+  ],
+};
+
+const Map<String, List<String>> _kModeFeatures = {
+  'document': ['Auto-crop', 'Shadow remove', 'Flatten page'],
+  'id_card': ['MRZ detect', 'Glare fix', 'Straighten'],
+  'passport': ['MRZ extract', 'Photo page only', 'Auto-align'],
+  'receipt': ['Auto-straighten', 'Fade fix', 'Long doc mode'],
+  'book': ['Spine shadow fix', 'Page flatten', 'Dual page'],
+  'table': ['Table detect', 'Border enhance', 'OCR cells'],
+  'whiteboard': ['Glare remove', 'Perspective fix', 'Enhance text'],
+  'photo': ['HDR mode', 'Portrait', 'Full res'],
+  'gallery': ['Multi-import', 'PDF merge', 'Batch enhance'],
+  'qr': ['URL open', 'Copy code', 'Share'],
+};
+
+class _ModeContent {
+  final String tip;
+  final List<_ImportOption> importOptions;
+  final List<_FeatureChip> featureChips;
+
+  const _ModeContent({
+    required this.tip,
+    required this.importOptions,
+    required this.featureChips,
+  });
+}
+
+class _ImportOption {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final String action; // 'gallery' | 'files' | 'camera' | 'cloud'
+  const _ImportOption({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.action,
+  });
+}
+
+class _FeatureChip {
+  final IconData icon;
+  final String label;
+  const _FeatureChip({required this.icon, required this.label});
+}
+
+const Map<String, _ModeContent> _kModeContent = {
+  'document': _ModeContent(
+    tip: 'Place document on flat surface for best results',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
+      _ImportOption(icon: Iconsax.cloud,       label: 'Drive',    color: Color(0xFF6366F1), action: 'cloud'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.scissor,       label: 'Auto-crop'),
+      _FeatureChip(icon: Iconsax.sun_1,         label: 'Shadow remove'),
+      _FeatureChip(icon: Iconsax.document_text, label: 'Flatten page'),
+      _FeatureChip(icon: Iconsax.text,          label: 'OCR text'),
+      _FeatureChip(icon: Iconsax.magicpen,      label: 'Enhance text'),
+      _FeatureChip(icon: Iconsax.crop,          label: 'Perspective fix'),
+      _FeatureChip(icon: Iconsax.document,      label: 'CSV export'),
+      _FeatureChip(icon: Iconsax.arrange_square,label: 'Reorder pages'),
+    ],
+  ),
+  'id_card': _ModeContent(
+    tip: 'Hold card steady — both sides will be captured',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
+      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+      _ImportOption(icon: Iconsax.scan,        label: 'Both sides',color: Color(0xFFEC4899),action: 'gallery'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.card,         label: 'MRZ detect'),
+      _FeatureChip(icon: Iconsax.sun_1,        label: 'Glare fix'),
+      _FeatureChip(icon: Iconsax.crop,         label: 'Auto align'),
+      _FeatureChip(icon: Iconsax.text,         label: 'Extract text'),
+    ],
+  ),
+  'passport': _ModeContent(
+    tip: 'Open to photo page, lay flat under good light',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,      label: 'Gallery', color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.camera,       label: 'Camera',  color: Color(0xFF22C55E), action: 'camera'),
+      _ImportOption(icon: Iconsax.personalcard, label: 'ID scan', color: Color(0xFFF43F5E), action: 'gallery'),
+      _ImportOption(icon: Iconsax.folder_open,  label: 'Files',   color: Color(0xFFF59E0B), action: 'files'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.scan,         label: 'MRZ extract'),
+      _FeatureChip(icon: Iconsax.crop,         label: 'Photo page'),
+      _FeatureChip(icon: Iconsax.magicpen,     label: 'Auto-align'),
+      _FeatureChip(icon: Iconsax.text,         label: 'Data extract'),
+    ],
+  ),
+  'receipt': _ModeContent(
+    tip: 'Flatten receipt fully — creases reduce OCR accuracy',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
+      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+      _ImportOption(icon: Iconsax.receipt,     label: 'Long doc', color: Color(0xFF22C55E), action: 'gallery'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.crop,         label: 'Auto-straighten'),
+      _FeatureChip(icon: Iconsax.sun_1,        label: 'Fade fix'),
+      _FeatureChip(icon: Iconsax.document,     label: 'Long doc mode'),
+      _FeatureChip(icon: Iconsax.text,         label: 'Amount extract'),
+    ],
+  ),
+  'book': _ModeContent(
+    tip: 'Hold phone directly above — spine shadow auto-removed',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
+      _ImportOption(icon: Iconsax.book,        label: 'Dual page',color: Color(0xFFF97316), action: 'gallery'),
+      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.magicpen,     label: 'Spine shadow'),
+      _FeatureChip(icon: Iconsax.crop,         label: 'Page flatten'),
+      _FeatureChip(icon: Iconsax.element_3,    label: 'Dual page split'),
+      _FeatureChip(icon: Iconsax.text,         label: 'OCR text'),
+    ],
+  ),
+  'table': _ModeContent(
+    tip: 'Avoid glare — frame all borders for accurate detection',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
+      _ImportOption(icon: Iconsax.element_3,   label: 'CSV export',color: Color(0xFF84CC16),action: 'gallery'),
+      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.element_3,    label: 'Table detect'),
+      _FeatureChip(icon: Iconsax.magicpen,     label: 'Border enhance'),
+      _FeatureChip(icon: Iconsax.text,         label: 'OCR cells'),
+      _FeatureChip(icon: Iconsax.document,     label: 'CSV export'),
+    ],
+  ),
+  'whiteboard': _ModeContent(
+    tip: 'Fill frame with board — glare is auto-removed',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
+      _ImportOption(icon: Iconsax.text_block,  label: 'Enhance',  color: Color(0xFF06B6D4), action: 'gallery'),
+      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.sun_1,        label: 'Glare remove'),
+      _FeatureChip(icon: Iconsax.crop,         label: 'Perspective fix'),
+      _FeatureChip(icon: Iconsax.magicpen,     label: 'Enhance text'),
+      _FeatureChip(icon: Iconsax.text,         label: 'OCR text'),
+    ],
+  ),
+  'photo': _ModeContent(
+    tip: 'Full resolution photo — no enhancement applied',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
+      _ImportOption(icon: Iconsax.cloud,       label: 'Drive',    color: Color(0xFF6366F1), action: 'cloud'),
+      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.sun_1,        label: 'HDR mode'),
+      _FeatureChip(icon: Iconsax.personalcard, label: 'Portrait'),
+      _FeatureChip(icon: Iconsax.camera,       label: 'Full res'),
+      _FeatureChip(icon: Iconsax.magicpen,     label: 'Vivid color'),
+    ],
+  ),
+  'qr': _ModeContent(
+    tip: 'Point camera — QR and barcodes auto-detected',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,        label: 'From image', color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.scan_barcode,   label: 'Barcode',    color: Color(0xFF6366F1), action: 'camera'),
+      _ImportOption(icon: Iconsax.link,           label: 'URL open',   color: Color(0xFF22C55E), action: 'gallery'),
+      _ImportOption(icon: Iconsax.copy,           label: 'Copy code',  color: Color(0xFFF59E0B), action: 'gallery'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.scan_barcode,    label: 'Auto detect'),
+      _FeatureChip(icon: Iconsax.link,            label: 'Open URL'),
+      _FeatureChip(icon: Iconsax.copy,            label: 'Copy code'),
+      _FeatureChip(icon: Iconsax.share,           label: 'Share'),
+    ],
+  ),
+  'gallery': _ModeContent(
+    tip: 'Select multiple images to combine into one PDF',
+    importOptions: [
+      _ImportOption(icon: Iconsax.gallery,     label: 'Photos',   color: Color(0xFF3B82F6), action: 'gallery'),
+      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+      _ImportOption(icon: Iconsax.cloud,       label: 'Drive',    color: Color(0xFF6366F1), action: 'cloud'),
+      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.gallery,      label: 'Multi-import'),
+      _FeatureChip(icon: Iconsax.document,     label: 'PDF merge'),
+      _FeatureChip(icon: Iconsax.magicpen,     label: 'Batch enhance'),
+      _FeatureChip(icon: Iconsax.arrange_square,label: 'Reorder pages'),
+    ],
+  ),
+};
+
+/// Live in-app [CameraPreview] for every mode except QR (CamScanner-style viewfinder).
+bool _usesFlutterCameraPreview(String modeId) => modeId != 'qr';
 
 // ── Frame type enum ──────────────────────────────────────────────────────────
 
-enum _FrameType { document, card, qr }
+enum _FrameType { document, card, qr, book, whiteboard, receipt, table }
 
 _FrameType _frameTypeFor(String modeId) {
-  if (modeId == 'qr') return _FrameType.qr;
-  if (modeId == 'id_card') return _FrameType.card;
-  return _FrameType.document;
+  switch (modeId) {
+    case 'qr':
+      return _FrameType.qr;
+    case 'id_card':
+    case 'passport':
+      return _FrameType.card;
+    case 'book':
+      return _FrameType.book;
+    case 'whiteboard':
+      return _FrameType.whiteboard;
+    case 'receipt':
+      return _FrameType.receipt;
+    case 'table':
+      return _FrameType.table;
+    default:
+      return _FrameType.document;
+  }
 }
 
 // ────────────────────────────────────────────────────────────────────────────
 
 class ScanScreen extends StatefulWidget {
   final String scanType;
-  const ScanScreen({super.key, required this.scanType});
+  /// When set (e.g. from Templates), shown under the scan title.
+  final String? templateLabel;
+  const ScanScreen({super.key, required this.scanType, this.templateLabel});
 
   @override
   State<ScanScreen> createState() => _ScanScreenState();
@@ -62,7 +374,7 @@ class _ScanScreenState extends State<ScanScreen>
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
   bool _isCameraReady = false;
-  /// 0 = off, 1 = auto, 2 = torch (CamScanner-style cycle on same button).
+  /// 0 = off, 1 = auto, 2 = torch (cycle on same button).
   int _flashMode = 0;
   bool _isCapturing = false;
   int _currentCameraIndex = 0;
@@ -83,6 +395,8 @@ class _ScanScreenState extends State<ScanScreen>
 
   // Mode
   late String _selectedMode;
+  String _selectedFilter = 'auto';
+  bool _modeWasExplicitlySelected = false;
 
   // Scan-line animation
   late AnimationController _scanLineCtrl;
@@ -91,15 +405,39 @@ class _ScanScreenState extends State<ScanScreen>
   // Mode scroll
   final ScrollController _modeScrollController = ScrollController();
 
-  // Thumbnail scroll
-  final ScrollController _thumbScrollController = ScrollController();
+  MobileScannerController? _qrController;
+  String? _lastBarcode;
+  DateTime? _lastBarcodeAt;
+
+  bool _isSavingScan = false;
+
+  bool _showZoomHud = false;
+  Timer? _zoomHudTimer;
+
+  Offset? _focusPoint;
+  bool _showFocusRing = false;
+  Timer? _focusRingTimer;
+
+  bool _timerModeEnabled = false;
+  int _timerCountdown = 0;
+  Timer? _countdownTimer;
+  String? _pendingFeatureAction;
+  bool _longDocModeEnabled = false;
+  String _qrResultAction = 'dialog';
 
   @override
   void initState() {
     super.initState();
-    _selectedMode = _kScanModes.any((m) => m.id == widget.scanType)
-        ? widget.scanType
-        : 'document';
+    _selectedMode =
+        _kScanModeIds.contains(widget.scanType) ? widget.scanType : 'document';
+    // Show mode features on first open as well (especially default document mode).
+    _modeWasExplicitlySelected = true;
+
+    if (_selectedMode == 'qr') {
+      _qrController = MobileScannerController();
+    } else {
+      _bootstrapCamera();
+    }
 
     _scanLineCtrl = AnimationController(
       vsync: this,
@@ -111,17 +449,14 @@ class _ScanScreenState extends State<ScanScreen>
       curve: Curves.easeInOut,
     );
 
-    _bootstrapCamera();
-
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
   }
 
   Future<void> _bootstrapCamera() async {
-    final p = await SharedPreferences.getInstance();
     if (!mounted) return;
     setState(() {
-      _prefAutoEnhance = p.getBool('autoEnhance') ?? true;
-      _prefQuality = p.getString('defaultQuality') ?? 'High';
+      _prefAutoEnhance = AppLocalStorage.getBool('autoEnhance', defaultValue: true);
+      _prefQuality = AppLocalStorage.getString('defaultQuality', defaultValue: 'High');
     });
     await _initCamera();
   }
@@ -227,6 +562,13 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   Future<void> _cycleFlash() async {
+    if (_selectedMode == 'qr') {
+      HapticFeedback.lightImpact();
+      try {
+        await _qrController?.toggleTorch();
+      } catch (_) {}
+      return;
+    }
     if (_cameraController == null) return;
     HapticFeedback.lightImpact();
     setState(() => _flashMode = (_flashMode + 1) % 3);
@@ -235,8 +577,39 @@ class _ScanScreenState extends State<ScanScreen>
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  Future<void> _captureImage() async {
+  void _startTimerCapture() {
+    if (_timerCountdown > 0) return;
+    setState(() => _timerCountdown = 3);
+    _countdownTimer?.cancel();
+    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) {
+        t.cancel();
+        return;
+      }
+      setState(() => _timerCountdown--);
+      if (_timerCountdown <= 0) {
+        t.cancel();
+        _captureImage(fromTimerCapture: true);
+      }
+    });
+  }
+
+  void _toggleTimerMode() {
+    HapticFeedback.lightImpact();
+    setState(() => _timerModeEnabled = !_timerModeEnabled);
+  }
+
+  Future<void> _captureImage({bool fromTimerCapture = false}) async {
+    if (!fromTimerCapture &&
+        _timerModeEnabled &&
+        _timerCountdown == 0 &&
+        _selectedMode != 'qr' &&
+        _selectedMode != 'gallery') {
+      _startTimerCapture();
+      return;
+    }
     if (_isCapturing) return;
+    if (_selectedMode == 'qr') return;
     if (_selectedMode == 'gallery') {
       await _pickFromGallery();
       return;
@@ -249,41 +622,187 @@ class _ScanScreenState extends State<ScanScreen>
       var outPath = image.path;
       if (_prefAutoEnhance) {
         outPath = await ImageEnhancementService.instance
-            .polishCaptureForScanMode(image.path, _selectedMode);
-      }
-      if (!mounted) return;
-      setState(() {
-        _capturedPages.add(outPath);
-        _isCapturing = false;
-      });
-      // Auto-scroll thumbnail strip to end
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_thumbScrollController.hasClients) {
-          _thumbScrollController.animateTo(
-            _thumbScrollController.position.maxScrollExtent,
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
-        }
-      });
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              'Page ${_capturedPages.length} captured!',
-              style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
-            ),
-            duration: const Duration(seconds: 1),
-            backgroundColor: AppColors.green,
-            behavior: SnackBarBehavior.floating,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-          ),
+            .polishCaptureForScanMode(
+          image.path,
+          _selectedMode,
+          filter: _selectedFilter,
         );
       }
+      if (!mounted) return;
+      var captured = <String>[outPath];
+      if (_pendingFeatureAction == 'dual_page_split' || _selectedMode == 'book') {
+        captured = await _splitDualPages(outPath);
+      }
+      setState(() {
+        _capturedPages.addAll(captured);
+        _isCapturing = false;
+      });
+      final firstPath = captured.first;
+      if (_pendingFeatureAction == 'ocr_text') {
+        final text = await OcrService.instance.extractText(firstPath);
+        await _showTextResultSheet('OCR Text', text.isEmpty ? 'No text found.' : text);
+      } else if (_pendingFeatureAction == 'mrz_extract') {
+        final mrz = await _extractMrzText(firstPath);
+        await _showTextResultSheet('MRZ Extract', mrz.isEmpty ? 'No MRZ detected.' : mrz);
+      } else if (_pendingFeatureAction == 'amount_extract') {
+        final txt = await OcrService.instance.extractText(firstPath);
+        final amounts = _extractAmounts(txt);
+        await _showTextResultSheet(
+          'Receipt Amounts',
+          amounts.isEmpty ? 'No amounts detected.' : amounts.join('\n'),
+        );
+      } else if (_pendingFeatureAction == 'csv_export') {
+        final txt = await OcrService.instance.extractText(firstPath);
+        final csv = await _saveCsvFromText(txt);
+        _showInfoSnack('CSV exported: ${p.basename(csv)}');
+      }
+      _pendingFeatureAction = null;
+      // Auto-navigate to edit screen after capture (CamScanner style)
+      if (mounted && !_longDocModeEnabled) {
+        final result = await Navigator.push<List<String>>(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EditScanScreen(
+              imagePaths: List<String>.from(_capturedPages),
+              scanType: _selectedMode,
+            ),
+          ),
+        );
+        // If user added/removed pages in edit screen, sync back
+        if (result != null && mounted) {
+          setState(() {
+            _capturedPages.clear();
+            _capturedPages.addAll(result);
+          });
+        }
+      }
+      _afterPagesAddedSnack(captured.length);
     } catch (e) {
       setState(() => _isCapturing = false);
     }
+  }
+
+  void _afterPagesAddedSnack(int count) {
+    if (!mounted) return;
+    final total = _capturedPages.length;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          count > 1
+              ? 'Added $count page(s) — $total total'
+              : 'Page $total captured!',
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+        ),
+        duration: const Duration(seconds: 1),
+        backgroundColor: AppColors.green,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      ),
+    );
+  }
+
+  Future<List<String>> _splitDualPages(String imagePath) async {
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final src = img.decodeImage(bytes);
+      if (src == null) return [imagePath];
+      final halfW = src.width ~/ 2;
+      final left = img.copyCrop(src, x: 0, y: 0, width: halfW, height: src.height);
+      final right = img.copyCrop(
+        src,
+        x: halfW,
+        y: 0,
+        width: src.width - halfW,
+        height: src.height,
+      );
+      final dir = await getTemporaryDirectory();
+      final ts = DateTime.now().millisecondsSinceEpoch;
+      final leftPath = p.join(dir.path, 'dual_left_$ts.jpg');
+      final rightPath = p.join(dir.path, 'dual_right_$ts.jpg');
+      await File(leftPath).writeAsBytes(img.encodeJpg(left, quality: 92));
+      await File(rightPath).writeAsBytes(img.encodeJpg(right, quality: 92));
+      return [leftPath, rightPath];
+    } catch (_) {
+      return [imagePath];
+    }
+  }
+
+  Future<String> _extractMrzText(String imagePath) async {
+    try {
+      final bytes = await File(imagePath).readAsBytes();
+      final src = img.decodeImage(bytes);
+      if (src == null) return '';
+      final y = (src.height * 0.68).round().clamp(0, src.height - 1);
+      final mrz = img.copyCrop(src, x: 0, y: y, width: src.width, height: src.height - y);
+      final dir = await getTemporaryDirectory();
+      final pathOut = p.join(dir.path, 'mrz_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      await File(pathOut).writeAsBytes(img.encodeJpg(mrz, quality: 92));
+      return OcrService.instance.extractText(pathOut);
+    } catch (_) {
+      return '';
+    }
+  }
+
+  List<String> _extractAmounts(String text) {
+    final exp = RegExp(r'(?<!\d)(?:\$|USD|EUR|PKR|Rs\.?)?\s?\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{2})?(?!\d)');
+    return exp
+        .allMatches(text)
+        .map((m) => m.group(0)?.trim() ?? '')
+        .where((s) => s.isNotEmpty)
+        .toSet()
+        .toList();
+  }
+
+  Future<String> _saveCsvFromText(String text) async {
+    final dir = await getTemporaryDirectory();
+    final filePath = p.join(dir.path, 'table_${DateTime.now().millisecondsSinceEpoch}.csv');
+    final lines = text
+        .split('\n')
+        .map((e) => e.trim())
+        .where((e) => e.isNotEmpty)
+        .map((e) => '"${e.replaceAll('"', '""')}"')
+        .toList();
+    await File(filePath).writeAsString('text\n${lines.join('\n')}');
+    return filePath;
+  }
+
+  Future<void> _showTextResultSheet(String title, String text) async {
+    if (!mounted) return;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: const Color(0xFF0F1A2E),
+      isScrollControlled: true,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(title,
+                  style: GoogleFonts.nunito(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  )),
+              const SizedBox(height: 10),
+              ConstrainedBox(
+                constraints: BoxConstraints(
+                  maxHeight: MediaQuery.of(ctx).size.height * 0.45,
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    text,
+                    style: GoogleFonts.nunito(color: Colors.white70, fontSize: 13),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   Future<void> _pickFromGallery() async {
@@ -294,6 +813,231 @@ class _ScanScreenState extends State<ScanScreen>
         _capturedPages.addAll(images.map((img) => img.path));
       });
     }
+  }
+
+  Future<void> _showImportSheet() async {
+    HapticFeedback.mediumImpact();
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ImportSheet(
+        onPickGallery: () {
+          Navigator.pop(ctx);
+          _pickFromGallery();
+        },
+        onPickFiles: () {
+          Navigator.pop(ctx);
+          _pickFromFiles();
+        },
+        onPickCamera: () {
+          Navigator.pop(ctx);
+          _pickSingleWithCamera();
+        },
+        onScanFromAlbum: () {
+          Navigator.pop(ctx);
+          _pickFromGallery();
+        },
+      ),
+    );
+  }
+
+  Future<void> _pickSingleWithCamera() async {
+    final picker = ImagePicker();
+    final image = await picker.pickImage(source: ImageSource.camera);
+    if (image != null && mounted) {
+      setState(() => _capturedPages.add(image.path));
+      _afterPagesAddedSnack(1);
+    }
+  }
+
+  Future<void> _pickFromFiles() async {
+    try {
+      final result = await FilePicker.platform.pickFiles(
+        allowMultiple: true,
+        type: FileType.custom,
+        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+      );
+      if (result != null && mounted) {
+        final paths = result.files
+            .where((f) => f.path != null)
+            .map((f) => f.path!)
+            .toList();
+        if (paths.isNotEmpty) {
+          setState(() => _capturedPages.addAll(paths));
+          _afterPagesAddedSnack(paths.length);
+        }
+      }
+    } catch (e) {
+      debugPrint('File picker: $e');
+    }
+  }
+
+  Future<void> _handleImportOption(_ImportOption opt) async {
+    if (_selectedMode == 'id_card' && opt.label == 'Both sides') {
+      await _pickFromGallery();
+      await _pickFromGallery();
+      return;
+    }
+    if (_selectedMode == 'receipt' && opt.label == 'Long doc') {
+      setState(() => _longDocModeEnabled = true);
+      _showInfoSnack('Long doc mode enabled. Capture pages, then tap Done.');
+      return;
+    }
+    if (_selectedMode == 'table' && opt.label == 'CSV export') {
+      setState(() => _pendingFeatureAction = 'csv_export');
+      _showInfoSnack('CSV export will run after next capture.');
+      return;
+    }
+    if (_selectedMode == 'qr' && opt.label == 'Barcode') {
+      await _selectMode('qr');
+      return;
+    }
+    if (_selectedMode == 'qr' && opt.label == 'URL open') {
+      setState(() => _qrResultAction = 'open_url');
+      await _selectMode('qr');
+      _showInfoSnack('QR action: open URL');
+      return;
+    }
+    if (_selectedMode == 'qr' && opt.label == 'Copy code') {
+      setState(() => _qrResultAction = 'copy_code');
+      await _selectMode('qr');
+      _showInfoSnack('QR action: copy code');
+      return;
+    }
+    switch (opt.action) {
+      case 'gallery':
+        await _pickFromGallery();
+        break;
+      case 'files':
+        await _pickFromFiles();
+        break;
+      case 'camera':
+        await _pickSingleWithCamera();
+        break;
+      case 'cloud':
+        await _pickFromFiles();
+        break;
+    }
+  }
+
+  Future<void> _handleFeatureChipTap(String label) async {
+    final key = label.toLowerCase();
+    if (key.contains('ocr text') ||
+        key.contains('extract text') ||
+        key.contains('data extract') ||
+        key.contains('ocr cells')) {
+      setState(() => _pendingFeatureAction = 'ocr_text');
+      _showInfoSnack('OCR will run after next capture.');
+      return;
+    }
+    if (key.contains('mrz')) {
+      setState(() => _pendingFeatureAction = 'mrz_extract');
+      _showInfoSnack('MRZ extraction queued.');
+      return;
+    }
+    if (key.contains('amount')) {
+      setState(() => _pendingFeatureAction = 'amount_extract');
+      _showInfoSnack('Amount extraction queued.');
+      return;
+    }
+    if (key.contains('dual page')) {
+      setState(() => _pendingFeatureAction = 'dual_page_split');
+      _showInfoSnack('Dual page split queued.');
+      return;
+    }
+    if (key.contains('csv export')) {
+      setState(() => _pendingFeatureAction = 'csv_export');
+      _showInfoSnack('CSV export queued.');
+      return;
+    }
+    if (key.contains('shadow remove')) {
+      setState(() => _selectedFilter = 'whitening');
+      return;
+    }
+    if (key.contains('glare')) {
+      setState(() => _selectedFilter = 'id_clear');
+      return;
+    }
+    if (key.contains('flatten') || key.contains('perspective')) {
+      setState(() => _selectedFilter = 'flatten');
+      return;
+    }
+    if (key.contains('auto-crop') ||
+        key.contains('auto align') ||
+        key.contains('auto-align') ||
+        key.contains('auto-straighten') ||
+        key.contains('photo page') ||
+        key.contains('full res') ||
+        key.contains('table detect') ||
+        key.contains('auto detect')) {
+      setState(() => _selectedFilter = 'auto');
+      return;
+    }
+    if (key.contains('fade fix') ||
+        key.contains('border enhance') ||
+        key.contains('enhance text') ||
+        key.contains('spine shadow')) {
+      setState(() => _selectedFilter = 'enhanced');
+      return;
+    }
+    if (key.contains('vivid') || key.contains('hdr') || key.contains('portrait')) {
+      setState(() => _selectedFilter = 'vivid');
+      return;
+    }
+    if (key.contains('long doc mode')) {
+      setState(() => _longDocModeEnabled = true);
+      _showInfoSnack('Long doc mode enabled.');
+      return;
+    }
+    if (key.contains('open url')) {
+      setState(() => _qrResultAction = 'open_url');
+      await _selectMode('qr');
+      return;
+    }
+    if (key.contains('copy code')) {
+      setState(() => _qrResultAction = 'copy_code');
+      await _selectMode('qr');
+      return;
+    }
+    if (key == 'share') {
+      setState(() => _qrResultAction = 'dialog');
+      await _selectMode('qr');
+      return;
+    }
+    if (key.contains('multi-import')) {
+      await _pickFromGallery();
+      return;
+    }
+    if (key.contains('pdf merge')) {
+      await _pickFromFiles();
+      _showInfoSnack('Pick PDFs from Files, then merge in Merge PDFs screen.');
+      return;
+    }
+    if (key.contains('batch enhance')) {
+      setState(() => _selectedFilter = 'enhanced');
+      await _pickFromGallery();
+      return;
+    }
+    if (key.contains('reorder pages')) {
+      if (_capturedPages.isNotEmpty) {
+        _proceedToEdit();
+      } else {
+        _showInfoSnack('Capture pages first to reorder.');
+      }
+      return;
+    }
+    _showInfoSnack('Action applied.');
+  }
+
+  void _showInfoSnack(String msg) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(msg, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
   }
 
   Future<void> _onPreviewTapUp(TapUpDetails d) async {
@@ -310,6 +1054,14 @@ class _ScanScreenState extends State<ScanScreen>
       await _cameraController!.setFocusPoint(Offset(nx, ny));
       await _cameraController!.setExposurePoint(Offset(nx, ny));
       HapticFeedback.selectionClick();
+      setState(() {
+        _focusPoint = local;
+        _showFocusRing = true;
+      });
+      _focusRingTimer?.cancel();
+      _focusRingTimer = Timer(const Duration(milliseconds: 1200), () {
+        if (mounted) setState(() => _showFocusRing = false);
+      });
     } catch (e) {
       debugPrint('Focus tap: $e');
     }
@@ -333,13 +1085,29 @@ class _ScanScreenState extends State<ScanScreen>
     if ((target - _currentZoom).abs() < 0.01) return;
     try {
       await _cameraController!.setZoomLevel(target);
-      if (mounted) setState(() => _currentZoom = target);
+      if (mounted) {
+        setState(() {
+          _currentZoom = target;
+          _showZoomHud = true;
+        });
+        _zoomHudTimer?.cancel();
+        _zoomHudTimer = Timer(const Duration(seconds: 2), () {
+          if (mounted) setState(() => _showZoomHud = false);
+        });
+      }
     } catch (e) {
       debugPrint('Zoom: $e');
     }
   }
 
   Future<void> _flipCamera() async {
+    if (_selectedMode == 'qr') {
+      HapticFeedback.lightImpact();
+      try {
+        await _qrController?.switchCamera();
+      } catch (_) {}
+      return;
+    }
     if (_cameras.length < 2) return;
     HapticFeedback.lightImpact();
     _currentCameraIndex = (_currentCameraIndex + 1) % _cameras.length;
@@ -348,17 +1116,365 @@ class _ScanScreenState extends State<ScanScreen>
     await _setupCamera(_cameras[_currentCameraIndex]);
   }
 
+  void _onBarcodeDetected(BarcodeCapture capture) {
+    if (capture.barcodes.isEmpty) return;
+    final raw = capture.barcodes.first.rawValue;
+    if (raw == null || raw.isEmpty) return;
+    final now = DateTime.now();
+    if (_lastBarcode == raw &&
+        _lastBarcodeAt != null &&
+        now.difference(_lastBarcodeAt!) < const Duration(seconds: 2)) {
+      return;
+    }
+    _lastBarcode = raw;
+    _lastBarcodeAt = now;
+    HapticFeedback.heavyImpact();
+    if (_qrResultAction == 'copy_code') {
+      Clipboard.setData(ClipboardData(text: raw));
+      _showInfoSnack('Copied to clipboard');
+      return;
+    }
+    if (_qrResultAction == 'open_url') {
+      final uri = Uri.tryParse(raw);
+      if (uri != null &&
+          (uri.scheme == 'http' || uri.scheme == 'https')) {
+        launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        _showInfoSnack('Scanned code is not a valid URL');
+      }
+      return;
+    }
+    if (!mounted) return;
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: const Color(0xFF1A2A40),
+        title: Text(
+          'Code scanned',
+          style: GoogleFonts.nunito(
+            color: Colors.white,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+        content: SelectableText(
+          raw,
+          style: GoogleFonts.nunito(color: Colors.white70, fontSize: 15),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () async {
+              await Clipboard.setData(ClipboardData(text: raw));
+              if (ctx.mounted) Navigator.pop(ctx);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(
+                    content: Text('Copied to clipboard',
+                        style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+                    backgroundColor: AppColors.green,
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
+            },
+            child: Text('Copy', style: GoogleFonts.nunito(color: AppColors.gold)),
+          ),
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text('OK', style: GoogleFonts.nunito(color: Colors.white)),
+          ),
+        ],
+      ),
+    );
+  }
+
   void _proceedToEdit() {
     if (_capturedPages.isEmpty) return;
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => EditScanScreen(
-          imagePaths: _capturedPages,
+          imagePaths: List<String>.from(_capturedPages),
           scanType: _selectedMode,
         ),
       ),
     );
+  }
+
+  String _defaultQuickSaveName() {
+    final n = DateTime.now();
+    final d = '${n.day}-${n.month}-${n.year}';
+    switch (_selectedMode) {
+      case 'document':
+        return 'Document_$d';
+      case 'receipt':
+        return 'Receipt_$d';
+      case 'id_card':
+        return 'ID_$d';
+      case 'passport':
+        return 'Passport_$d';
+      case 'book':
+        return 'Book_$d';
+      case 'table':
+        return 'Table_$d';
+      case 'whiteboard':
+        return 'Whiteboard_$d';
+      case 'photo':
+        return 'Photo_$d';
+      case 'gallery':
+        return 'Import_$d';
+      default:
+        return 'Scan_$d';
+    }
+  }
+
+  void _scheduleOcrIndexFromScan(int documentId, List<String> imagePaths) {
+    Future<void>(() async {
+      try {
+        final buf = StringBuffer();
+        final maxPages = imagePaths.length < 5 ? imagePaths.length : 5;
+        for (var i = 0; i < maxPages; i++) {
+          final path = imagePaths[i];
+          if (!File(path).existsSync()) continue;
+          final t = await OcrService.instance.extractText(path);
+          if (t.isNotEmpty) {
+            if (buf.isNotEmpty) buf.writeln();
+            buf.write(t);
+          }
+        }
+        final combined = buf.toString().trim();
+        if (combined.isNotEmpty) {
+          await DatabaseService.instance.updateOcrText(documentId, combined);
+        }
+      } catch (_) {}
+    });
+  }
+
+  void _previewCapturedPage(int index) {
+    if (index < 0 || index >= _capturedPages.length) return;
+    showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => Dialog(
+        backgroundColor: Colors.black,
+        insetPadding: const EdgeInsets.all(12),
+        child: Stack(
+          children: [
+            Positioned.fill(
+              child: InteractiveViewer(
+                minScale: 0.5,
+                maxScale: 4,
+                child: Center(
+                  child: Image.file(
+                    File(_capturedPages[index]),
+                    fit: BoxFit.contain,
+                  ),
+                ),
+              ),
+            ),
+            Positioned(
+              top: 4,
+              right: 4,
+              child: IconButton(
+                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                onPressed: () => Navigator.pop(ctx),
+              ),
+            ),
+            Positioned(
+              bottom: 12,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: Text(
+                  'Page ${index + 1} of ${_capturedPages.length}',
+                  style: GoogleFonts.nunito(
+                    color: Colors.white70,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _showQuickSaveSheet() async {
+    if (_capturedPages.isEmpty || _isSavingScan) return;
+    final nameCtrl = TextEditingController(text: _defaultQuickSaveName());
+    final name = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: const Color(0xFF0F1A2E),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      builder: (sheetCtx) {
+        return Padding(
+          padding: EdgeInsets.fromLTRB(
+            24,
+            20,
+            24,
+            MediaQuery.of(sheetCtx).viewInsets.bottom + 24,
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              Center(
+                child: Container(
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white24,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Text(
+                'Save to library',
+                style: GoogleFonts.nunito(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Text(
+                'PDF · ${_capturedPages.length} page(s)',
+                style: GoogleFonts.nunito(
+                  color: Colors.white54,
+                  fontWeight: FontWeight.w600,
+                  fontSize: 12,
+                ),
+              ),
+              const SizedBox(height: 14),
+              TextField(
+                controller: nameCtrl,
+                autofocus: true,
+                style: GoogleFonts.nunito(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+                decoration: InputDecoration(
+                  hintText: 'Document name',
+                  hintStyle: GoogleFonts.nunito(color: Colors.white38),
+                  filled: true,
+                  fillColor: Colors.white.withValues(alpha: 0.08),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(14),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () => Navigator.pop(sheetCtx),
+                      child: Text(
+                        'Cancel',
+                        style: GoogleFonts.nunito(
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    flex: 2,
+                    child: ElevatedButton(
+                      onPressed: () {
+                        final t = nameCtrl.text.trim();
+                        Navigator.pop(sheetCtx, t.isEmpty ? null : t);
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.gold,
+                        foregroundColor: AppColors.navyDark,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(14),
+                        ),
+                      ),
+                      child: Text(
+                        'Save',
+                        style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 15,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+    nameCtrl.dispose();
+    if (name != null && name.isNotEmpty && mounted) {
+      await _performQuickSaveToLibrary(name);
+    }
+  }
+
+  Future<void> _performQuickSaveToLibrary(String docName) async {
+    if (_isSavingScan || _capturedPages.isEmpty) return;
+    setState(() => _isSavingScan = true);
+    try {
+      final paths = List<String>.from(_capturedPages);
+      final filePath =
+          await PdfService.instance.createPdfFromImages(paths, docName);
+      final thumbPath = await PdfService.instance.generateThumbnail(paths[0]);
+      final fileSizeMB = await PdfService.instance.getFileSizeMB(filePath);
+      final doc = DocumentModel(
+        name: docName,
+        filePath: filePath,
+        fileType: 'pdf',
+        scanType: _selectedMode,
+        pageCount: paths.length,
+        fileSizeMB: fileSizeMB,
+        createdAt: DateTime.now(),
+        thumbnailPath: thumbPath,
+        tags: const [],
+      );
+      final id = await DatabaseService.instance.insertDocument(doc);
+      await AppLocalStorage.setString('lastSavedDocName', docName);
+      _scheduleOcrIndexFromScan(id, paths);
+      if (!mounted) return;
+      setState(() {
+        _capturedPages.clear();
+        _isSavingScan = false;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            'Saved: $docName',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+          ),
+          backgroundColor: AppColors.green,
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isSavingScan = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Save failed: $e',
+              style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+            ),
+            backgroundColor: Colors.redAccent,
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
+      }
+    }
   }
 
   void _showPermissionDialog() {
@@ -406,28 +1522,66 @@ class _ScanScreenState extends State<ScanScreen>
 
   void _scrollToSelected() {
     final index = _kScanModes.indexWhere((m) => m.id == _selectedMode);
-    if (index < 0 || !_modeScrollController.hasClients) return;
-    const chipWidth = 90.0;
-    final offset = (index * chipWidth) - (chipWidth / 2);
-    _modeScrollController.animateTo(
-      offset.clamp(0.0, _modeScrollController.position.maxScrollExtent),
-      duration: const Duration(milliseconds: 350),
-      curve: Curves.easeOut,
-    );
+    if (index < 0) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_modeScrollController.hasClients) return;
+      final maxScroll = _modeScrollController.position.maxScrollExtent;
+      final totalItems = _kScanModes.length;
+      if (totalItems == 0) return;
+      final targetOffset = (maxScroll / (totalItems - 1)) * index;
+      _modeScrollController.animateTo(
+        targetOffset.clamp(0.0, maxScroll),
+        duration: const Duration(milliseconds: 350),
+        curve: Curves.easeOut,
+      );
+    });
   }
 
-  void _selectMode(String id) {
+  Future<void> _selectMode(String id) async {
+    if (id == _selectedMode) return;
     HapticFeedback.selectionClick();
-    setState(() => _selectedMode = id);
+    final wasQr = _selectedMode == 'qr';
+    final willQr = id == 'qr';
+    final wasCam = _usesFlutterCameraPreview(_selectedMode);
+    final willCam = _usesFlutterCameraPreview(id);
+
+    if (wasQr && !willQr) {
+      await _qrController?.dispose();
+      _qrController = null;
+      await _bootstrapCamera();
+    } else if (!wasQr && willQr) {
+      await _cameraController?.dispose();
+      _cameraController = null;
+      if (mounted) setState(() => _isCameraReady = false);
+      _qrController = MobileScannerController();
+    } else {
+      if (wasCam && !willCam) {
+        await _cameraController?.dispose();
+        _cameraController = null;
+        if (mounted) setState(() => _isCameraReady = false);
+      } else if (!wasCam && willCam) {
+        await _bootstrapCamera();
+      }
+    }
+
+    if (!mounted) return;
+    setState(() {
+      _selectedMode = id;
+      _selectedFilter = 'auto';
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
+    setState(() => _modeWasExplicitlySelected = true);
   }
 
   @override
   void dispose() {
+    _zoomHudTimer?.cancel();
+    _focusRingTimer?.cancel();
+    _countdownTimer?.cancel();
+    _qrController?.dispose();
     _cameraController?.dispose();
     _scanLineCtrl.dispose();
     _modeScrollController.dispose();
-    _thumbScrollController.dispose();
     super.dispose();
   }
 
@@ -439,8 +1593,20 @@ class _ScanScreenState extends State<ScanScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. Camera preview (tap = focus/exposure, pinch = zoom, double-tap = grid)
-          if (_isCameraReady && _cameraController != null)
+          // 1. Live QR scanner OR camera preview
+          if (_selectedMode == 'qr')
+            Positioned.fill(
+              child: _qrController != null
+                  ? MobileScanner(
+                      controller: _qrController!,
+                      fit: BoxFit.cover,
+                      onDetect: _onBarcodeDetected,
+                    )
+                  : const Center(
+                      child: CircularProgressIndicator(color: AppColors.gold),
+                    ),
+            )
+          else if (_isCameraReady && _cameraController != null)
             Positioned.fill(
               child: GestureDetector(
                 key: _previewKey,
@@ -449,7 +1615,16 @@ class _ScanScreenState extends State<ScanScreen>
                 onDoubleTap: _toggleAlignmentGrid,
                 onScaleStart: _onPinchStart,
                 onScaleUpdate: _onPinchUpdate,
-                child: CameraPreview(_cameraController!),
+                child: SizedBox.expand(
+                  child: FittedBox(
+                    fit: BoxFit.cover,
+                    child: SizedBox(
+                      width: _cameraController!.value.previewSize!.height,
+                      height: _cameraController!.value.previewSize!.width,
+                      child: CameraPreview(_cameraController!),
+                    ),
+                  ),
+                ),
               ),
             )
           else
@@ -457,25 +1632,113 @@ class _ScanScreenState extends State<ScanScreen>
               child: CircularProgressIndicator(color: AppColors.gold),
             ),
 
-          // 2. Scan frame + scan-line
-          Positioned.fill(
-            child: AnimatedBuilder(
-              animation: _scanLineAnim,
-              builder: (_, __) => CustomPaint(
-                painter: _ScanFramePainter(
-                  frameType: _frameTypeFor(_selectedMode),
-                  frameColor: _kScanModes
-                      .firstWhere(
-                        (m) => m.id == _selectedMode,
-                        orElse: () => _kScanModes.first,
-                      )
-                      .color,
-                  scanLineProgress: _scanLineAnim.value,
-                  showAlignmentGrid: _showAlignmentGrid,
+          // 2. Scan frame + scan-line (live camera + QR overlay)
+          if (_selectedMode == 'qr')
+            Positioned.fill(
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _scanLineAnim,
+                  builder: (_, __) => CustomPaint(
+                    painter: _ScanFramePainter(
+                      frameType: _FrameType.qr,
+                      frameColor: _kScanModes
+                          .firstWhere(
+                            (m) => m.id == 'qr',
+                            orElse: () => _kScanModes.first,
+                          )
+                          .color,
+                      scanLineProgress: _scanLineAnim.value,
+                      showAlignmentGrid: false,
+                    ),
+                  ),
+                ),
+              ),
+            )
+          else if (_usesFlutterCameraPreview(_selectedMode))
+            Positioned.fill(
+              child: AnimatedBuilder(
+                animation: _scanLineAnim,
+                builder: (_, __) => CustomPaint(
+                  painter: _ScanFramePainter(
+                    frameType: _frameTypeFor(_selectedMode),
+                    frameColor: _kScanModes
+                        .firstWhere(
+                          (m) => m.id == _selectedMode,
+                          orElse: () => _kScanModes.first,
+                        )
+                        .color,
+                    scanLineProgress: _scanLineAnim.value,
+                    showAlignmentGrid: _showAlignmentGrid,
+                  ),
                 ),
               ),
             ),
-          ),
+
+          if (_showZoomHud && _selectedMode != 'qr')
+            Positioned(
+              bottom: 320,
+              left: 0,
+              right: 0,
+              child: Center(
+                child: AnimatedOpacity(
+                  opacity: _showZoomHud ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black54,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    child: Text(
+                      '${_currentZoom.toStringAsFixed(1)}×',
+                      style: GoogleFonts.nunito(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w700,
+                        fontSize: 14,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          if (_showFocusRing && _focusPoint != null)
+            Positioned(
+              left: _focusPoint!.dx - 30,
+              top: _focusPoint!.dy - 30,
+              child: IgnorePointer(
+                child: AnimatedOpacity(
+                  opacity: _showFocusRing ? 1.0 : 0.0,
+                  duration: const Duration(milliseconds: 200),
+                  child: Container(
+                    width: 60,
+                    height: 60,
+                    decoration: BoxDecoration(
+                      border:
+                          Border.all(color: AppColors.gold, width: 1.5),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+          if (_timerCountdown > 0)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: Text(
+                    '$_timerCountdown',
+                    style: GoogleFonts.nunito(
+                      fontSize: 96,
+                      fontWeight: FontWeight.w900,
+                      color: Colors.white.withOpacity(0.85),
+                    ),
+                  ),
+                ),
+              ),
+            ),
 
           // 3. Top bar
           _buildTopBar(),
@@ -517,25 +1780,84 @@ class _ScanScreenState extends State<ScanScreen>
               Icons.arrow_back_ios_new_rounded,
               () => Navigator.pop(context),
             ),
-            const Spacer(),
-            Text(
-              _scanTypeLabel(),
-              style: GoogleFonts.nunito(
-                color: Colors.white,
-                fontWeight: FontWeight.w800,
-                fontSize: 16,
-                letterSpacing: 0.3,
+            Expanded(
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      _scanTypeLabel(),
+                      style: GoogleFonts.nunito(
+                        color: Colors.white,
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                        letterSpacing: 0.3,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                    Container(
+                      width: 6,
+                      height: 6,
+                      margin: const EdgeInsets.only(top: 3),
+                      decoration: BoxDecoration(
+                        color: _kScanModes
+                            .firstWhere((m) => m.id == _selectedMode,
+                                orElse: () => _kScanModes.first)
+                            .color,
+                        shape: BoxShape.circle,
+                      ),
+                    ),
+                    if (widget.templateLabel != null &&
+                        widget.templateLabel!.isNotEmpty) ...[
+                      const SizedBox(height: 2),
+                      Text(
+                        'Template: ${widget.templateLabel}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: GoogleFonts.nunito(
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 11,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ],
+                  ],
+                ),
               ),
             ),
-            const Spacer(),
-            _iconBtn(
-              _flashIcon(),
-              _cycleFlash,
-              color: _flashMode == 0 ? Colors.white : AppColors.gold,
-              bgColor: _flashMode == 0
-                  ? Colors.black45
-                  : AppColors.gold.withOpacity(0.2),
-            ),
+            if (_usesFlutterCameraPreview(_selectedMode) ||
+                _selectedMode == 'qr') ...[
+              _iconBtn(
+                _timerModeEnabled ? Icons.timer : Icons.timer_outlined,
+                _toggleTimerMode,
+                color: _timerModeEnabled ? AppColors.gold : Colors.white,
+                bgColor: _timerModeEnabled
+                    ? AppColors.gold.withOpacity(0.2)
+                    : Colors.black45,
+              ),
+              const SizedBox(width: 8),
+              _iconBtn(
+                _flashIcon(),
+                _cycleFlash,
+                color: _flashMode == 0 ? Colors.white : AppColors.gold,
+                bgColor: _flashMode == 0
+                    ? Colors.black45
+                    : AppColors.gold.withOpacity(0.2),
+              ),
+            ] else
+              IgnorePointer(
+                child: Opacity(
+                  opacity: 0.22,
+                  child: _iconBtn(
+                    Icons.flash_off_rounded,
+                    () {},
+                    color: Colors.white54,
+                    bgColor: Colors.black45,
+                  ),
+                ),
+              ),
           ],
         ),
       ),
@@ -546,32 +1868,178 @@ class _ScanScreenState extends State<ScanScreen>
 
   Widget _buildPagesBadge() {
     return Positioned(
-      top: MediaQuery.of(context).padding.top + 68,
+      top: MediaQuery.of(context).padding.top + 72,
       right: 16,
       child: GestureDetector(
         onTap: _proceedToEdit,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
-            color: AppColors.gold,
+            color: AppColors.navyDark.withOpacity(0.85),
             borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: AppColors.gold, width: 1.5),
             boxShadow: [
               BoxShadow(
-                color: AppColors.gold.withOpacity(0.45),
-                blurRadius: 12,
-                offset: const Offset(0, 4),
+                color: Colors.black.withOpacity(0.3),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
               ),
             ],
           ),
-          child: Text(
-            '${_capturedPages.length} page${_capturedPages.length > 1 ? 's' : ''} →',
-            style: GoogleFonts.nunito(
-              color: AppColors.navyDark,
-              fontWeight: FontWeight.w900,
-              fontSize: 13,
-            ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 18,
+                height: 18,
+                decoration: BoxDecoration(
+                  color: AppColors.gold,
+                  shape: BoxShape.circle,
+                ),
+                child: Center(
+                  child: Text(
+                    '${_capturedPages.length}',
+                    style: GoogleFonts.nunito(
+                      fontSize: 10,
+                      fontWeight: FontWeight.w900,
+                      color: AppColors.navyDark,
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                'Edit →',
+                style: GoogleFonts.nunito(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ],
           ),
         ),
+      ),
+    );
+  }
+
+  Widget _buildModeFeaturesPanel() {
+    final content = _kModeContent[_selectedMode];
+    if (content == null) return const SizedBox.shrink();
+
+    const modeColor = AppColors.gold;
+
+    return AnimatedSwitcher(
+      duration: const Duration(milliseconds: 260),
+      transitionBuilder: (child, anim) => FadeTransition(
+        opacity: anim,
+        child: SlideTransition(
+          position: Tween<Offset>(
+            begin: const Offset(0, 0.08),
+            end: Offset.zero,
+          ).animate(anim),
+          child: child,
+        ),
+      ),
+      child: Column(
+        key: ValueKey(_selectedMode),
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+
+          const SizedBox(height: 10),
+
+          // ── Filter chips row
+          SizedBox(
+            height: 34,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: (_kModeFilters[_selectedMode] ?? []).length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final filters = _kModeFilters[_selectedMode] ?? [];
+                final f = filters[i];
+                final isSelected = _selectedFilter == f.id;
+                return GestureDetector(
+                  onTap: () {
+                    HapticFeedback.selectionClick();
+                    setState(() => _selectedFilter = f.id);
+                  },
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 180),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 14, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? modeColor.withOpacity(0.18)
+                          : Colors.white.withOpacity(0.07),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(
+                        color: isSelected ? modeColor : Colors.white24,
+                        width: isSelected ? 1.5 : 1.0,
+                      ),
+                    ),
+                    child: Text(
+                      f.label,
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        fontWeight:
+                            isSelected ? FontWeight.w700 : FontWeight.w500,
+                        color: isSelected ? modeColor : Colors.white54,
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 10),
+
+          // ── Feature chips row
+          SizedBox(
+            height: 30,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: content.featureChips.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final chip = content.featureChips[i];
+                return GestureDetector(
+                  onTap: () => _handleFeatureChipTap(chip.label),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.white12),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(chip.icon,
+                            color: modeColor.withOpacity(0.7), size: 12),
+                        const SizedBox(width: 5),
+                        Text(
+                          chip.label,
+                          style: GoogleFonts.nunito(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white54,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          const SizedBox(height: 8),
+        ],
       ),
     );
   }
@@ -590,97 +2058,77 @@ class _ScanScreenState extends State<ScanScreen>
             end: Alignment.bottomCenter,
             colors: [
               Colors.transparent,
-              Colors.black.withOpacity(0.70),
-              Colors.black.withOpacity(0.97),
+              Colors.transparent,
+              _capturedPages.isEmpty
+                  ? Colors.black.withOpacity(0.75)
+                  : Colors.black.withOpacity(0.92),
+              _capturedPages.isEmpty
+                  ? Colors.black.withOpacity(0.90)
+                  : Colors.black.withOpacity(0.98),
             ],
-            stops: const [0, 0.28, 1],
+            stops: const [0, 0.10, 0.35, 1],
           ),
         ),
         child: SafeArea(
           top: false,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const SizedBox(height: 10),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.62,
+            ),
+            child: SingleChildScrollView(
+              physics: const NeverScrollableScrollPhysics(),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const SizedBox(height: 10),
 
-              // Thumbnail strip (visible only when pages > 0)
-              if (_capturedPages.isNotEmpty) _buildThumbnailStrip(),
-
-              const SizedBox(height: 4),
+              if (_longDocModeEnabled)
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton.icon(
+                      onPressed: _capturedPages.isEmpty
+                          ? null
+                          : () {
+                              setState(() => _longDocModeEnabled = false);
+                              _proceedToEdit();
+                            },
+                      icon: const Icon(Icons.check_rounded, size: 16),
+                      label: Text(
+                        'Done',
+                        style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  ),
+                ),
 
               // Mode selector
               _buildModeSelector(),
 
-              const SizedBox(height: 20),
-
-              // Shutter row
-              _buildShutterRow(),
-
-              const SizedBox(height: 30),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ── Thumbnail Strip ────────────────────────────────────────────────────────
-
-  Widget _buildThumbnailStrip() {
-    return SizedBox(
-      height: 64,
-      child: ListView.separated(
-        controller: _thumbScrollController,
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _capturedPages.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          return GestureDetector(
-            onTap: _proceedToEdit,
-            onLongPress: () => _confirmRemoveThumbnail(i),
-            child: Container(
-              width: 52,
-              height: 52,
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(
-                  color: Colors.white.withOpacity(0.35),
-                  width: 1.5,
-                ),
-                image: DecorationImage(
-                  image: FileImage(File(_capturedPages[i])),
-                  fit: BoxFit.cover,
-                ),
-              ),
-              child: Stack(
-                children: [
-                  // Page number badge
-                  Positioned(
-                    bottom: 3,
-                    right: 3,
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.65),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        '${i + 1}',
-                        style: GoogleFonts.nunito(
-                          fontSize: 9,
-                          fontWeight: FontWeight.w800,
-                          color: Colors.white,
-                        ),
-                      ),
+                  if (_modeWasExplicitlySelected) ...[
+                    const SizedBox(height: 10),
+                    AnimatedSize(
+                      duration: const Duration(milliseconds: 280),
+                      curve: Curves.easeOut,
+                      child: _modeWasExplicitlySelected
+                          ? _buildModeFeaturesPanel()
+                          : const SizedBox.shrink(),
                     ),
-                  ),
+                  ],
+
+                  const SizedBox(height: 14),
+
+                  // Shutter row
+                  _buildShutterRow(),
+
+                  SizedBox(
+                      height: MediaQuery.of(context).padding.bottom > 0 ? 12 : 30),
                 ],
               ),
             ),
-          );
-        },
+          ),
+        ),
       ),
     );
   }
@@ -689,57 +2137,62 @@ class _ScanScreenState extends State<ScanScreen>
 
   Widget _buildModeSelector() {
     return SizedBox(
-      height: 74,
-      child: ListView.separated(
-        controller: _modeScrollController,
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16),
-        itemCount: _kScanModes.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (context, i) {
-          final mode = _kScanModes[i];
-          final isSelected = _selectedMode == mode.id;
+      height: 44,
+      child: ScrollConfiguration(
+        behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
+        child: ListView.separated(
+          controller: _modeScrollController,
+          scrollDirection: Axis.horizontal,
+          physics: const BouncingScrollPhysics(),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          itemCount: _kScanModes.length,
+          separatorBuilder: (_, __) => const SizedBox(width: 6),
+          itemBuilder: (context, i) {
+            final mode = _kScanModes[i];
+            final isSelected = _selectedMode == mode.id;
 
-          return GestureDetector(
-            onTap: () => _selectMode(mode.id),
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 220),
-              curve: Curves.easeOut,
-              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-              decoration: BoxDecoration(
-                color: isSelected
-                    ? mode.color.withOpacity(0.18)
-                    : Colors.white.withOpacity(0.07),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: isSelected ? mode.color : Colors.white24,
-                  width: isSelected ? 1.8 : 1.0,
+            return GestureDetector(
+              onTap: () => _selectMode(mode.id),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 220),
+                curve: Curves.easeOut,
+                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                decoration: BoxDecoration(
+                  color: isSelected
+                      ? AppColors.gold
+                      : Colors.white.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(22),
+                  border: Border.all(
+                    color: isSelected
+                        ? AppColors.gold
+                        : Colors.white.withOpacity(0.15),
+                    width: 1.2,
+                  ),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      mode.icon,
+                      color: isSelected ? AppColors.navyDark : Colors.white60,
+                      size: 15,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      mode.label,
+                      style: GoogleFonts.nunito(
+                        fontSize: 11,
+                        fontWeight:
+                            isSelected ? FontWeight.w800 : FontWeight.w500,
+                        color: isSelected ? AppColors.navyDark : Colors.white60,
+                      ),
+                    ),
+                  ],
                 ),
               ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    mode.icon,
-                    color: isSelected ? mode.color : Colors.white60,
-                    size: 22,
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    mode.label,
-                    style: GoogleFonts.nunito(
-                      fontSize: 11,
-                      fontWeight:
-                          isSelected ? FontWeight.w800 : FontWeight.w500,
-                      color: isSelected ? mode.color : Colors.white60,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }
@@ -747,6 +2200,9 @@ class _ScanScreenState extends State<ScanScreen>
   // ── Shutter Row ────────────────────────────────────────────────────────────
 
   Widget _buildShutterRow() {
+    const ringColor = AppColors.gold;
+    const ringW = 4.5;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 44),
       child: Row(
@@ -755,44 +2211,98 @@ class _ScanScreenState extends State<ScanScreen>
         children: [
           // Gallery picker
           GestureDetector(
-            onTap: _pickFromGallery,
+            onTap: _showImportSheet,
             child: _sideBtn(const Icon(Iconsax.gallery, color: Colors.white, size: 26)),
           ),
 
-          // Shutter
-          GestureDetector(
-            onTap: _captureImage,
-            child: AnimatedContainer(
-              duration: const Duration(milliseconds: 100),
-              width: _isCapturing ? 74 : 80,
-              height: _isCapturing ? 74 : 80,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.white, width: 4),
-              ),
-              child: Center(
-                child: AnimatedContainer(
-                  duration: const Duration(milliseconds: 100),
-                  width: 62,
-                  height: 62,
+          Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (_selectedMode == 'qr')
+                Container(
+                  width: 80,
+                  height: 80,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: _isCapturing ? Colors.white60 : Colors.white,
+                    border: Border.all(color: AppColors.gold, width: 2.5),
+                    color: AppColors.gold.withOpacity(0.15),
                   ),
-                  child: _isCapturing
-                      ? const Center(
-                          child: CircularProgressIndicator(
-                            color: Colors.black45,
-                            strokeWidth: 2.5,
+                  child: Center(
+                    child: Text(
+                      'LIVE',
+                      style: GoogleFonts.nunito(
+                        color: AppColors.gold,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 13,
+                        letterSpacing: 1.5,
+                      ),
+                    ),
+                  ),
+                )
+              else
+                GestureDetector(
+                  onTap: _captureImage,
+                  child: Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      AnimatedContainer(
+                        duration: const Duration(milliseconds: 100),
+                        width: _isCapturing ? 74 : 80,
+                        height: _isCapturing ? 74 : 80,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: ringColor, width: ringW),
+                        ),
+                        child: Center(
+                          child: AnimatedContainer(
+                            duration: const Duration(milliseconds: 100),
+                            width: 62,
+                            height: 62,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _isCapturing ? Colors.white60 : Colors.white,
+                            ),
+                            child: _isCapturing
+                                ? const Center(
+                                    child: CircularProgressIndicator(
+                                      color: Colors.black45,
+                                      strokeWidth: 2.5,
+                                    ),
+                                  )
+                                : null,
                           ),
-                        )
-                      : null,
+                        ),
+                      ),
+                      if (_capturedPages.isNotEmpty && !_isCapturing)
+                        Positioned(
+                          top: -6,
+                          right: -6,
+                          child: Container(
+                            width: 22,
+                            height: 22,
+                            decoration: BoxDecoration(
+                              color: AppColors.gold,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.black, width: 1.5),
+                            ),
+                            child: Center(
+                              child: Text(
+                                '${_capturedPages.length}',
+                                style: GoogleFonts.nunito(
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w900,
+                                  color: AppColors.navyDark,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
                 ),
-              ),
-            ),
+            ],
           ),
 
-          // Flip camera
           GestureDetector(
             onTap: _flipCamera,
             child: _sideBtn(const Icon(Icons.flip_camera_ios_rounded,
@@ -811,7 +2321,7 @@ class _ScanScreenState extends State<ScanScreen>
       height: 56,
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.28),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(20),
         border: Border.all(color: Colors.white38, width: 1.5),
       ),
       child: child,
@@ -902,13 +2412,14 @@ class _ScanScreenState extends State<ScanScreen>
   }) {
     return GestureDetector(
       onTap: onTap,
+      behavior: HitTestBehavior.opaque,
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 200),
-        width: 40,
-        height: 40,
+        width: 42,
+        height: 42,
         decoration: BoxDecoration(
           color: bgColor,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(13),
         ),
         child: Icon(icon, color: color, size: 22),
       ),
@@ -952,35 +2463,85 @@ class _ScanFramePainter extends CustomPainter {
         top = size.height * 0.28;
         bottom = top + h;
         break;
-      case _FrameType.document:
-        final margin = size.width * 0.08;
+      case _FrameType.book:
+        final w = size.width * 0.90;
+        final h = w * 0.58;
+        left = (size.width - w) / 2;
+        right = left + w;
+        top = size.height * 0.22;
+        bottom = top + h;
+        break;
+      case _FrameType.whiteboard:
+        final margin = size.width * 0.05;
         left = margin;
         right = size.width - margin;
-        top = size.height * 0.17;
-        bottom = size.height * 0.68;
+        top = size.height * 0.10;
+        bottom = size.height * 0.82;
+        break;
+      case _FrameType.receipt:
+        var rw = size.width * 0.72;
+        var rh = rw * 1.28;
+        final maxH = size.height * 0.58;
+        if (rh > maxH) {
+          rh = maxH;
+          rw = rh / 1.28;
+        }
+        left = (size.width - rw) / 2;
+        right = left + rw;
+        top = size.height * 0.16;
+        bottom = top + rh;
+        break;
+      case _FrameType.table:
+        final tw = size.width * 0.90;
+        final th = tw * 0.52;
+        left = (size.width - tw) / 2;
+        right = left + tw;
+        top = size.height * 0.24;
+        bottom = top + th;
+        break;
+      case _FrameType.document:
+        left = 0;
+        right = size.width;
+        top = 0;
+        bottom = size.height;
         break;
     }
 
-    // ── Dim overlay ──
-    final dimPaint = Paint()
-      ..color = Colors.black.withOpacity(0.48)
-      ..style = PaintingStyle.fill;
+    if (frameType != _FrameType.document) {
+      left = left + 2;
+      top = top + 2;
+      right = right - 2;
+      bottom = bottom - 2;
+    }
 
-    final framePath = Path()
-      ..addRect(Rect.fromLTRB(left, top, right, bottom));
-    final fullPath = Path()
-      ..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-    final dimPath = Path.combine(PathOperation.difference, fullPath, framePath);
-    canvas.drawPath(dimPath, dimPaint);
+    // ── Dim overlay ──
+    if (frameType != _FrameType.document) {
+      final dimPaint = Paint()
+        ..color = Colors.black.withOpacity(0.48)
+        ..style = PaintingStyle.fill;
+
+      final framePath = Path()
+        ..addRect(Rect.fromLTRB(left, top, right, bottom));
+      final fullPath = Path()
+        ..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
+      final dimPath = Path.combine(PathOperation.difference, fullPath, framePath);
+      canvas.drawPath(dimPath, dimPaint);
+    }
 
     // ── Corner brackets ──
     final bracketPaint = Paint()
       ..color = frameColor
-      ..strokeWidth = 3.2
+      ..strokeWidth = 3.8
       ..style = PaintingStyle.stroke
       ..strokeCap = StrokeCap.round;
 
-    final cornerLen = frameType == _FrameType.qr ? 22.0 : 30.0;
+    final cornerLen = frameType == _FrameType.qr
+        ? 22.0
+        : (frameType == _FrameType.whiteboard
+            ? 26.0
+            : (frameType == _FrameType.receipt
+                ? 24.0
+                : (frameType == _FrameType.document ? 36.0 : 30.0)));
 
     void drawCorner(Offset a, Offset corner, Offset b) {
       final path = Path()
@@ -1054,4 +2615,256 @@ class _ScanFramePainter extends CustomPainter {
       old.frameColor != frameColor ||
       old.scanLineProgress != scanLineProgress ||
       old.showAlignmentGrid != showAlignmentGrid;
+}
+
+class _ImportSheet extends StatelessWidget {
+  final VoidCallback onPickGallery;
+  final VoidCallback onPickFiles;
+  final VoidCallback onPickCamera;
+  final VoidCallback onScanFromAlbum;
+
+  const _ImportSheet({
+    required this.onPickGallery,
+    required this.onPickFiles,
+    required this.onPickCamera,
+    required this.onScanFromAlbum,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: Color(0xFF0F1A2E),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+      ),
+      child: SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const SizedBox(height: 12),
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.white24,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 18),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'Import',
+                style: GoogleFonts.nunito(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 18,
+                ),
+              ),
+            ),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceAround,
+                children: [
+                  _tile(
+                    icon: Iconsax.gallery,
+                    label: 'Gallery',
+                    color: const Color(0xFF3B82F6),
+                    onTap: onPickGallery,
+                  ),
+                  _tile(
+                    icon: Iconsax.folder_open,
+                    label: 'Files',
+                    color: const Color(0xFFF59E0B),
+                    onTap: onPickFiles,
+                  ),
+                  _tile(
+                    icon: Iconsax.camera,
+                    label: 'Camera',
+                    color: const Color(0xFF22C55E),
+                    onTap: onPickCamera,
+                  ),
+                  _tile(
+                    icon: Iconsax.scan,
+                    label: 'Scan album',
+                    color: const Color(0xFFEC4899),
+                    onTap: onScanFromAlbum,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: Text(
+                'More options',
+                style: GoogleFonts.nunito(
+                  color: Colors.white54,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+            const SizedBox(height: 10),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+              child: Column(
+                children: [
+                  _listRow(
+                    context: context,
+                    icon: Icons.cloud_download_outlined,
+                    label: 'Google Drive',
+                    sub: 'Import documents from Drive',
+                    color: const Color(0xFF3B82F6),
+                    onTap: onPickFiles,
+                  ),
+                  const SizedBox(height: 8),
+                  _listRow(
+                    context: context,
+                    icon: Icons.cloud_outlined,
+                    label: 'Dropbox',
+                    sub: 'Import from Dropbox',
+                    color: const Color(0xFF06B6D4),
+                    onTap: onPickFiles,
+                  ),
+                  const SizedBox(height: 8),
+                  _listRow(
+                    context: context,
+                    icon: Icons.photo_library_outlined,
+                    label: 'All photos',
+                    sub: 'Browse full photo library',
+                    color: const Color(0xFFEC4899),
+                    onTap: onPickGallery,
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 24),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _tile({
+    required IconData icon,
+    required String label,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    const brandColor = AppColors.gold;
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Container(
+            width: 60,
+            height: 60,
+            decoration: BoxDecoration(
+              color: brandColor.withOpacity(0.15),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: brandColor.withOpacity(0.4),
+                width: 1.2,
+              ),
+            ),
+            child: Icon(icon, color: brandColor, size: 26),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            label,
+            textAlign: TextAlign.center,
+            style: GoogleFonts.nunito(
+              color: Colors.white70,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _listRow({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+    required String sub,
+    required Color color,
+    VoidCallback? onTap,
+  }) {
+    const brandColor = AppColors.gold;
+    return GestureDetector(
+      onTap: onTap ??
+          () {
+            Navigator.pop(context);
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  '$label imported via Files',
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+                ),
+                backgroundColor: AppColors.navyMid,
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
+          },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: Colors.white12),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 38,
+              height: 38,
+              decoration: BoxDecoration(
+                color: brandColor.withOpacity(0.15),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(icon, color: brandColor, size: 20),
+            ),
+            const SizedBox(width: 12),
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  label,
+                  style: GoogleFonts.nunito(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+                Text(
+                  sub,
+                  style: GoogleFonts.nunito(
+                    color: Colors.white38,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ],
+            ),
+            const Spacer(),
+            const Icon(
+              Icons.chevron_right_rounded,
+              color: Colors.white30,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }

@@ -3,10 +3,15 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:share_plus/share_plus.dart';
 import '../app_theme_controller.dart';
+import '../services/app_local_storage.dart';
+import '../services/biometric_service.dart';
 import '../services/database_service.dart';
+import '../services/document_export_service.dart';
 import '../theme.dart';
+import 'all_features_screen.dart';
+import 'onboarding_screen.dart';
 
 // Scanner-focused settings; toggles are wired to prefs / theme / DB where applicable.
 
@@ -32,6 +37,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _loadingStorage = false;
 
   bool _prefsLoaded = false;
+  bool _biometricLock = false;
+  bool _exportingZip = false;
 
   static const _formats = ['PDF', 'JPG'];
 
@@ -60,22 +67,44 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _loadPrefs() async {
-    final prefs = await SharedPreferences.getInstance();
+    final bio = await BiometricService.instance.isBiometricLockEnabled();
     if (!mounted) return;
     setState(() {
-      _autoEnhance       = prefs.getBool('autoEnhance')       ?? true;
-      _darkMode          = prefs.getBool('darkMode')          ?? false;
-      _gridView          = prefs.getBool('gridView')          ?? false;
-      _defaultFormat     = _normalizeFormat(prefs.getString('defaultFormat') ?? 'PDF');
-      _defaultQuality    = prefs.getString('defaultQuality')  ?? 'High';
-      _language          = prefs.getString('language')        ?? 'English';
-      _prefsLoaded       = true;
+      _autoEnhance    = AppLocalStorage.getBool('autoEnhance', defaultValue: true);
+      _darkMode       = AppLocalStorage.getBool('darkMode');
+      _gridView       = AppLocalStorage.getBool('gridView');
+      _defaultFormat  = _normalizeFormat(
+          AppLocalStorage.getString('defaultFormat', defaultValue: 'PDF'));
+      _defaultQuality = AppLocalStorage.getString('defaultQuality', defaultValue: 'High');
+      _language       = AppLocalStorage.getString('language', defaultValue: 'English');
+      _biometricLock  = bio;
+      _prefsLoaded    = true;
     });
   }
 
-  Future<void> _save(Future<void> Function(SharedPreferences) fn) async {
-    final prefs = await SharedPreferences.getInstance();
-    await fn(prefs);
+  Future<void> _exportAllZip() async {
+    if (_exportingZip) return;
+    setState(() => _exportingZip = true);
+    try {
+      final path =
+          await DocumentExportService.instance.exportAllDocumentsToZipFile();
+      if (!mounted) return;
+      if (path == null) {
+        _showInfo('Nothing to export', 'Add scans first, then try again.');
+        return;
+      }
+      await Share.shareXFiles(
+        [XFile(path)],
+        subject: 'ScanOnly backup',
+        text: 'Local backup of your ScanOnly library (ZIP is not encrypted—store safely).',
+      );
+    } catch (e) {
+      if (mounted) {
+        _showInfo('Export failed', e.toString());
+      }
+    } finally {
+      if (mounted) setState(() => _exportingZip = false);
+    }
   }
 
   // ── Storage helpers ───────────────────────────────────────────
@@ -170,9 +199,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             trailing: _language == l.$1
                 ? Icon(Iconsax.tick_circle, color: AppColors.navyDark, size: 20)
                 : null,
-            onTap: () {
+            onTap: () async {
               setState(() => _language = l.$1);
-              _save((p) => p.setString('language', _language));
+              await AppLocalStorage.setString('language', _language);
+              if (!mounted) return;
               Navigator.pop(context);
               _showSuccess(
                 'Zaban save ho gayi. Poori app ke liye app ek dafa band karke kholein.',
@@ -224,7 +254,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   void _showSuccess(String msg) => ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(msg, style: GoogleFonts.nunito()),
-          backgroundColor: AppColors.green,
+          backgroundColor: AppColors.navyMid,
           behavior: SnackBarBehavior.floating,
         ));
 
@@ -265,6 +295,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 // ── 1. Scan Settings ──────────────────────────
                 _sectionLabel('Scan Settings', Iconsax.camera, AppColors.gold),
+                _navTile(
+                  icon: Iconsax.element_4,
+                  color: AppColors.gold,
+                  title: 'All tools & features',
+                  subtitle: 'Tools hub — scan, OCR, PDF, share',
+                  onTap: () => Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const AllFeaturesScreen(),
+                        ),
+                      ),
+                ),
                 _toggleTile(
                   icon: Iconsax.magic_star,
                   color: AppColors.gold,
@@ -273,7 +315,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: _autoEnhance,
                   onChanged: (v) {
                     setState(() => _autoEnhance = v);
-                    _save((p) => p.setBool('autoEnhance', v));
+                    AppLocalStorage.setBool('autoEnhance', v);
                   },
                 ),
                 _toggleTile(
@@ -284,7 +326,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: _gridView,
                   onChanged: (v) {
                     setState(() => _gridView = v);
-                    _save((p) => p.setBool('gridView', v));
+                    AppLocalStorage.setBool('gridView', v);
                   },
                 ),
                 _pickerTile(
@@ -296,30 +338,90 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   options: _formats,
                   onChanged: (v) {
                     setState(() => _defaultFormat = v);
-                    _save((p) => p.setString('defaultFormat', v));
+                    AppLocalStorage.setString('defaultFormat', v);
                   },
                 ),
                 _pickerTile(
                   icon: Iconsax.setting_4,
-                  color: AppColors.purple,
+                  color: AppColors.navyMid,
                   title: 'Scan Quality',
                   subtitle: 'Scan resolution',
                   value: _defaultQuality,
                   options: _qualities,
                   onChanged: (v) {
                     setState(() => _defaultQuality = v);
-                    _save((p) => p.setString('defaultQuality', v));
+                    AppLocalStorage.setString('defaultQuality', v);
                   },
                 ),
 
                 const SizedBox(height: 20),
 
+                // ── Privacy & security (on-device value) ─────
+                _sectionLabel(
+                    'Privacy & security', Iconsax.shield_tick, AppColors.navyMid),
+                _privacyHighlightsCard(),
+                _toggleTile(
+                  icon: Iconsax.lock,
+                  color: AppColors.navyMid,
+                  title: 'Lock when leaving app',
+                  subtitle:
+                      'Face / fingerprint when returning from home or another app',
+                  value: _biometricLock,
+                  onChanged: (v) async {
+                    if (v) {
+                      final can =
+                          await BiometricService.instance.canUseBiometrics();
+                      if (!can) {
+                        if (!mounted) return;
+                        _showInfo(
+                          'Biometrics unavailable',
+                          'Add a fingerprint or face unlock in system settings first.',
+                        );
+                        return;
+                      }
+                      final ok =
+                          await BiometricService.instance.authenticate();
+                      if (!ok) return;
+                      await BiometricService.instance.enableBiometricLock();
+                      if (mounted) setState(() => _biometricLock = true);
+                    } else {
+                      await BiometricService.instance.disableBiometricLock();
+                      if (mounted) setState(() => _biometricLock = false);
+                    }
+                  },
+                ),
+                _actionTile(
+                  icon: Iconsax.document_upload,
+                  color: AppColors.gold,
+                  title: _exportingZip
+                      ? 'Creating backup…'
+                      : 'Export all documents (ZIP)',
+                  subtitle:
+                      'On-device backup file. ZIP is not encrypted—keep it private.',
+                  onTap: _exportingZip ? () {} : _exportAllZip,
+                ),
+                _navTile(
+                  icon: Iconsax.flash_1,
+                  color: AppColors.gold,
+                  title: 'Why ScanOnly?',
+                  subtitle:
+                      'Focused on fast local scanning—not a fax & cloud suite.',
+                  onTap: () => _showInfo(
+                        'Why ScanOnly?',
+                        'We keep the core loop fast: scan → enhance → one PDF on your phone. '
+                        'No account is required for saving. OCR and search run on-device. '
+                        'We skip bulky corporate extras so the app stays light and respectful of your time.',
+                      ),
+                ),
+
+                const SizedBox(height: 20),
+
                 // ── 2. Storage ────────────────────────────────
-                _sectionLabel('Storage', Iconsax.folder_2, AppColors.orange),
+                _sectionLabel('Storage', Iconsax.folder_2, AppColors.gold),
                 _storageTile(),
                 _actionTile(
                   icon: Iconsax.broom,
-                  color: AppColors.orange,
+                  color: AppColors.gold,
                   title: 'Clear Cache',
                   subtitle: _loadingStorage
                       ? 'Calculating…'
@@ -338,7 +440,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 20),
 
                 // ── 3. Appearance ─────────────────────────────
-                _sectionLabel('Appearance', Iconsax.brush_2, AppColors.purple),
+                _sectionLabel('Appearance', Iconsax.brush_2, AppColors.navyMid),
                 _toggleTile(
                   icon: _darkMode ? Iconsax.moon : Iconsax.sun_1,
                   color: AppColors.navyDark,
@@ -347,7 +449,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   value: _darkMode,
                   onChanged: (v) {
                     setState(() => _darkMode = v);
-                    _save((p) => p.setBool('darkMode', v));
+                    AppLocalStorage.setBool('darkMode', v);
                     AppThemeController.setDarkMode(v);
                   },
                 ),
@@ -364,11 +466,40 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // ── 4. About ──────────────────────────────────
                 _sectionLabel('About', Iconsax.info_circle, AppColors.navyMid),
                 _navTile(
+                  icon: Iconsax.book,
+                  color: AppColors.gold,
+                  title: 'Show intro again',
+                  subtitle: 'Replay the first-launch tour',
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute<void>(
+                        builder: (_) => const OnboardingScreen(
+                          replaceRootOnFinish: false,
+                        ),
+                      ),
+                    );
+                  },
+                ),
+                _navTile(
                   icon: Iconsax.mobile,
                   color: AppColors.navyMid,
                   title: 'App Version',
                   subtitle: 'v1.0.0 (Build 1)',
-                  onTap: () {},
+                  onTap: () => showAboutDialog(
+                        context: context,
+                        applicationName: 'ScanOnly',
+                        applicationVersion: '1.0.0+1',
+                        applicationIcon: const Icon(Iconsax.scan,
+                            color: AppColors.navyMid, size: 40),
+                        children: [
+                          Text(
+                            'ScanOnly: fast local scanning, one-tap PDFs, and optional biometric lock. '
+                            'We stay focused—no fax cloud suite.',
+                            style: GoogleFonts.nunito(fontSize: 13, height: 1.45),
+                          ),
+                        ],
+                      ),
                 ),
                 _navTile(
                   icon: Iconsax.shield,
@@ -379,7 +510,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 _navTile(
                   icon: Iconsax.document_text,
-                  color: AppColors.purple,
+                  color: AppColors.navyMid,
                   title: 'Terms of Use',
                   subtitle: 'Usage terms',
                   onTap: () => _showInfo('Terms of Use', 'Personal aur commercial use ke liye free. Redistribution allowed nahi.'),
@@ -422,6 +553,56 @@ class _SettingsScreenState extends State<SettingsScreen> {
               ],
             ),
           ),
+        ),
+      );
+
+  Widget _privacyHighlightsCard() => Container(
+        width: double.infinity,
+        margin: const EdgeInsets.only(bottom: 12),
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: AppColors.gold.withOpacity(0.10),
+          borderRadius: BorderRadius.circular(14),
+          border: Border.all(color: AppColors.gold.withOpacity(0.30)),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              'On-device by default',
+              style: GoogleFonts.nunito(
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+                color: AppColors.navyDark,
+              ),
+            ),
+            const SizedBox(height: 8),
+            _privacyBullet('Scans & PDFs stay on this phone unless you share.'),
+            _privacyBullet('No account needed to save or search your library.'),
+            _privacyBullet('OCR runs locally so you can find text inside scans.'),
+          ],
+        ),
+      );
+
+  Widget _privacyBullet(String text) => Padding(
+        padding: const EdgeInsets.only(bottom: 6),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(Iconsax.tick_circle, size: 16, color: AppColors.gold),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                text,
+                style: GoogleFonts.nunito(
+                  fontSize: 12.5,
+                  height: 1.35,
+                  color: AppColors.textDark,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
         ),
       );
 

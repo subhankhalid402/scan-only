@@ -58,7 +58,7 @@ class _SearchScreenState extends State<SearchScreen> {
                         controller: _controller,
                         onChanged: _search,
                         decoration: InputDecoration(
-                          hintText: 'Search documents, text...',
+                          hintText: 'Search by name or text inside scans…',
                           hintStyle: GoogleFonts.nunito(color: Colors.grey),
                           prefixIcon: const Icon(Iconsax.search_normal, color: AppColors.navyMid),
                           suffixIcon: _controller.text.isNotEmpty
@@ -93,19 +93,70 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildEmptyState() {
+    void tryQuery(String q) {
+      _controller.text = q;
+      _search(q);
+      setState(() {});
+    }
+
     return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Iconsax.search_normal, size: 70, color: Colors.grey[300]),
-          const SizedBox(height: 16),
-          Text('Search your documents',
-            style: GoogleFonts.nunito(fontSize: 16, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
-          const SizedBox(height: 8),
-          Text('Search by name, date, or content',
-            style: GoogleFonts.nunito(fontSize: 13, color: Colors.grey[400])),
-        ],
+      child: SingleChildScrollView(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(Iconsax.search_normal, size: 70, color: Colors.grey[300]),
+            const SizedBox(height: 16),
+            Text(
+              'Search your library',
+              style: GoogleFonts.nunito(
+                  fontSize: 16,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w800),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              'Matches file names, tags, and text inside scans (OCR, on-device).',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(
+                  fontSize: 13, color: Colors.grey[500], height: 1.35),
+            ),
+            const SizedBox(height: 20),
+            Text(
+              'Try:',
+              style: GoogleFonts.nunito(
+                  fontSize: 12,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w700),
+            ),
+            const SizedBox(height: 10),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              alignment: WrapAlignment.center,
+              children: [
+                _suggestionChip('receipt', tryQuery),
+                _suggestionChip('invoice', tryQuery),
+                _suggestionChip('passport', tryQuery),
+                _suggestionChip('homework', tryQuery),
+                _suggestionChip('Work', tryQuery),
+                _suggestionChip('Tax', tryQuery),
+              ],
+            ),
+          ],
+        ),
       ),
+    );
+  }
+
+  Widget _suggestionChip(String label, void Function(String) onTap) {
+    return ActionChip(
+      label: Text(label,
+          style: GoogleFonts.nunito(
+              fontWeight: FontWeight.w700, fontSize: 13)),
+      onPressed: () => onTap(label),
+      backgroundColor: AppColors.navyMid.withValues(alpha: 0.08),
+      side: BorderSide(color: AppColors.navyMid.withValues(alpha: 0.2)),
     );
   }
 

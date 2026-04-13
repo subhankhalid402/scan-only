@@ -1,4 +1,3 @@
-import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
@@ -19,9 +18,12 @@ import 'import_documents_screen.dart';
 import 'search_screen.dart';
 import 'documents_screen.dart';
 import 'edit_scan_screen.dart';
+import 'signature_pad_screen.dart';
+import 'manual_erase_screen.dart';
+import 'merge_pdfs_screen.dart';
 
 // ══════════════════════════════════════════════════════════════
-//  AllFeaturesScreen  –  CamScanner-style layout
+//  AllFeaturesScreen  –  category + horizontal tiles layout
 //  • Vertical scroll karo (page ke through)
 //  • Har category ek horizontal scrollable row hai
 //  • No deep scrolling needed — sab kuch visible aur accessible
@@ -206,6 +208,16 @@ class AllFeaturesScreen extends StatelessWidget {
               color: AppColors.navyMid,
               onTap: () => _withImageForEdit(context),
             ),
+            _item(
+              icon: Iconsax.eraser,
+              title: 'Smart erase',
+              subtitle: 'Remove area',
+              color: AppColors.red,
+              onTap: () => _withImage(
+                  context,
+                  (path) =>
+                      _go(context, ManualEraseScreen(imagePath: path))),
+            ),
           ],
         ),
 
@@ -285,6 +297,16 @@ class AllFeaturesScreen extends StatelessWidget {
                           filePath: doc.filePath))),
             ),
             _item(
+              icon: Icons.compress_rounded,
+              title: 'Compress PDF',
+              subtitle: 'Reduce PDF file size',
+              color: AppColors.navyMid,
+              onTap: () => _withDoc(
+                  context,
+                  (doc) =>
+                      _go(context, DocumentViewerScreen(document: doc))),
+            ),
+            _item(
               icon: Iconsax.document_download,
               title: 'Export',
               subtitle: 'Save as PDF',
@@ -293,6 +315,13 @@ class AllFeaturesScreen extends StatelessWidget {
                   context,
                   (doc) =>
                       _go(context, DocumentViewerScreen(document: doc))),
+            ),
+            _item(
+              icon: Iconsax.document_copy,
+              title: 'Merge PDFs',
+              subtitle: 'Combine files',
+              color: AppColors.purple,
+              onTap: () => _go(context, const MergePdfsScreen()),
             ),
           ],
         ),
@@ -348,6 +377,13 @@ class AllFeaturesScreen extends StatelessWidget {
               subtitle: 'Pick & scan photo',
               color: AppColors.red,
               onTap: () => _pickAndEdit(context),
+            ),
+            _item(
+              icon: Iconsax.pen_add,
+              title: 'Signature',
+              subtitle: 'Draw & save',
+              color: AppColors.purple,
+              onTap: () => _go(context, const SignaturePadScreen()),
             ),
           ],
         ),
@@ -418,12 +454,13 @@ class AllFeaturesScreen extends StatelessWidget {
       _showInfo(context, 'Pehle koi document scan karein ya import karein.');
       return;
     }
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (_) => Column(
+      builder: (sheetCtx) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 12),
@@ -444,21 +481,28 @@ class AllFeaturesScreen extends StatelessWidget {
             height: 280,
             child: ListView.builder(
               itemCount: docs.length,
-              itemBuilder: (ctx, i) => ListTile(
-                leading:
-                    Icon(Iconsax.document, color: AppColors.navyMid),
-                title: Text(docs[i].name,
+              itemBuilder: (ctx, i) {
+                final chosen = docs[i];
+                return ListTile(
+                  leading: Icon(Iconsax.document, color: AppColors.navyMid),
+                  title: Text(
+                    chosen.name,
+                    style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+                  ),
+                  subtitle: Text(
+                    chosen.fileType.toUpperCase(),
                     style: GoogleFonts.nunito(
-                        fontWeight: FontWeight.w700)),
-                subtitle: Text(
-                    docs[i].fileType.toUpperCase(),
-                    style: GoogleFonts.nunito(
-                        fontSize: 11, color: AppColors.textMuted)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  onDoc(docs[i]);
-                },
-              ),
+                        fontSize: 11, color: AppColors.textMuted),
+                  ),
+                  onTap: () {
+                    Navigator.pop(sheetCtx);
+                    Future.microtask(() {
+                      if (!context.mounted) return;
+                      onDoc(chosen);
+                    });
+                  },
+                );
+              },
             ),
           ),
           const SizedBox(height: 16),
@@ -491,19 +535,19 @@ class _CategorySection extends StatelessWidget {
       children: [
         // ── Section header ──────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 10, 18, 8),
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
           child: Row(
             children: [
               Container(
-                width: 28,
-                height: 28,
+                width: 30,
+                height: 30,
                 decoration: BoxDecoration(
                   color: section.color.withOpacity(0.15),
-                  borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(9),
                 ),
-                child: Icon(section.icon, color: section.color, size: 15),
+                child: Icon(section.icon, color: section.color, size: 16),
               ),
-              const SizedBox(width: 8),
+              const SizedBox(width: 9),
               Text(
                 section.title,
                 style: GoogleFonts.nunito(
@@ -516,19 +560,24 @@ class _CategorySection extends StatelessWidget {
           ),
         ),
 
-        // ── Horizontal scrollable tiles ─────────────────────────
-        SizedBox(
-          height: 108, // fixed height — no vertical overflow
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 14),
+        // ── Grid (no horizontal scroll) ─────────────────────────
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 14),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 4,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.82,
+            ),
             itemCount: section.items.length,
-            itemBuilder: (_, i) =>
-                _FeatureTile(item: section.items[i]),
+            itemBuilder: (_, i) => _FeatureTile(item: section.items[i]),
           ),
         ),
 
-        const SizedBox(height: 6),
+        const SizedBox(height: 14),
 
         // ── Divider between sections ────────────────────────────
         Divider(
@@ -538,7 +587,6 @@ class _CategorySection extends StatelessWidget {
           indent: 18,
           endIndent: 18,
         ),
-        const SizedBox(height: 4),
       ],
     );
   }
@@ -557,15 +605,13 @@ class _FeatureTile extends StatelessWidget {
     return GestureDetector(
       onTap: item.onTap,
       child: Container(
-        width: 78,
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
         decoration: BoxDecoration(
           color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
               color: Colors.black.withOpacity(0.06),
-              blurRadius: 8,
+              blurRadius: 6,
               offset: const Offset(0, 2),
             ),
           ],
@@ -573,26 +619,23 @@ class _FeatureTile extends StatelessWidget {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // ── Icon bubble ─────────────────────────────────────
             Container(
-              width: 44,
-              height: 44,
+              width: 42,
+              height: 42,
               decoration: BoxDecoration(
                 color: item.color.withOpacity(0.12),
-                borderRadius: BorderRadius.circular(13),
+                borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(item.icon, color: item.color, size: 22),
+              child: Icon(item.icon, color: item.color, size: 21),
             ),
-            const SizedBox(height: 7),
-
-            // ── Title ───────────────────────────────────────────
+            const SizedBox(height: 6),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
                 item.title,
                 style: GoogleFonts.nunito(
                   fontWeight: FontWeight.w700,
-                  fontSize: 10.5,
+                  fontSize: 10,
                   color: const Color(0xFF1E2A4A),
                 ),
                 textAlign: TextAlign.center,

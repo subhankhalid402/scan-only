@@ -7,9 +7,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme.dart';
 import '../services/ocr_service.dart';
+import '../services/translation_service.dart';
 
 // ══════════════════════════════════════════════════════════════
-//  TextExtractionScreen  –  CamScanner-style OCR screen
+//  TextExtractionScreen  –  OCR screen
 //
 //  Working features:
 //  ✅ OCR extraction with real loading state
@@ -20,7 +21,7 @@ import '../services/ocr_service.dart';
 //  ✅ Re-extract (retry) button
 //  ✅ Select-all shortcut
 //  ✅ Word / line / confidence stats
-//  ✅ Language selector for translate (UI-ready, hook your service)
+//  ✅ On-device translate (ML Kit) with language chips
 // ══════════════════════════════════════════════════════════════
 
 class TextExtractionScreen extends StatefulWidget {
@@ -38,6 +39,7 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
   bool _isEditing = false;
   bool _isSaving = false;
   bool _textEdited = false;
+  bool _isTranslating = false;
 
   late TextEditingController _textController;
 
@@ -175,49 +177,104 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
   // ── Translate sheet ───────────────────────────────────────────
 
   void _showTranslateSheet() {
-    // UI-ready: hook your translate service here.
-    // Languages list — extend as needed.
     final langs = [
-      ('Urdu', '🇵🇰'), ('English', '🇬🇧'), ('Arabic', '🇸🇦'),
-      ('French', '🇫🇷'), ('German', '🇩🇪'), ('Spanish', '🇪🇸'),
-      ('Chinese', '🇨🇳'), ('Hindi', '🇮🇳'),
+      ('Urdu', '🇵🇰'),
+      ('English', '🇬🇧'),
+      ('Arabic', '🇸🇦'),
+      ('French', '🇫🇷'),
+      ('German', '🇩🇪'),
+      ('Spanish', '🇪🇸'),
+      ('Chinese', '🇨🇳'),
+      ('Hindi', '🇮🇳'),
     ];
 
-    showModalBottomSheet(
+    showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(22))),
-      builder: (_) => Column(
+      builder: (sheetCtx) => Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 10),
-          Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey[300],
+          Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2))),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Text('Translate to…',
-                style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 16)),
+                style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w800, fontSize: 16)),
           ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              'On-device ML Kit. First use may download language packs.',
+              textAlign: TextAlign.center,
+              style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted),
+            ),
+          ),
+          const SizedBox(height: 12),
           Wrap(
-            spacing: 10, runSpacing: 10,
+            spacing: 10,
+            runSpacing: 10,
             alignment: WrapAlignment.center,
-            children: langs.map((l) => ActionChip(
-              avatar: Text(l.$2, style: const TextStyle(fontSize: 16)),
-              label: Text(l.$1, style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 13)),
-              backgroundColor: AppColors.navyDark.withOpacity(0.06),
-              onPressed: () {
-                Navigator.pop(context);
-                // TODO: call your translate service with (text, targetLang: l.$1)
-                _showSuccess('Translate feature ke liye apna service hook karein.');
-              },
-            )).toList(),
+            children: langs
+                .map((l) => ActionChip(
+                      avatar: Text(l.$2, style: const TextStyle(fontSize: 16)),
+                      label: Text(l.$1,
+                          style: GoogleFonts.nunito(
+                              fontWeight: FontWeight.w700, fontSize: 13)),
+                      backgroundColor: AppColors.navyDark.withOpacity(0.06),
+                      onPressed: () async {
+                        Navigator.pop(sheetCtx);
+                        if (!mounted) return;
+                        await _translateTo(l.$1);
+                      },
+                    ))
+                .toList(),
           ),
           const SizedBox(height: 20),
         ],
       ),
     );
+  }
+
+  Future<void> _translateTo(String targetDisplayName) async {
+    final text = _currentText;
+    if (text.isEmpty) {
+      _showError('No text to translate.');
+      return;
+    }
+    setState(() => _isTranslating = true);
+    try {
+      final translated = await TranslationService.instance
+          .translateToNamedLanguage(text, targetDisplayName);
+      if (!mounted) return;
+      final trimmed = translated.trim();
+      setState(() {
+        _extractedText = trimmed;
+        _textController.text = trimmed;
+        _isTranslating = false;
+        final words = trimmed
+            .split(RegExp(r'\s+'))
+            .where((w) => w.isNotEmpty)
+            .length;
+        final lines =
+            trimmed.split('\n').where((l) => l.isNotEmpty).length;
+        _stats = {..._stats, 'wordCount': words, 'lineCount': lines};
+      });
+      _showSuccess('Translated to $targetDisplayName.');
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isTranslating = false);
+        _showError(
+            'Translation failed. Ensure network for first-time model download, then retry. ($e)');
+      }
+    }
   }
 
   void _showDiscardDialog() {
@@ -285,7 +342,38 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F6FA),
       appBar: _buildAppBar(),
-      body: _isExtracting ? _buildLoading() : _buildBody(),
+      body: Stack(
+        children: [
+          _isExtracting ? _buildLoading() : _buildBody(),
+          if (_isTranslating)
+            ColoredBox(
+              color: Colors.black26,
+              child: Center(
+                child: Card(
+                  shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(24),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const CircularProgressIndicator(color: AppColors.gold),
+                        const SizedBox(height: 16),
+                        Text(
+                          'Translating…',
+                          style: GoogleFonts.nunito(
+                            fontWeight: FontWeight.w800,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
     );
   }
 

@@ -12,6 +12,9 @@ class WatermarkService {
   Future<String> addTextWatermark(
     String imagePath, {
     required String text,
+    int red = 180,
+    int green = 180,
+    int blue = 180,
     int opacity = 100,
   }) async {
     try {
@@ -20,7 +23,12 @@ class WatermarkService {
       var image = img.decodeImage(bytes);
       if (image == null) throw Exception('Could not decode image');
 
-      final color = img.ColorRgba8(180, 180, 180, opacity);
+      final color = img.ColorRgba8(
+        red.clamp(0, 255),
+        green.clamp(0, 255),
+        blue.clamp(0, 255),
+        opacity.clamp(0, 255),
+      );
 
       // Draw watermark text multiple times diagonally
       final positions = [
@@ -132,6 +140,9 @@ class WatermarkService {
     return addTextWatermark(
       imagePath,
       text: '© $copyrightText',
+      red: 40,
+      green: 48,
+      blue: 88,
       opacity: 120,
     );
   }

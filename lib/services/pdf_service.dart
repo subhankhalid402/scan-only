@@ -6,6 +6,10 @@ import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as pathLib;
 import 'package:intl/intl.dart';
 import 'package:image/image.dart' as img;
+import 'package:pdfx/pdfx.dart' as pdfx;
+
+import '../models/document_model.dart';
+import 'database_service.dart';
 
 class PdfService {
   static final PdfService instance = PdfService._init();
@@ -49,6 +53,44 @@ class PdfService {
     final file = File(filePath);
     await file.writeAsBytes(await pdf.save());
     return filePath;
+  }
+
+  static String _pdfNameStem(String displayName) {
+    var stem = pathLib.basenameWithoutExtension(displayName);
+    stem = stem.replaceAll(RegExp(r'[^\w\-\s\(\)]'), '_').trim();
+    if (stem.isEmpty) stem = 'Scan';
+    return stem;
+  }
+
+  /// Creates a PDF from image paths, registers it in the local library.
+  Future<DocumentModel?> createLibraryPdfFromImages(
+    List<String> imagePaths,
+    String sourceDisplayName, {
+    String scanType = 'document',
+  }) async {
+    final existing = <String>[];
+    for (final p in imagePaths) {
+      if (await File(p).exists()) existing.add(p);
+    }
+    if (existing.isEmpty) return null;
+
+    final stem = _pdfNameStem(sourceDisplayName);
+    final pdfPath = await createPdfFromImages(existing, stem);
+    final thumbPath = await generateThumbnail(existing.first);
+    final fileSizeMB = await getFileSizeMB(pdfPath);
+
+    final doc = DocumentModel(
+      name: '$stem.pdf',
+      filePath: pdfPath,
+      fileType: 'pdf',
+      scanType: scanType,
+      pageCount: existing.length,
+      fileSizeMB: fileSizeMB,
+      createdAt: DateTime.now(),
+      thumbnailPath: thumbPath,
+    );
+    final id = await DatabaseService.instance.insertDocument(doc);
+    return doc.copyWith(id: id);
   }
 
   /// Create PDF with embedded OCR text layer (searchable PDF)
@@ -201,5 +243,100 @@ class PdfService {
     final pdfDir = Directory('${outputDir.path}/ScanOnly/PDFs');
     if (!await pdfDir.exists()) return [];
     return pdfDir.listSync();
+  }
+
+  /// Smaller PDF by re-encoding images (JPEG quality + max width).
+  Future<String> createCompressedPdfFromImages(
+    List<String> imagePaths,
+    String documentName, {
+    int jpegQuality = 58,
+    int maxWidth = 1400,
+  }) async {
+    final pdf = pw.Document();
+
+    for (final imagePath in imagePaths) {
+      final imageFile = File(imagePath);
+      if (!await imageFile.exists()) continue;
+
+      final raw = await imageFile.readAsBytes();
+      var decoded = img.decodeImage(raw);
+      if (decoded == null) continue;
+      if (decoded.width > maxWidth) {
+        decoded = img.copyResize(decoded, width: maxWidth);
+      }
+      final jpg = img.encodeJpg(decoded, quality: jpegQuality);
+      final pdfImage = pw.MemoryImage(jpg);
+
+      pdf.addPage(
+        pw.Page(
+          pageFormat: PdfPageFormat.a4,
+          margin: pw.EdgeInsets.zero,
+          build: (pw.Context context) {
+            return pw.Center(
+              child: pw.Image(pdfImage, fit: pw.BoxFit.contain),
+            );
+          },
+        ),
+      );
+    }
+
+    final outputDir = await getApplicationDocumentsDirectory();
+    final pdfDir = Directory('${outputDir.path}/ScanOnly/PDFs');
+    await pdfDir.create(recursive: true);
+
+    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final filePath = '${pdfDir.path}/${documentName}_compressed_$timestamp.pdf';
+    await File(filePath).writeAsBytes(await pdf.save());
+    return filePath;
+  }
+
+  /// Merge multiple PDFs into one (rasterize pages via pdfx, then build a new PDF).
+  Future<String> mergePdfFiles(List<String> pdfPaths, String documentName) async {
+    if (pdfPaths.isEmpty) {
+      throw ArgumentError('No PDF files to merge');
+    }
+
+    final tempDir = await getTemporaryDirectory();
+    final imagePaths = <String>[];
+    var seq = 0;
+
+    for (final pdfPath in pdfPaths) {
+      final file = File(pdfPath);
+      if (!await file.exists()) continue;
+
+      final doc = await pdfx.PdfDocument.openFile(pdfPath);
+      try {
+        for (var p = 1; p <= doc.pagesCount; p++) {
+          final page = await doc.getPage(p);
+          try {
+            final rw = (page.width * 2).clamp(480.0, 2200.0);
+            final rh = (page.height * (rw / page.width)).clamp(400.0, 3200.0);
+            final rendered = await page.render(
+              width: rw,
+              height: rh,
+              format: pdfx.PdfPageImageFormat.jpeg,
+              quality: 85,
+            );
+            if (rendered != null && rendered.bytes.isNotEmpty) {
+              final out = File(
+                '${tempDir.path}/merge_${DateTime.now().microsecondsSinceEpoch}_${seq++}.jpg',
+              );
+              await out.writeAsBytes(rendered.bytes);
+              imagePaths.add(out.path);
+            }
+          } finally {
+            await page.close();
+          }
+        }
+      } finally {
+        await doc.close();
+      }
+    }
+
+    if (imagePaths.isEmpty) {
+      throw StateError('Could not read any pages from the selected PDFs');
+    }
+
+    return createPdfFromImages(imagePaths, '${documentName}_merged');
   }
 }

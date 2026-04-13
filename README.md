@@ -1,6 +1,6 @@
 # ScanOnly - Free Document Scanner App
 
-A full-featured document scanner app like CamScanner — 100% FREE, Offline, and Private!
+A full-featured document scanner app — 100% FREE, offline, and private.
 
 ## Features
 - **Scan Documents** - Camera scanner with edge detection frame

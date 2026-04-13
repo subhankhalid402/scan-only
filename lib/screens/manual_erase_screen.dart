@@ -9,7 +9,7 @@ import 'package:iconsax/iconsax.dart';
 import '../services/smart_erase_service.dart';
 import '../theme.dart';
 
-/// CamScanner-style: user drags a rectangle on the page to choose what to remove.
+/// User drags a rectangle on the page to choose what to remove.
 class ManualEraseScreen extends StatefulWidget {
   const ManualEraseScreen({super.key, required this.imagePath});
 
@@ -210,7 +210,7 @@ class _ManualEraseScreenState extends State<ManualEraseScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 12, 20, 8),
             child: Text(
-              'Drag a rectangle over the part you want to remove (like CamScanner).',
+              'Drag a rectangle over the part you want to remove.',
               textAlign: TextAlign.center,
               style: GoogleFonts.nunito(color: Colors.white70, fontSize: 14, height: 1.35),
             ),

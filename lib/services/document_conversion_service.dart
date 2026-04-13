@@ -168,6 +168,35 @@ class DocumentConversionService {
     }
   }
 
+  /// Convert plain text to PDF
+  Future<String> convertTextToPdf(String text, {String fileName = 'text_document'}) async {
+    try {
+      final pdf = pw.Document();
+
+      pdf.addPage(
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          build: (pw.Context context) => [
+            pw.Text(
+              text.trim().isEmpty ? ' ' : text,
+              style: const pw.TextStyle(fontSize: 12),
+            ),
+          ],
+        ),
+      );
+
+      final directory = await getApplicationDocumentsDirectory();
+      final safeName = fileName.trim().isEmpty ? 'text_document' : fileName.trim();
+      final outputPath =
+          '${directory.path}/${safeName}_converted_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final outputFile = File(outputPath);
+      await outputFile.writeAsBytes(await pdf.save());
+      return outputPath;
+    } catch (e) {
+      throw Exception('Text to PDF conversion failed: $e');
+    }
+  }
+
   /// Get supported formats
   List<String> getSupportedFormats() {
     return ['.docx', '.pptx', '.jpg', '.jpeg', '.png', '.pdf'];

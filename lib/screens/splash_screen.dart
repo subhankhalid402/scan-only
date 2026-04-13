@@ -1,11 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import '../services/app_local_storage.dart';
 import '../theme.dart';
+import 'edit_scan_screen.dart';
 import 'home_screen.dart';
+import 'onboarding_screen.dart';
+import 'scan_screen.dart';
 
 class SplashScreen extends StatefulWidget {
-  const SplashScreen({super.key});
+  final String? initialSharedFile;
+  const SplashScreen({super.key, this.initialSharedFile});
 
   @override
   State<SplashScreen> createState() => _SplashScreenState();
@@ -21,7 +26,7 @@ class _SplashScreenState extends State<SplashScreen>
   void initState() {
     super.initState();
     _animationController = AnimationController(
-      duration: const Duration(milliseconds: 1500),
+      duration: const Duration(milliseconds: 1000),
       vsync: this,
     );
 
@@ -35,11 +40,45 @@ class _SplashScreenState extends State<SplashScreen>
 
     _animationController.forward();
 
-    // Navigate to home after 3 seconds
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) {
+    // ~1s minimum for branding; prefs load in parallel (was a fixed 2.2s wait every launch).
+    Future.microtask(() async {
+      await Future.delayed(const Duration(milliseconds: 1000));
+      if (!mounted) return;
+      final done =
+          AppLocalStorage.getBool(OnboardingScreen.kOnboardingPrefsKey);
+      if (!mounted) return;
+      if (done) {
+        final shared = widget.initialSharedFile;
+        if (shared != null && shared.isNotEmpty) {
+          final lower = shared.toLowerCase();
+          final isImage = lower.endsWith('.jpg') ||
+              lower.endsWith('.jpeg') ||
+              lower.endsWith('.png') ||
+              lower.endsWith('.webp');
+          if (isImage) {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => EditScanScreen(
+                  imagePaths: [shared],
+                  scanType: 'gallery',
+                ),
+              ),
+            );
+          } else {
+            Navigator.of(context).pushReplacement(
+              MaterialPageRoute(
+                builder: (_) => const ScanScreen(scanType: 'gallery'),
+              ),
+            );
+          }
+          return;
+        }
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
+        );
+      } else {
+        Navigator.of(context).pushReplacement(
+          MaterialPageRoute(builder: (_) => const OnboardingScreen()),
         );
       }
     });

@@ -63,6 +63,17 @@ class DatabaseService {
     return result.map((map) => DocumentModel.fromMap(map)).toList();
   }
 
+  /// Newest first, capped in SQL (avoids loading the whole table for home / previews).
+  Future<List<DocumentModel>> getRecentDocuments(int limit) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'documents',
+      orderBy: 'createdAt DESC',
+      limit: limit,
+    );
+    return result.map((map) => DocumentModel.fromMap(map)).toList();
+  }
+
   Future<List<DocumentModel>> searchDocuments(String query) async {
     final db = await instance.database;
     final q = '%$query%';

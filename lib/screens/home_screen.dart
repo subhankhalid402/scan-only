@@ -1,3 +1,5 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
@@ -6,11 +8,14 @@ import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../models/document_model.dart';
 import '../services/database_service.dart';
+import '../services/pdf_service.dart';
 import 'scan_screen.dart';
 import 'documents_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'document_viewer_screen.dart';
+import 'features_hub_screen.dart';
+import 'advanced_sharing_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,7 +26,15 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  int _docsRefreshToken = 0;
   List<DocumentModel> _recentDocs = [];
+  void _openTab(int index) {
+    setState(() {
+      _selectedIndex = index;
+      if (index == 1) _docsRefreshToken++;
+    });
+  }
+
 
   @override
   void initState() {
@@ -30,9 +43,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _loadRecentDocs() async {
-    final docs = await DatabaseService.instance.getAllDocuments();
+    final docs = await DatabaseService.instance.getRecentDocuments(5);
     if (mounted) {
-      setState(() => _recentDocs = docs.take(5).toList());
+      setState(() => _recentDocs = docs);
     }
   }
 
@@ -41,6 +54,147 @@ class _HomeScreenState extends State<HomeScreen> {
       context,
       MaterialPageRoute(builder: (_) => ScanScreen(scanType: scanType)),
     ).then((_) => _loadRecentDocs());
+  }
+
+  Future<void> _shareDocument(DocumentModel doc) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => AdvancedSharingScreen(
+          filePath: doc.filePath,
+          fileName: doc.name,
+        ),
+      ),
+    );
+  }
+
+  Future<void> _renameDocument(DocumentModel doc) async {
+    final controller = TextEditingController(text: doc.name);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Rename document',
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+        ),
+        content: TextField(
+          controller: controller,
+          autofocus: true,
+          decoration: InputDecoration(
+            border:
+                OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('Cancel'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
+            child: Text(
+              'Save',
+              style: GoogleFonts.nunito(
+                color: AppColors.navyDark,
+                fontWeight: FontWeight.w700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (saved == true &&
+        controller.text.trim().isNotEmpty &&
+        mounted) {
+      await DatabaseService.instance.updateDocument(
+        doc.copyWith(
+          name: controller.text.trim(),
+          modifiedAt: DateTime.now(),
+        ),
+      );
+      _loadRecentDocs();
+    }
+    controller.dispose();
+  }
+
+  bool _isRasterDoc(DocumentModel d) {
+    final t = d.fileType.toLowerCase();
+    if (t == 'jpg' || t == 'jpeg' || t == 'png' || t == 'webp') return true;
+    final dot = d.filePath.lastIndexOf('.');
+    if (dot < 0 || dot >= d.filePath.length - 1) return false;
+    final ext = d.filePath.substring(dot + 1).toLowerCase();
+    return ext == 'jpg' ||
+        ext == 'jpeg' ||
+        ext == 'png' ||
+        ext == 'webp';
+  }
+
+  Future<void> _generatePdf(DocumentModel doc) async {
+    if (!_isRasterDoc(doc)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Generate PDF is for JPG/PNG scans only.')),
+      );
+      return;
+    }
+    if (!await File(doc.filePath).exists()) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('File not found.')),
+      );
+      return;
+    }
+    if (!mounted) return;
+
+    showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      useRootNavigator: true,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(width: 20),
+            Expanded(
+              child: Text(
+                'Generating PDF…',
+                style: GoogleFonts.nunito(fontWeight: FontWeight.w600),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      final saved = await PdfService.instance.createLibraryPdfFromImages(
+        [doc.filePath],
+        doc.name,
+        scanType: doc.scanType,
+      );
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (!mounted) return;
+      if (saved != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('PDF saved: ${saved.name}'),
+            backgroundColor: AppColors.navyMid,
+          ),
+        );
+        _loadRecentDocs();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Could not create PDF.')),
+        );
+      }
+    } catch (e) {
+      if (mounted) Navigator.of(context, rootNavigator: true).pop();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('PDF failed: $e')),
+      );
+    }
   }
 
   @override
@@ -57,7 +211,10 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _selectedIndex,
         children: [
           _buildHomePage(),
-          DocumentsScreen(onRefresh: _loadRecentDocs),
+          DocumentsScreen(
+            onRefresh: _loadRecentDocs,
+            refreshToken: _docsRefreshToken,
+          ),
           const SearchScreen(),
           const SettingsScreen(),
         ],
@@ -102,9 +259,9 @@ class _HomeScreenState extends State<HomeScreen> {
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
           colors: [
-            Color(0xFF0B1740),
-            Color(0xFF162460),
-            Color(0xFF1E3A8A),
+            AppColors.navyDark,
+            AppColors.navyMid,
+            AppColors.navyLight,
           ],
         ),
       ),
@@ -141,34 +298,74 @@ class _HomeScreenState extends State<HomeScreen> {
                       color: Colors.white,
                     ),
                   ),
-                  const Spacer(),
-                  // Notification bell
-                  Container(
-                    width: 42, height: 42,
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.08),
-                      shape: BoxShape.circle,
-                      border: Border.all(color: Colors.white24),
-                    ),
-                    child: const Icon(Iconsax.notification, color: Colors.white, size: 20),
-                  ),
                 ],
               ),
             ),
 
             const SizedBox(height: 20),
 
-            // Scanner shortcuts (essentials only)
+            // Scan type grid — 2 rows of 4
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Row(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
                 children: [
-                  Expanded(child: _scanTile(Iconsax.document_text, 'Document', 'document', AppColors.gold)),
-                  Expanded(child: _scanTile(Iconsax.card, 'ID', 'id_card', const Color(0xFF3B82F6))),
-                  Expanded(child: _scanTile(Iconsax.receipt, 'Receipt', 'receipt', const Color(0xFF22C55E))),
-                  Expanded(child: _scanTile(Iconsax.scan_barcode, 'QR', 'qr', const Color(0xFF6366F1))),
-                  Expanded(child: _scanTile(Iconsax.gallery, 'Import', 'gallery', const Color(0xFFEF4444))),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _scanTile(Iconsax.document_text, 'Document',  'document',   AppColors.gold),
+                      _scanTile(Iconsax.card,          'ID Card',   'id_card',    AppColors.gold),
+                      _scanTile(Iconsax.receipt,       'Receipt',   'receipt',    AppColors.gold),
+                      _scanTile(Iconsax.scan_barcode,  'QR Code',   'qr',         AppColors.gold),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      _scanTile(Iconsax.book,          'Book',       'book',       AppColors.gold),
+                      _scanTile(Iconsax.camera,        'Photo',      'photo',      AppColors.gold),
+                      _scanTile(Iconsax.gallery,       'Gallery',    'gallery',    AppColors.gold),
+                      _scanTile(Iconsax.text_block,    'Whiteboard', 'whiteboard', AppColors.gold),
+                    ],
+                  ),
                 ],
+              ),
+            ),
+
+            const SizedBox(height: 16),
+
+            // All Features button
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: GestureDetector(
+                onTap: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const FeaturesHubScreen()),
+                ),
+                child: Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.symmetric(vertical: 13),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.10),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(color: Colors.white12),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        'All Features',
+                        style: GoogleFonts.nunito(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w800,
+                          color: Colors.white,
+                        ),
+                      ),
+                      const SizedBox(width: 4),
+                      const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 20),
+                    ],
+                  ),
+                ),
               ),
             ),
 
@@ -237,7 +434,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               GestureDetector(
-                onTap: () => setState(() => _selectedIndex = 1),
+                onTap: () => _openTab(1),
                 child: Text(
                   'See all',
                   style: GoogleFonts.nunito(
@@ -259,7 +456,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     Icon(Iconsax.document, size: 64, color: Colors.grey[300]),
                     const SizedBox(height: 14),
                     Text(
-                      'No documents yet\nTap the camera button to scan!',
+                      'No documents yet',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.nunito(
                         fontSize: 14,
@@ -289,6 +486,10 @@ class _HomeScreenState extends State<HomeScreen> {
                       );
                       _loadRecentDocs();
                     },
+                    onShare: () => _shareDocument(doc),
+                    onRename: () => _renameDocument(doc),
+                    onGeneratePdf:
+                        _isRasterDoc(doc) ? () => _generatePdf(doc) : null,
                     onDelete: () async {
                       await DatabaseService.instance.deleteDocument(doc.id!);
                       _loadRecentDocs();
@@ -330,7 +531,7 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget _navItem(int index, IconData icon, String label) {
     final isActive = _selectedIndex == index;
     return GestureDetector(
-      onTap: () => setState(() => _selectedIndex = index),
+      onTap: () => _openTab(index),
       behavior: HitTestBehavior.opaque,
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -360,23 +561,29 @@ class _HomeScreenState extends State<HomeScreen> {
 class _DocCard extends StatelessWidget {
   final DocumentModel doc;
   final VoidCallback onTap;
+  final VoidCallback onShare;
+  final VoidCallback onRename;
+  final VoidCallback? onGeneratePdf;
   final VoidCallback onDelete;
 
   const _DocCard({
     required this.doc,
     required this.onTap,
+    required this.onShare,
+    required this.onRename,
+    this.onGeneratePdf,
     required this.onDelete,
   });
 
   Color _accentColor() {
     switch (doc.fileType) {
-      case 'pdf':  return const Color(0xFFEF4444);
+      case 'pdf':             return AppColors.navyDark;
       case 'jpg':
       case 'jpeg':
-      case 'png':  return const Color(0xFF3B82F6);
+      case 'png':             return AppColors.navyMid;
       case 'docx':
-      case 'doc':  return const Color(0xFF22C55E);
-      default:     return const Color(0xFF6366F1);
+      case 'doc':             return AppColors.gold;
+      default:                return AppColors.navyMid;
     }
   }
 
@@ -390,85 +597,121 @@ class _DocCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _accentColor();
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        margin: const EdgeInsets.only(bottom: 10),
-        decoration: BoxDecoration(
-          color: Colors.white,
+    // Whole row is one surface — tap anywhere (except ⋮) opens
+    // the document with a ripple. [PopupMenuButton] handles its own tap only.
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 10),
+      child: Material(
+        color: Colors.white,
+        elevation: 1.5,
+        shadowColor: Colors.black.withOpacity(0.08),
+        borderRadius: BorderRadius.circular(16),
+        clipBehavior: Clip.antiAlias,
+        child: InkWell(
+          onTap: onTap,
           borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, 2)),
-          ],
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(14),
-          child: Row(
-            children: [
-              // Left accent bar
-              Container(
-                width: 4, height: 56,
-                decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(2)),
-              ),
-              const SizedBox(width: 12),
-              // Icon
-              Container(
-                width: 48, height: 48,
-                decoration: BoxDecoration(
-                  color: color.withOpacity(0.12),
-                  borderRadius: BorderRadius.circular(12),
+          child: Padding(
+            padding: const EdgeInsets.all(14),
+            child: Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
                 ),
-                child: Icon(Iconsax.document_text, color: color, size: 24),
-              ),
-              const SizedBox(width: 12),
-              // Info
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      doc.name,
-                      style: GoogleFonts.nunito(
-                        fontSize: 13, fontWeight: FontWeight.w700, color: AppColors.textDark),
-                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Text(
-                          '${_formatDate(doc.createdAt)} · ${doc.pageCount} page${doc.pageCount > 1 ? 's' : ''}',
-                          style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted),
+                const SizedBox(width: 12),
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.12),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Icon(Iconsax.document_text, color: color, size: 24),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        doc.name,
+                        style: GoogleFonts.nunito(
+                          fontSize: 13,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textDark,
                         ),
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF0F0F0),
-                            borderRadius: BorderRadius.circular(6),
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          Text(
+                            '${_formatDate(doc.createdAt)} · ${doc.pageCount} page${doc.pageCount > 1 ? 's' : ''}',
+                            style: GoogleFonts.nunito(
+                              fontSize: 11,
+                              color: AppColors.textMuted,
+                            ),
                           ),
-                          child: Text(
-                            '${doc.fileSizeMB.toStringAsFixed(1)} MB',
-                            style: GoogleFonts.nunito(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.textMuted),
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 7,
+                              vertical: 2,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF0F0F0),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${doc.fileSizeMB.toStringAsFixed(1)} MB',
+                              style: GoogleFonts.nunito(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w600,
+                                color: AppColors.textMuted,
+                              ),
+                            ),
                           ),
-                        ),
-                      ],
-                    ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                PopupMenuButton<String>(
+                  icon: const Icon(Icons.more_vert, color: Colors.grey, size: 20),
+                  onSelected: (val) {
+                    switch (val) {
+                      case 'share':
+                        onShare();
+                        break;
+                      case 'rename':
+                        onRename();
+                        break;
+                      case 'pdf':
+                        onGeneratePdf?.call();
+                        break;
+                      case 'delete':
+                        onDelete();
+                        break;
+                    }
+                  },
+                  itemBuilder: (_) => [
+                    const PopupMenuItem(value: 'share', child: Text('Share')),
+                    const PopupMenuItem(value: 'rename', child: Text('Rename')),
+                    if (onGeneratePdf != null)
+                      const PopupMenuItem(
+                        value: 'pdf',
+                        child: Text('Generate PDF'),
+                      ),
+                    const PopupMenuItem(value: 'delete', child: Text('Delete')),
                   ],
                 ),
-              ),
-              // 3-dot menu
-              PopupMenuButton<String>(
-                icon: const Icon(Icons.more_vert, color: Colors.grey, size: 20),
-                onSelected: (val) {
-                  if (val == 'delete') onDelete();
-                },
-                itemBuilder: (_) => const [
-                  PopupMenuItem(value: 'share',  child: Text('Share')),
-                  PopupMenuItem(value: 'rename', child: Text('Rename')),
-                  PopupMenuItem(value: 'delete', child: Text('Delete')),
-                ],
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
