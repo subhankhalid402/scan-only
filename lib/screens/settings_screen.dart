@@ -32,8 +32,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   String _language = 'English';
 
   // ── Storage state ─────────────────────────────────────────────
-  double _cacheSize = 0;      // MB
-  double _storageUsed = 0;    // MB
+  double _cacheSize = 0; // MB
+  double _storageUsed = 0; // MB
   bool _loadingStorage = false;
 
   bool _prefsLoaded = false;
@@ -46,16 +46,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (v == 'JPG' || v == 'PDF') return v!;
     return 'PDF';
   }
+
   static const _qualities = ['Low', 'Medium', 'High', 'Ultra'];
   static const _languages = [
-    ('English',  '🇬🇧'),
-    ('اردو',     '🇵🇰'),
-    ('العربية',  '🇸🇦'),
+    ('English', '🇬🇧'),
+    ('اردو', '🇵🇰'),
+    ('العربية', '🇸🇦'),
     ('Français', '🇫🇷'),
-    ('Deutsch',  '🇩🇪'),
-    ('Español',  '🇪🇸'),
-    ('हिंदी',    '🇮🇳'),
-    ('中文',     '🇨🇳'),
+    ('Deutsch', '🇩🇪'),
+    ('Español', '🇪🇸'),
+    ('हिंदी', '🇮🇳'),
+    ('中文', '🇨🇳'),
   ];
 
   // ── Lifecycle ─────────────────────────────────────────────────
@@ -70,15 +71,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
     final bio = await BiometricService.instance.isBiometricLockEnabled();
     if (!mounted) return;
     setState(() {
-      _autoEnhance    = AppLocalStorage.getBool('autoEnhance', defaultValue: true);
-      _darkMode       = AppLocalStorage.getBool('darkMode');
-      _gridView       = AppLocalStorage.getBool('gridView');
-      _defaultFormat  = _normalizeFormat(
+      _autoEnhance = AppLocalStorage.getBool('autoEnhance', defaultValue: true);
+      _darkMode = AppLocalStorage.getBool('darkMode');
+      _gridView = AppLocalStorage.getBool('gridView');
+      _defaultFormat = _normalizeFormat(
           AppLocalStorage.getString('defaultFormat', defaultValue: 'PDF'));
-      _defaultQuality = AppLocalStorage.getString('defaultQuality', defaultValue: 'High');
-      _language       = AppLocalStorage.getString('language', defaultValue: 'English');
-      _biometricLock  = bio;
-      _prefsLoaded    = true;
+      _defaultQuality =
+          AppLocalStorage.getString('defaultQuality', defaultValue: 'High');
+      _language =
+          AppLocalStorage.getString('language', defaultValue: 'English');
+      _biometricLock = bio;
+      _prefsLoaded = true;
     });
   }
 
@@ -96,7 +99,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       await Share.shareXFiles(
         [XFile(path)],
         subject: 'ScanOnly backup',
-        text: 'Local backup of your ScanOnly library (ZIP is not encrypted—store safely).',
+        text:
+            'Local backup of your ScanOnly library (ZIP is not encrypted—store safely).',
       );
     } catch (e) {
       if (mounted) {
@@ -112,9 +116,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _calculateStorage() async {
     setState(() => _loadingStorage = true);
     try {
-      final tmp  = await getTemporaryDirectory();
+      final tmp = await getTemporaryDirectory();
       final docs = await getApplicationDocumentsDirectory();
-      _cacheSize   = await _dirSize(tmp);
+      _cacheSize = await _dirSize(tmp);
       _storageUsed = await _dirSize(docs);
     } catch (_) {}
     if (mounted) setState(() => _loadingStorage = false);
@@ -133,7 +137,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _clearCache() async {
     final confirmed = await _confirm(
       title: 'Cache Clear Karein?',
-      body: '${_cacheSize.toStringAsFixed(1)} MB temporary files delete ho jaayengi.',
+      body:
+          '${_cacheSize.toStringAsFixed(1)} MB temporary files delete ho jaayengi.',
       confirmLabel: 'Clear',
       danger: false,
     );
@@ -143,7 +148,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final tmp = await getTemporaryDirectory();
       if (await tmp.exists()) {
         await for (final f in tmp.list()) {
-          try { await f.delete(recursive: true); } catch (_) {}
+          try {
+            await f.delete(recursive: true);
+          } catch (_) {}
         }
       }
       final freed = _cacheSize;
@@ -157,7 +164,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _clearAllDocuments() async {
     final confirmed = await _confirm(
       title: 'Sare Documents Delete Karein?',
-      body: 'Yeh action undo nahi ho sakta. Library se sare scans aur database entries delete ho jaayengi.',
+      body:
+          'Yeh action undo nahi ho sakta. Library se sare scans aur database entries delete ho jaayengi.',
       confirmLabel: 'Delete Karein',
       danger: true,
     );
@@ -184,31 +192,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           const SizedBox(height: 10),
-          Container(width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey[300],
+          Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2))),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
             child: Text('Zaban Chunein',
-                style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 16)),
+                style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w800, fontSize: 16)),
           ),
           ..._languages.map((l) => ListTile(
-            leading: Text(l.$2, style: const TextStyle(fontSize: 22)),
-            title: Text(l.$1,
-                style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 14)),
-            trailing: _language == l.$1
-                ? Icon(Iconsax.tick_circle, color: AppColors.navyDark, size: 20)
-                : null,
-            onTap: () async {
-              setState(() => _language = l.$1);
-              await AppLocalStorage.setString('language', _language);
-              if (!mounted) return;
-              Navigator.pop(context);
-              _showSuccess(
-                'Zaban save ho gayi. Poori app ke liye app ek dafa band karke kholein.',
-              );
-            },
-          )),
+                leading: Text(l.$2, style: const TextStyle(fontSize: 22)),
+                title: Text(l.$1,
+                    style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w700, fontSize: 14)),
+                trailing: _language == l.$1
+                    ? Icon(Iconsax.tick_circle,
+                        color: AppColors.navyDark, size: 20)
+                    : null,
+                onTap: () async {
+                  setState(() => _language = l.$1);
+                  await AppLocalStorage.setString('language', _language);
+                  if (!mounted) return;
+                  Navigator.pop(context);
+                  _showSuccess(
+                    'Zaban save ho gayi. Poori app ke liye app ek dafa band karke kholein.',
+                  );
+                },
+              )),
           const SizedBox(height: 12),
         ],
       ),
@@ -228,13 +242,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
         title: Text(title,
-            style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 16)),
+            style:
+                GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 16)),
         content: Text(body, style: GoogleFonts.nunito(fontSize: 13)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: Text('Cancel',
-                style: GoogleFonts.nunito(color: AppColors.navyDark, fontWeight: FontWeight.w700)),
+                style: GoogleFonts.nunito(
+                    color: AppColors.navyDark, fontWeight: FontWeight.w700)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
@@ -251,19 +267,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ── Snackbars ─────────────────────────────────────────────────
 
-  void _showSuccess(String msg) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg, style: GoogleFonts.nunito()),
-          backgroundColor: AppColors.navyMid,
-          behavior: SnackBarBehavior.floating,
-        ));
+  void _showSuccess(String msg) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg, style: GoogleFonts.nunito()),
+        backgroundColor: AppColors.navyMid,
+        behavior: SnackBarBehavior.floating,
+      ));
 
-  void _showError(String msg) => ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(msg, style: GoogleFonts.nunito()),
-          backgroundColor: AppColors.red,
-          behavior: SnackBarBehavior.floating,
-        ));
+  void _showError(String msg) =>
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(msg, style: GoogleFonts.nunito()),
+        backgroundColor: AppColors.red,
+        behavior: SnackBarBehavior.floating,
+      ));
 
   // ══════════════════════════════════════════════════════════════
   //  BUILD
@@ -291,7 +307,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
           _buildHeader(),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
+              padding: const EdgeInsets.fromLTRB(12, 10, 12, 22),
               children: [
                 // ── 1. Scan Settings ──────────────────────────
                 _sectionLabel('Scan Settings', Iconsax.camera, AppColors.gold),
@@ -301,11 +317,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'All tools & features',
                   subtitle: 'Tools hub — scan, OCR, PDF, share',
                   onTap: () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const AllFeaturesScreen(),
-                        ),
-                      ),
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => const AllFeaturesScreen(),
+                    ),
+                  ),
                 ),
                 _toggleTile(
                   icon: Iconsax.magic_star,
@@ -354,11 +370,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
                 // ── Privacy & security (on-device value) ─────
-                _sectionLabel(
-                    'Privacy & security', Iconsax.shield_tick, AppColors.navyMid),
+                _sectionLabel('Privacy & security', Iconsax.shield_tick,
+                    AppColors.navyMid),
                 _privacyHighlightsCard(),
                 _toggleTile(
                   icon: Iconsax.lock,
@@ -379,8 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         );
                         return;
                       }
-                      final ok =
-                          await BiometricService.instance.authenticate();
+                      final ok = await BiometricService.instance.authenticate();
                       if (!ok) return;
                       await BiometricService.instance.enableBiometricLock();
                       if (mounted) setState(() => _biometricLock = true);
@@ -407,14 +422,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   subtitle:
                       'Focused on fast local scanning—not a fax & cloud suite.',
                   onTap: () => _showInfo(
-                        'Why ScanOnly?',
-                        'We keep the core loop fast: scan → enhance → one PDF on your phone. '
+                    'Why ScanOnly?',
+                    'We keep the core loop fast: scan → enhance → one PDF on your phone. '
                         'No account is required for saving. OCR and search run on-device. '
                         'We skip bulky corporate extras so the app stays light and respectful of your time.',
-                      ),
+                  ),
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
                 // ── 2. Storage ────────────────────────────────
                 _sectionLabel('Storage', Iconsax.folder_2, AppColors.gold),
@@ -437,7 +452,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   isDanger: true,
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
                 // ── 3. Appearance ─────────────────────────────
                 _sectionLabel('Appearance', Iconsax.brush_2, AppColors.navyMid),
@@ -445,7 +460,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: _darkMode ? Iconsax.moon : Iconsax.sun_1,
                   color: AppColors.navyDark,
                   title: 'Dark Mode',
-                  subtitle: _darkMode ? 'Dark theme on hai' : 'Light theme on hai',
+                  subtitle:
+                      _darkMode ? 'Dark theme on hai' : 'Light theme on hai',
                   value: _darkMode,
                   onChanged: (v) {
                     setState(() => _darkMode = v);
@@ -461,7 +477,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   onTap: _showLanguageSheet,
                 ),
 
-                const SizedBox(height: 20),
+                const SizedBox(height: 14),
 
                 // ── 4. About ──────────────────────────────────
                 _sectionLabel('About', Iconsax.info_circle, AppColors.navyMid),
@@ -487,36 +503,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'App Version',
                   subtitle: 'v1.0.0 (Build 1)',
                   onTap: () => showAboutDialog(
-                        context: context,
-                        applicationName: 'ScanOnly',
-                        applicationVersion: '1.0.0+1',
-                        applicationIcon: const Icon(Iconsax.scan,
-                            color: AppColors.navyMid, size: 40),
-                        children: [
-                          Text(
-                            'ScanOnly: fast local scanning, one-tap PDFs, and optional biometric lock. '
-                            'We stay focused—no fax cloud suite.',
-                            style: GoogleFonts.nunito(fontSize: 13, height: 1.45),
-                          ),
-                        ],
+                    context: context,
+                    applicationName: 'ScanOnly',
+                    applicationVersion: '1.0.0+1',
+                    applicationIcon: const Icon(Iconsax.scan,
+                        color: AppColors.navyMid, size: 40),
+                    children: [
+                      Text(
+                        'ScanOnly: fast local scanning, one-tap PDFs, and optional biometric lock. '
+                        'We stay focused—no fax cloud suite.',
+                        style: GoogleFonts.nunito(fontSize: 13, height: 1.45),
                       ),
+                    ],
+                  ),
                 ),
                 _navTile(
                   icon: Iconsax.shield,
                   color: AppColors.blue,
                   title: 'Privacy Policy',
                   subtitle: 'Data handling policy',
-                  onTap: () => _showInfo('Privacy Policy', 'Aapka data sirf aapke device pe rehta hai. Koi server pe upload nahi hota.'),
+                  onTap: () => _showInfo('Privacy Policy',
+                      'Aapka data sirf aapke device pe rehta hai. Koi server pe upload nahi hota.'),
                 ),
                 _navTile(
                   icon: Iconsax.document_text,
                   color: AppColors.navyMid,
                   title: 'Terms of Use',
                   subtitle: 'Usage terms',
-                  onTap: () => _showInfo('Terms of Use', 'Personal aur commercial use ke liye free. Redistribution allowed nahi.'),
+                  onTap: () => _showInfo('Terms of Use',
+                      'Personal aur commercial use ke liye free. Redistribution allowed nahi.'),
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 16),
 
                 // ── App badge ─────────────────────────────────
                 _buildAppBadge(),
@@ -541,15 +559,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
             child: Row(
               children: [
                 Text('Settings',
                     style: GoogleFonts.nunito(
-                        fontSize: 22, fontWeight: FontWeight.w800,
+                        fontSize: 22,
+                        fontWeight: FontWeight.w800,
                         color: Colors.white)),
                 const Spacer(),
-                Icon(Iconsax.setting_2, color: Colors.white.withOpacity(0.6), size: 22),
+                Icon(
+                  Iconsax.setting_2,
+                  color: Colors.white.withValues(alpha: 0.6),
+                  size: 22,
+                ),
               ],
             ),
           ),
@@ -561,9 +584,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         margin: const EdgeInsets.only(bottom: 12),
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: AppColors.gold.withOpacity(0.10),
+          color: AppColors.gold.withValues(alpha: 0.10),
           borderRadius: BorderRadius.circular(14),
-          border: Border.all(color: AppColors.gold.withOpacity(0.30)),
+          border: Border.all(color: AppColors.gold.withValues(alpha: 0.30)),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -579,7 +602,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 8),
             _privacyBullet('Scans & PDFs stay on this phone unless you share.'),
             _privacyBullet('No account needed to save or search your library.'),
-            _privacyBullet('OCR runs locally so you can find text inside scans.'),
+            _privacyBullet(
+                'OCR runs locally so you can find text inside scans.'),
           ],
         ),
       );
@@ -613,17 +637,19 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: Row(
           children: [
             Container(
-              width: 26, height: 26,
+              width: 26,
+              height: 26,
               decoration: BoxDecoration(
-                  color: color.withOpacity(0.13),
+                  color: color.withValues(alpha: 0.13),
                   borderRadius: BorderRadius.circular(7)),
               child: Icon(icon, color: color, size: 14),
             ),
             const SizedBox(width: 8),
             Text(title,
                 style: GoogleFonts.nunito(
-                    fontSize: 13, fontWeight: FontWeight.w800,
-                    color: AppColors.navyDark.withOpacity(0.7),
+                    fontSize: 13,
+                    fontWeight: FontWeight.w800,
+                    color: AppColors.navyDark.withValues(alpha: 0.7),
                     letterSpacing: 0.3)),
           ],
         ),
@@ -647,8 +673,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         trailing: Switch(
           value: value,
           onChanged: onChanged,
-          activeColor: AppColors.gold,
-          activeTrackColor: AppColors.gold.withOpacity(0.3),
+          activeThumbColor: AppColors.gold,
+          activeTrackColor: AppColors.gold.withValues(alpha: 0.3),
           materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
         ),
       );
@@ -673,7 +699,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         trailing: Container(
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: color.withValues(alpha: 0.1),
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(value,
@@ -701,7 +727,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
         trailing: Icon(
           Iconsax.arrow_right_3,
           size: 16,
-          color: isDanger ? AppColors.red.withOpacity(0.5) : Colors.grey[350],
+          color: isDanger
+              ? AppColors.red.withValues(alpha: 0.5)
+              : Colors.grey[350],
         ),
         titleColor: isDanger ? AppColors.red : null,
       );
@@ -721,7 +749,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         title: title,
         subtitle: subtitle,
         onTap: onTap,
-        trailing: Icon(Iconsax.arrow_right_3, size: 16, color: Colors.grey[350]),
+        trailing:
+            Icon(Iconsax.arrow_right_3, size: 16, color: Colors.grey[350]),
       );
 
   // ── Base tile ─────────────────────────────────────────────────
@@ -738,36 +767,45 @@ class _SettingsScreenState extends State<SettingsScreen> {
       GestureDetector(
         onTap: onTap,
         child: Container(
-          margin: const EdgeInsets.only(bottom: 10),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 13),
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.navyDark.withValues(alpha: 0.1),
+            ),
             boxShadow: [
-              BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
             ],
           ),
           child: Row(
             children: [
               Container(
-                width: 40, height: 40,
+                width: 34,
+                height: 34,
                 decoration: BoxDecoration(
-                    color: color.withOpacity(0.1),
+                    color: color.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12)),
-                child: Icon(icon, color: color, size: 20),
+                child: Icon(icon, color: color, size: 17),
               ),
-              const SizedBox(width: 14),
+              const SizedBox(width: 10),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(title,
                         style: GoogleFonts.nunito(
-                            fontSize: 14, fontWeight: FontWeight.w700,
+                            fontSize: 13,
+                            fontWeight: FontWeight.w700,
                             color: titleColor ?? AppColors.textDark)),
                     Text(subtitle,
                         style: GoogleFonts.nunito(
-                            fontSize: 11, color: AppColors.textMuted)),
+                            fontSize: 10, color: AppColors.textMuted)),
                   ],
                 ),
               ),
@@ -790,7 +828,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(16),
-        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 8, offset: const Offset(0, 2))],
+        border: Border.all(
+          color: AppColors.navyDark.withValues(alpha: 0.1),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withValues(alpha: 0.04),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -798,11 +845,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Row(
             children: [
               Container(
-                width: 40, height: 40,
+                width: 40,
+                height: 40,
                 decoration: BoxDecoration(
-                    color: AppColors.navyMid.withOpacity(0.1),
+                    color: AppColors.navyMid.withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(12)),
-                child: Icon(Iconsax.chart_square, color: AppColors.navyMid, size: 20),
+                child: Icon(Iconsax.chart_square,
+                    color: AppColors.navyMid, size: 20),
               ),
               const SizedBox(width: 14),
               Expanded(
@@ -810,12 +859,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Documents Storage',
-                        style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark)),
+                        style: GoogleFonts.nunito(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppColors.textDark)),
                     Text(
                       _loadingStorage
                           ? 'Calculating…'
                           : '${used.toStringAsFixed(1)} MB used',
-                      style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted),
+                      style: GoogleFonts.nunito(
+                          fontSize: 11, color: AppColors.textMuted),
                     ),
                   ],
                 ),
@@ -841,8 +894,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   // ── Picker sheet ──────────────────────────────────────────────
 
-  void _showPickerSheet(
-      String title, List<String> options, String current, void Function(String) onChanged) {
+  void _showPickerSheet(String title, List<String> options, String current,
+      void Function(String) onChanged) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.white,
@@ -853,19 +906,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
         children: [
           const SizedBox(height: 10),
           Container(
-              width: 40, height: 4,
-              decoration: BoxDecoration(color: Colors.grey[300],
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.grey[300],
                   borderRadius: BorderRadius.circular(2))),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 14),
             child: Text(title,
-                style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 16)),
+                style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w800, fontSize: 16)),
           ),
           ...options.map((o) => ListTile(
                 title: Text(o,
-                    style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 14)),
+                    style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w700, fontSize: 14)),
                 trailing: current == o
-                    ? Icon(Iconsax.tick_circle, color: AppColors.navyDark, size: 20)
+                    ? Icon(Iconsax.tick_circle,
+                        color: AppColors.navyDark, size: 20)
                     : null,
                 onTap: () {
                   onChanged(o);
@@ -885,14 +943,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text(title,
-            style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
-        content: Text(body, style: GoogleFonts.nunito(fontSize: 13, height: 1.5)),
+        title:
+            Text(title, style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+        content:
+            Text(body, style: GoogleFonts.nunito(fontSize: 13, height: 1.5)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
             child: Text('OK',
-                style: GoogleFonts.nunito(fontWeight: FontWeight.w700, color: AppColors.navyDark)),
+                style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w700, color: AppColors.navyDark)),
           ),
         ],
       ),
@@ -904,14 +964,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildAppBadge() => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppColors.navyDark.withOpacity(0.04),
+          color: AppColors.navyDark.withValues(alpha: 0.04),
           borderRadius: BorderRadius.circular(18),
-          border: Border.all(color: AppColors.navyDark.withOpacity(0.08)),
+          border: Border.all(
+            color: AppColors.navyDark.withValues(alpha: 0.08),
+          ),
         ),
         child: Column(
           children: [
             Container(
-              width: 60, height: 60,
+              width: 60,
+              height: 60,
               decoration: BoxDecoration(
                   color: AppColors.navyMid,
                   borderRadius: BorderRadius.circular(18)),
@@ -920,10 +983,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
             const SizedBox(height: 10),
             Text('ScanOnly',
                 style: GoogleFonts.nunito(
-                    fontSize: 18, fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
                     color: AppColors.navyDark)),
             Text('Free • Offline • Private',
-                style: GoogleFonts.nunito(fontSize: 13, color: AppColors.textMuted)),
+                style: GoogleFonts.nunito(
+                    fontSize: 13, color: AppColors.textMuted)),
             const SizedBox(height: 4),
             Text('v1.0.0 (Build 1)',
                 style: GoogleFonts.nunito(fontSize: 11, color: Colors.grey)),

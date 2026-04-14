@@ -21,6 +21,7 @@ import 'edit_scan_screen.dart';
 import 'signature_pad_screen.dart';
 import 'manual_erase_screen.dart';
 import 'merge_pdfs_screen.dart';
+import 'office_export_hub_screen.dart';
 
 // ══════════════════════════════════════════════════════════════
 //  AllFeaturesScreen  –  category + horizontal tiles layout
@@ -62,7 +63,7 @@ class AllFeaturesScreen extends StatelessWidget {
 
       // ── Body: vertical list of category sections ────────────
       body: ListView.builder(
-        padding: const EdgeInsets.symmetric(vertical: 14),
+        padding: const EdgeInsets.symmetric(vertical: 10),
         itemCount: sections.length,
         itemBuilder: (_, i) => _CategorySection(section: sections[i]),
       ),
@@ -97,16 +98,14 @@ class AllFeaturesScreen extends StatelessWidget {
               title: 'Passport',
               subtitle: 'Passport scanner',
               color: const Color(0xFFF43F5E),
-              onTap: () =>
-                  _go(context, const ScanScreen(scanType: 'passport')),
+              onTap: () => _go(context, const ScanScreen(scanType: 'passport')),
             ),
             _item(
               icon: Iconsax.receipt,
               title: 'Receipt',
               subtitle: 'Bills & receipts',
               color: const Color(0xFF22C55E),
-              onTap: () =>
-                  _go(context, const ScanScreen(scanType: 'receipt')),
+              onTap: () => _go(context, const ScanScreen(scanType: 'receipt')),
             ),
             _item(
               icon: Iconsax.scan_barcode,
@@ -135,8 +134,7 @@ class AllFeaturesScreen extends StatelessWidget {
               title: 'Table',
               subtitle: 'Spreadsheets',
               color: const Color(0xFF84CC16),
-              onTap: () =>
-                  _go(context, const ScanScreen(scanType: 'table')),
+              onTap: () => _go(context, const ScanScreen(scanType: 'table')),
             ),
           ],
         ),
@@ -186,20 +184,16 @@ class AllFeaturesScreen extends StatelessWidget {
               title: 'Watermark',
               subtitle: 'Add watermark',
               color: AppColors.orange,
-              onTap: () => _withDoc(
-                  context,
-                  (doc) =>
-                      _go(context, DocumentViewerScreen(document: doc))),
+              onTap: () => _withDoc(context,
+                  (doc) => _go(context, DocumentViewerScreen(document: doc))),
             ),
             _item(
               icon: Iconsax.pen_add,
               title: 'Annotate',
               subtitle: 'Draw & mark',
               color: AppColors.blue,
-              onTap: () => _withImage(
-                  context,
-                  (path) =>
-                      _go(context, AnnotationScreen(imagePath: path))),
+              onTap: () => _withImage(context,
+                  (path) => _go(context, AnnotationScreen(imagePath: path))),
             ),
             _item(
               icon: Iconsax.clock,
@@ -213,10 +207,8 @@ class AllFeaturesScreen extends StatelessWidget {
               title: 'Smart erase',
               subtitle: 'Remove area',
               color: AppColors.red,
-              onTap: () => _withImage(
-                  context,
-                  (path) =>
-                      _go(context, ManualEraseScreen(imagePath: path))),
+              onTap: () => _withImage(context,
+                  (path) => _go(context, ManualEraseScreen(imagePath: path))),
             ),
           ],
         ),
@@ -291,30 +283,31 @@ class AllFeaturesScreen extends StatelessWidget {
               color: AppColors.red,
               onTap: () => _withDoc(
                   context,
-                  (doc) => _go(
-                      context,
-                      DocumentConversionScreen(
-                          filePath: doc.filePath))),
+                  (doc) => _go(context,
+                      DocumentConversionScreen(filePath: doc.filePath))),
+            ),
+            _item(
+              icon: Iconsax.document_upload,
+              title: 'Office Export',
+              subtitle: 'Excel, Word, PPT, Slides',
+              color: AppColors.purple,
+              onTap: () => _go(context, const OfficeExportHubScreen()),
             ),
             _item(
               icon: Icons.compress_rounded,
               title: 'Compress PDF',
               subtitle: 'Reduce PDF file size',
               color: AppColors.navyMid,
-              onTap: () => _withDoc(
-                  context,
-                  (doc) =>
-                      _go(context, DocumentViewerScreen(document: doc))),
+              onTap: () => _withDoc(context,
+                  (doc) => _go(context, DocumentViewerScreen(document: doc))),
             ),
             _item(
               icon: Iconsax.document_download,
               title: 'Export',
               subtitle: 'Save as PDF',
               color: AppColors.gold,
-              onTap: () => _withDoc(
-                  context,
-                  (doc) =>
-                      _go(context, DocumentViewerScreen(document: doc))),
+              onTap: () => _withDoc(context,
+                  (doc) => _go(context, DocumentViewerScreen(document: doc))),
             ),
             _item(
               icon: Iconsax.document_copy,
@@ -342,18 +335,15 @@ class AllFeaturesScreen extends StatelessWidget {
                   (doc) => _go(
                       context,
                       AdvancedSharingScreen(
-                          filePath: doc.filePath,
-                          fileName: doc.name))),
+                          filePath: doc.filePath, fileName: doc.name))),
             ),
             _item(
               icon: Iconsax.printer,
               title: 'Print',
               subtitle: 'Print document',
               color: AppColors.navyDark,
-              onTap: () => _withDoc(
-                  context,
-                  (doc) =>
-                      _go(context, DocumentViewerScreen(document: doc))),
+              onTap: () => _withDoc(context,
+                  (doc) => _go(context, DocumentViewerScreen(document: doc))),
             ),
           ],
         ),
@@ -398,7 +388,11 @@ class AllFeaturesScreen extends StatelessWidget {
     required VoidCallback onTap,
   }) =>
       _FeatureItem(
-          icon: icon, title: title, subtitle: subtitle, color: color, onTap: onTap);
+          icon: icon,
+          title: title,
+          subtitle: subtitle,
+          color: color,
+          onTap: onTap);
 
   // ── Navigation helpers ───────────────────────────────────────────────────
 
@@ -535,24 +529,24 @@ class _CategorySection extends StatelessWidget {
       children: [
         // ── Section header ──────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(18, 14, 18, 10),
+          padding: const EdgeInsets.fromLTRB(14, 10, 14, 8),
           child: Row(
             children: [
               Container(
                 width: 30,
-                height: 30,
+                height: 28,
                 decoration: BoxDecoration(
-                  color: section.color.withOpacity(0.15),
+                  color: section.color.withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(9),
                 ),
                 child: Icon(section.icon, color: section.color, size: 16),
               ),
-              const SizedBox(width: 9),
+              const SizedBox(width: 7),
               Text(
                 section.title,
                 style: GoogleFonts.nunito(
                   fontWeight: FontWeight.w800,
-                  fontSize: 15,
+                  fontSize: 14,
                   color: const Color(0xFF1E2A4A),
                 ),
               ),
@@ -562,28 +556,28 @@ class _CategorySection extends StatelessWidget {
 
         // ── Grid (no horizontal scroll) ─────────────────────────
         Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 14),
+          padding: const EdgeInsets.symmetric(horizontal: 12),
           child: GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 4,
-              mainAxisSpacing: 10,
-              crossAxisSpacing: 10,
-              childAspectRatio: 0.82,
+              mainAxisSpacing: 8,
+              crossAxisSpacing: 8,
+              childAspectRatio: 0.88,
             ),
             itemCount: section.items.length,
             itemBuilder: (_, i) => _FeatureTile(item: section.items[i]),
           ),
         ),
 
-        const SizedBox(height: 14),
+        const SizedBox(height: 10),
 
         // ── Divider between sections ────────────────────────────
         Divider(
           height: 1,
           thickness: 1,
-          color: Colors.grey.withOpacity(0.13),
+          color: Colors.grey.withValues(alpha: 0.13),
           indent: 18,
           endIndent: 18,
         ),
@@ -610,7 +604,7 @@ class _FeatureTile extends StatelessWidget {
           borderRadius: BorderRadius.circular(14),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.06),
+              color: Colors.black.withValues(alpha: 0.06),
               blurRadius: 6,
               offset: const Offset(0, 2),
             ),
@@ -621,21 +615,21 @@ class _FeatureTile extends StatelessWidget {
           children: [
             Container(
               width: 42,
-              height: 42,
+              height: 38,
               decoration: BoxDecoration(
-                color: item.color.withOpacity(0.12),
+                color: item.color.withValues(alpha: 0.12),
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Icon(item.icon, color: item.color, size: 21),
+              child: Icon(item.icon, color: item.color, size: 18),
             ),
-            const SizedBox(height: 6),
+            const SizedBox(height: 4),
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 4),
               child: Text(
                 item.title,
                 style: GoogleFonts.nunito(
                   fontWeight: FontWeight.w700,
-                  fontSize: 10,
+                  fontSize: 9.5,
                   color: const Color(0xFF1E2A4A),
                 ),
                 textAlign: TextAlign.center,

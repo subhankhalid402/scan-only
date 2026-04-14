@@ -1,6 +1,18 @@
 import 'dart:ui' show Rect;
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
+class OcrTextLine {
+  final String text;
+  final Rect boundingBox;
+  final double confidence;
+
+  const OcrTextLine({
+    required this.text,
+    required this.boundingBox,
+    required this.confidence,
+  });
+}
+
 class OcrService {
   static final OcrService instance = OcrService._init();
 
@@ -55,6 +67,37 @@ class OcrService {
     } catch (e) {
       print('OCR Error: $e');
       return '';
+    }
+  }
+
+  /// Extract OCR lines with bounding boxes for UI overlays.
+  Future<List<OcrTextLine>> extractTextLines(String imagePath) async {
+    try {
+      final inputImage = InputImage.fromFilePath(imagePath);
+      final recognizedText = await _latinRecognizer.processImage(inputImage);
+      final out = <OcrTextLine>[];
+      for (final block in recognizedText.blocks) {
+        for (final line in block.lines) {
+          final t = line.text.trim();
+          if (t.isEmpty) continue;
+          out.add(
+            OcrTextLine(
+              text: t,
+              boundingBox: line.boundingBox,
+              confidence: line.elements.isNotEmpty
+                  ? line.elements
+                          .map((e) => e.confidence ?? 0.0)
+                          .fold<double>(0.0, (a, b) => a + b) /
+                      line.elements.length
+                  : 0.0,
+            ),
+          );
+        }
+      }
+      return out;
+    } catch (e) {
+      print('OCR lines error: $e');
+      return const [];
     }
   }
 

@@ -67,6 +67,8 @@ dependencies:
   google_fonts: ^6.2.1
   flutter_slidable: ^3.1.1
   shimmer: ^3.0.0
+  flutter_colorpicker: ^1.1.0
+  flutter_drawing_board: ^0.9.7
 
   # Email (Optional - for sharing)
   mailer: ^6.1.0
@@ -88,10 +90,11 @@ flutter:
   generate: true
 
 flutter_launcher_icons:
+  android: true
+  ios: true
   image_path: "assets/images/launcher_icon.png"
-  android:
-    notification_icon: "ic_notification"
-    adaptive_icon_background: "#1e3a5f"
-    adaptive_icon_foreground: "assets/images/launcher_icon.png"
-  ios:
-    image_path: "assets/images/launcher_icon.png"
+  min_sdk_android: 21
+  adaptive_icon_background: "#1e3a5f"
+  adaptive_icon_foreground: "assets/images/launcher_icon.png"
+  adaptive_icon_foreground_inset: 0
+  remove_alpha_ios: true

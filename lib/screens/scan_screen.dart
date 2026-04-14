@@ -18,10 +18,24 @@ import '../models/document_model.dart';
 import '../services/app_local_storage.dart';
 import '../services/database_service.dart';
 import '../services/image_enhancement_service.dart';
+import '../services/image_processing_service.dart';
 import '../services/ocr_service.dart';
 import '../services/pdf_service.dart';
 import '../theme.dart';
+import 'document_scan_editor_screen.dart';
 import 'edit_scan_screen.dart';
+import 'bank_statement_result_screen.dart';
+import 'academic_certificate_result_screen.dart';
+import 'book_result_screen.dart';
+import 'driving_license_result_screen.dart';
+import 'id_card_result_screen.dart';
+import 'medical_prescription_result_screen.dart';
+import 'passport_result_screen.dart';
+import 'photo_enhancement_screen.dart';
+import 'receipt_result_screen.dart';
+import 'table_result_screen.dart';
+import 'vehicle_rc_result_screen.dart';
+import 'whiteboard_result_screen.dart';
 
 // ── Scan mode model ──────────────────────────────────────────────────────────
 
@@ -47,16 +61,55 @@ class _FilterOption {
 
 /// All capture modes (horizontal scroll).
 const List<_ScanMode> _kScanModes = [
-  _ScanMode(id: 'document', icon: Iconsax.document_text, label: 'Document', color: AppColors.gold),
-  _ScanMode(id: 'id_card', icon: Iconsax.card, label: 'ID Card', color: AppColors.gold),
-  _ScanMode(id: 'passport', icon: Iconsax.personalcard, label: 'Passport', color: AppColors.gold),
-  _ScanMode(id: 'receipt', icon: Iconsax.receipt, label: 'Receipt', color: AppColors.gold),
-  _ScanMode(id: 'book', icon: Iconsax.book, label: 'Book', color: AppColors.gold),
-  _ScanMode(id: 'table', icon: Iconsax.element_3, label: 'Table', color: AppColors.gold),
-  _ScanMode(id: 'whiteboard', icon: Iconsax.text_block, label: 'Board', color: AppColors.gold),
-  _ScanMode(id: 'photo', icon: Iconsax.camera, label: 'Photo', color: AppColors.gold),
-  _ScanMode(id: 'qr', icon: Iconsax.scan_barcode, label: 'QR / Bar', color: AppColors.gold),
-  _ScanMode(id: 'gallery', icon: Iconsax.gallery, label: 'Gallery', color: AppColors.gold),
+  _ScanMode(
+      id: 'document',
+      icon: Iconsax.document_text,
+      label: 'Doc',
+      color: AppColors.gold),
+  _ScanMode(
+      id: 'id_card',
+      icon: Iconsax.card,
+      label: 'ID Card',
+      color: AppColors.gold),
+  _ScanMode(
+      id: 'passport',
+      icon: Iconsax.personalcard,
+      label: 'Passport',
+      color: AppColors.gold),
+  _ScanMode(
+      id: 'receipt',
+      icon: Iconsax.receipt,
+      label: 'Receipt',
+      color: AppColors.gold),
+  _ScanMode(
+      id: 'book', icon: Iconsax.book, label: 'Book', color: AppColors.gold),
+  _ScanMode(
+      id: 'whiteboard',
+      icon: Iconsax.text_block,
+      label: 'Whiteboard',
+      color: AppColors.gold),
+  _ScanMode(
+      id: 'photo', icon: Iconsax.camera, label: 'Photo', color: AppColors.gold),
+  _ScanMode(
+      id: 'table',
+      icon: Iconsax.element_3,
+      label: 'Table',
+      color: AppColors.gold),
+  _ScanMode(
+      id: 'driving_license',
+      icon: Iconsax.card_tick_1,
+      label: 'License',
+      color: AppColors.gold),
+  _ScanMode(
+      id: 'academic_certificate',
+      icon: Icons.school_rounded,
+      label: 'Certificate',
+      color: AppColors.gold),
+  _ScanMode(
+      id: 'qr',
+      icon: Iconsax.scan_barcode,
+      label: 'QR / Barcode',
+      color: AppColors.gold),
 ];
 
 Set<String> get _kScanModeIds => _kScanModes.map((m) => m.id).toSet();
@@ -75,6 +128,41 @@ const Map<String, List<_FilterOption>> _kModeFilters = {
     _FilterOption(id: 'color', label: 'Color'),
     _FilterOption(id: 'bw', label: 'B&W'),
     _FilterOption(id: 'id_clear', label: 'ID Clear'),
+    _FilterOption(id: 'enhanced', label: 'Enhanced'),
+  ],
+  'driving_license': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'color', label: 'Color'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'id_clear', label: 'Glare Fix'),
+    _FilterOption(id: 'enhanced', label: 'Enhanced'),
+  ],
+  'vehicle_rc': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'color', label: 'Color'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'contrast', label: 'High Contrast'),
+    _FilterOption(id: 'enhanced', label: 'Enhanced'),
+  ],
+  'medical_prescription': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'contrast', label: 'High Contrast'),
+    _FilterOption(id: 'thermal', label: 'Text Boost'),
+    _FilterOption(id: 'enhanced', label: 'Enhanced'),
+  ],
+  'bank_statement': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'contrast', label: 'High Contrast'),
+    _FilterOption(id: 'thermal', label: 'Text Boost'),
+    _FilterOption(id: 'enhanced', label: 'Enhanced'),
+  ],
+  'academic_certificate': [
+    _FilterOption(id: 'auto', label: 'Auto'),
+    _FilterOption(id: 'color', label: 'Color'),
+    _FilterOption(id: 'bw', label: 'B&W'),
+    _FilterOption(id: 'contrast', label: 'High Contrast'),
     _FilterOption(id: 'enhanced', label: 'Enhanced'),
   ],
   'passport': [
@@ -131,6 +219,19 @@ const Map<String, List<_FilterOption>> _kModeFilters = {
 const Map<String, List<String>> _kModeFeatures = {
   'document': ['Auto-crop', 'Shadow remove', 'Flatten page'],
   'id_card': ['MRZ detect', 'Glare fix', 'Straighten'],
+  'driving_license': ['DLIMS detect', 'Glare fix', 'Auto-align'],
+  'vehicle_rc': ['RC detect', 'Token tax check', 'Ownership history'],
+  'medical_prescription': [
+    'Handwriting OCR',
+    'Medicine parsing',
+    'Reminder setup'
+  ],
+  'bank_statement': ['Transaction OCR', 'IBFT/RAAST detect', 'Analytics'],
+  'academic_certificate': [
+    'HEC QR detect',
+    'Seal/watermark',
+    'Academic profile'
+  ],
   'passport': ['MRZ extract', 'Photo page only', 'Auto-align'],
   'receipt': ['Auto-straighten', 'Fade fix', 'Long doc mode'],
   'book': ['Spine shadow fix', 'Page flatten', 'Dual page'],
@@ -176,155 +277,478 @@ const Map<String, _ModeContent> _kModeContent = {
   'document': _ModeContent(
     tip: 'Place document on flat surface for best results',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
-      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
-      _ImportOption(icon: Iconsax.cloud,       label: 'Drive',    color: Color(0xFF6366F1), action: 'cloud'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.cloud,
+          label: 'Drive',
+          color: Color(0xFF6366F1),
+          action: 'cloud'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.scissor,       label: 'Auto-crop'),
-      _FeatureChip(icon: Iconsax.sun_1,         label: 'Shadow remove'),
+      _FeatureChip(icon: Iconsax.scissor, label: 'Auto-crop'),
+      _FeatureChip(icon: Iconsax.sun_1, label: 'Shadow remove'),
       _FeatureChip(icon: Iconsax.document_text, label: 'Flatten page'),
-      _FeatureChip(icon: Iconsax.text,          label: 'OCR text'),
-      _FeatureChip(icon: Iconsax.magicpen,      label: 'Enhance text'),
-      _FeatureChip(icon: Iconsax.crop,          label: 'Perspective fix'),
-      _FeatureChip(icon: Iconsax.document,      label: 'CSV export'),
-      _FeatureChip(icon: Iconsax.arrange_square,label: 'Reorder pages'),
+      _FeatureChip(icon: Iconsax.text, label: 'OCR text'),
+      _FeatureChip(icon: Iconsax.magicpen, label: 'Enhance text'),
+      _FeatureChip(icon: Iconsax.crop, label: 'Perspective fix'),
+      _FeatureChip(icon: Iconsax.document, label: 'CSV export'),
+      _FeatureChip(icon: Iconsax.arrange_square, label: 'Reorder pages'),
     ],
   ),
   'id_card': _ModeContent(
     tip: 'Hold card steady — both sides will be captured',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
-      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
-      _ImportOption(icon: Iconsax.scan,        label: 'Both sides',color: Color(0xFFEC4899),action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
+      _ImportOption(
+          icon: Iconsax.scan,
+          label: 'Both sides',
+          color: Color(0xFFEC4899),
+          action: 'gallery'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.card,         label: 'MRZ detect'),
-      _FeatureChip(icon: Iconsax.sun_1,        label: 'Glare fix'),
-      _FeatureChip(icon: Iconsax.crop,         label: 'Auto align'),
-      _FeatureChip(icon: Iconsax.text,         label: 'Extract text'),
+      _FeatureChip(icon: Iconsax.card, label: 'MRZ detect'),
+      _FeatureChip(icon: Iconsax.sun_1, label: 'Glare fix'),
+      _FeatureChip(icon: Iconsax.crop, label: 'Auto align'),
+      _FeatureChip(icon: Iconsax.text, label: 'Extract text'),
+    ],
+  ),
+  'driving_license': _ModeContent(
+    tip: 'Capture front and back for complete license details',
+    importOptions: [
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
+      _ImportOption(
+          icon: Iconsax.scan,
+          label: 'Both sides',
+          color: Color(0xFFEC4899),
+          action: 'gallery'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.card_tick_1, label: 'DLIMS detect'),
+      _FeatureChip(icon: Iconsax.sun_1, label: 'Glare fix'),
+      _FeatureChip(icon: Iconsax.crop, label: 'Auto align'),
+      _FeatureChip(icon: Iconsax.text, label: 'Extract text'),
+    ],
+  ),
+  'vehicle_rc': _ModeContent(
+    tip: 'Capture all RC pages clearly (book or card format)',
+    importOptions: [
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
+      _ImportOption(
+          icon: Iconsax.scan,
+          label: 'Multi-page',
+          color: Color(0xFFEC4899),
+          action: 'gallery'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.car, label: 'RC detect'),
+      _FeatureChip(icon: Iconsax.document_text, label: 'OCR fields'),
+      _FeatureChip(icon: Iconsax.shield_tick, label: 'Token tax check'),
+      _FeatureChip(icon: Iconsax.text, label: 'Ownership history'),
+    ],
+  ),
+  'medical_prescription': _ModeContent(
+    tip: 'Capture full prescription clearly (doctor and medicine section)',
+    importOptions: [
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
+      _ImportOption(
+          icon: Iconsax.scan,
+          label: 'Multi-page',
+          color: Color(0xFFEC4899),
+          action: 'gallery'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.magic_star, label: 'Handwriting OCR'),
+      _FeatureChip(icon: Iconsax.note_text, label: 'Medicine parse'),
+      _FeatureChip(icon: Iconsax.warning_2, label: 'Drug interaction'),
+      _FeatureChip(icon: Iconsax.notification, label: 'Set reminders'),
+    ],
+  ),
+  'bank_statement': _ModeContent(
+    tip: 'Capture all pages in sequence for accurate transaction extraction',
+    importOptions: [
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
+      _ImportOption(
+          icon: Iconsax.scan,
+          label: 'Multi-page',
+          color: Color(0xFFEC4899),
+          action: 'gallery'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.bank, label: 'Bank format detect'),
+      _FeatureChip(icon: Iconsax.document_text, label: 'Transaction OCR'),
+      _FeatureChip(icon: Iconsax.chart_2, label: 'Credit vs Debit'),
+      _FeatureChip(icon: Iconsax.export_1, label: 'Excel export'),
+    ],
+  ),
+  'academic_certificate': _ModeContent(
+    tip: 'Capture full document including seal, signatures and QR',
+    importOptions: [
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
+      _ImportOption(
+          icon: Iconsax.scan,
+          label: 'Multi-page',
+          color: Color(0xFFEC4899),
+          action: 'gallery'),
+    ],
+    featureChips: [
+      _FeatureChip(icon: Iconsax.scan, label: 'HEC QR detect'),
+      _FeatureChip(icon: Iconsax.shield_tick, label: 'Security check'),
+      _FeatureChip(icon: Iconsax.document_text, label: 'Academic profile'),
+      _FeatureChip(icon: Iconsax.warning_2, label: 'Fake flags'),
     ],
   ),
   'passport': _ModeContent(
     tip: 'Open to photo page, lay flat under good light',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,      label: 'Gallery', color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.camera,       label: 'Camera',  color: Color(0xFF22C55E), action: 'camera'),
-      _ImportOption(icon: Iconsax.personalcard, label: 'ID scan', color: Color(0xFFF43F5E), action: 'gallery'),
-      _ImportOption(icon: Iconsax.folder_open,  label: 'Files',   color: Color(0xFFF59E0B), action: 'files'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.personalcard,
+          label: 'ID scan',
+          color: Color(0xFFF43F5E),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.scan,         label: 'MRZ extract'),
-      _FeatureChip(icon: Iconsax.crop,         label: 'Photo page'),
-      _FeatureChip(icon: Iconsax.magicpen,     label: 'Auto-align'),
-      _FeatureChip(icon: Iconsax.text,         label: 'Data extract'),
+      _FeatureChip(icon: Iconsax.scan, label: 'MRZ extract'),
+      _FeatureChip(icon: Iconsax.crop, label: 'Photo page'),
+      _FeatureChip(icon: Iconsax.magicpen, label: 'Auto-align'),
+      _FeatureChip(icon: Iconsax.text, label: 'Data extract'),
     ],
   ),
   'receipt': _ModeContent(
     tip: 'Flatten receipt fully — creases reduce OCR accuracy',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
-      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
-      _ImportOption(icon: Iconsax.receipt,     label: 'Long doc', color: Color(0xFF22C55E), action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
+      _ImportOption(
+          icon: Iconsax.receipt,
+          label: 'Long doc',
+          color: Color(0xFF22C55E),
+          action: 'gallery'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.crop,         label: 'Auto-straighten'),
-      _FeatureChip(icon: Iconsax.sun_1,        label: 'Fade fix'),
-      _FeatureChip(icon: Iconsax.document,     label: 'Long doc mode'),
-      _FeatureChip(icon: Iconsax.text,         label: 'Amount extract'),
+      _FeatureChip(icon: Iconsax.crop, label: 'Auto-straighten'),
+      _FeatureChip(icon: Iconsax.sun_1, label: 'Fade fix'),
+      _FeatureChip(icon: Iconsax.document, label: 'Long doc mode'),
+      _FeatureChip(icon: Iconsax.text, label: 'Amount extract'),
     ],
   ),
   'book': _ModeContent(
-    tip: 'Hold phone directly above — spine shadow auto-removed',
+    tip:
+        'Capture full page/spread; curvature and finger edge cleanup are applied',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
-      _ImportOption(icon: Iconsax.book,        label: 'Dual page',color: Color(0xFFF97316), action: 'gallery'),
-      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.book,
+          label: 'Dual page',
+          color: Color(0xFFF97316),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.scan,
+          label: 'Batch scan',
+          color: Color(0xFFEC4899),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.magicpen,     label: 'Spine shadow'),
-      _FeatureChip(icon: Iconsax.crop,         label: 'Page flatten'),
-      _FeatureChip(icon: Iconsax.element_3,    label: 'Dual page split'),
-      _FeatureChip(icon: Iconsax.text,         label: 'OCR text'),
+      _FeatureChip(icon: Iconsax.magicpen, label: 'Spine shadow'),
+      _FeatureChip(icon: Iconsax.crop, label: 'Page flatten'),
+      _FeatureChip(icon: Iconsax.element_3, label: 'Dual page split'),
+      _FeatureChip(icon: Iconsax.text, label: 'EN+Urdu OCR'),
+      _FeatureChip(icon: Iconsax.document_text, label: 'TOC + headings'),
+      _FeatureChip(icon: Iconsax.export_1, label: 'PDF/DOCX/EPUB'),
     ],
   ),
   'table': _ModeContent(
     tip: 'Avoid glare — frame all borders for accurate detection',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
-      _ImportOption(icon: Iconsax.element_3,   label: 'CSV export',color: Color(0xFF84CC16),action: 'gallery'),
-      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.element_3,
+          label: 'CSV export',
+          color: Color(0xFF84CC16),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.element_3,    label: 'Table detect'),
-      _FeatureChip(icon: Iconsax.magicpen,     label: 'Border enhance'),
-      _FeatureChip(icon: Iconsax.text,         label: 'OCR cells'),
-      _FeatureChip(icon: Iconsax.document,     label: 'CSV export'),
+      _FeatureChip(icon: Iconsax.element_3, label: 'Table detect'),
+      _FeatureChip(icon: Iconsax.magicpen, label: 'Border enhance'),
+      _FeatureChip(icon: Iconsax.text, label: 'OCR cells'),
+      _FeatureChip(icon: Iconsax.document, label: 'CSV export'),
     ],
   ),
   'whiteboard': _ModeContent(
     tip: 'Fill frame with board — glare is auto-removed',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
-      _ImportOption(icon: Iconsax.text_block,  label: 'Enhance',  color: Color(0xFF06B6D4), action: 'gallery'),
-      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.text_block,
+          label: 'Enhance',
+          color: Color(0xFF06B6D4),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.sun_1,        label: 'Glare remove'),
-      _FeatureChip(icon: Iconsax.crop,         label: 'Perspective fix'),
-      _FeatureChip(icon: Iconsax.magicpen,     label: 'Enhance text'),
-      _FeatureChip(icon: Iconsax.text,         label: 'OCR text'),
+      _FeatureChip(icon: Iconsax.sun_1, label: 'Glare remove'),
+      _FeatureChip(icon: Iconsax.crop, label: 'Perspective fix'),
+      _FeatureChip(icon: Iconsax.magicpen, label: 'Enhance text'),
+      _FeatureChip(icon: Iconsax.text, label: 'OCR text'),
     ],
   ),
   'photo': _ModeContent(
     tip: 'Full resolution photo — no enhancement applied',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,     label: 'Gallery',  color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
-      _ImportOption(icon: Iconsax.cloud,       label: 'Drive',    color: Color(0xFF6366F1), action: 'cloud'),
-      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Gallery',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.cloud,
+          label: 'Drive',
+          color: Color(0xFF6366F1),
+          action: 'cloud'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.sun_1,        label: 'HDR mode'),
+      _FeatureChip(icon: Iconsax.sun_1, label: 'HDR mode'),
       _FeatureChip(icon: Iconsax.personalcard, label: 'Portrait'),
-      _FeatureChip(icon: Iconsax.camera,       label: 'Full res'),
-      _FeatureChip(icon: Iconsax.magicpen,     label: 'Vivid color'),
+      _FeatureChip(icon: Iconsax.camera, label: 'Full res'),
+      _FeatureChip(icon: Iconsax.magicpen, label: 'Vivid color'),
     ],
   ),
   'qr': _ModeContent(
     tip: 'Point camera — QR and barcodes auto-detected',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,        label: 'From image', color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.scan_barcode,   label: 'Barcode',    color: Color(0xFF6366F1), action: 'camera'),
-      _ImportOption(icon: Iconsax.link,           label: 'URL open',   color: Color(0xFF22C55E), action: 'gallery'),
-      _ImportOption(icon: Iconsax.copy,           label: 'Copy code',  color: Color(0xFFF59E0B), action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'From image',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.scan_barcode,
+          label: 'Barcode',
+          color: Color(0xFF6366F1),
+          action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.link,
+          label: 'URL open',
+          color: Color(0xFF22C55E),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.copy,
+          label: 'Copy code',
+          color: Color(0xFFF59E0B),
+          action: 'gallery'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.scan_barcode,    label: 'Auto detect'),
-      _FeatureChip(icon: Iconsax.link,            label: 'Open URL'),
-      _FeatureChip(icon: Iconsax.copy,            label: 'Copy code'),
-      _FeatureChip(icon: Iconsax.share,           label: 'Share'),
+      _FeatureChip(icon: Iconsax.scan_barcode, label: 'Auto detect'),
+      _FeatureChip(icon: Iconsax.link, label: 'Open URL'),
+      _FeatureChip(icon: Iconsax.copy, label: 'Copy code'),
+      _FeatureChip(icon: Iconsax.share, label: 'Share'),
     ],
   ),
   'gallery': _ModeContent(
     tip: 'Select multiple images to combine into one PDF',
     importOptions: [
-      _ImportOption(icon: Iconsax.gallery,     label: 'Photos',   color: Color(0xFF3B82F6), action: 'gallery'),
-      _ImportOption(icon: Iconsax.folder_open, label: 'Files',    color: Color(0xFFF59E0B), action: 'files'),
-      _ImportOption(icon: Iconsax.cloud,       label: 'Drive',    color: Color(0xFF6366F1), action: 'cloud'),
-      _ImportOption(icon: Iconsax.camera,      label: 'Camera',   color: Color(0xFF22C55E), action: 'camera'),
+      _ImportOption(
+          icon: Iconsax.gallery,
+          label: 'Photos',
+          color: Color(0xFF3B82F6),
+          action: 'gallery'),
+      _ImportOption(
+          icon: Iconsax.folder_open,
+          label: 'Files',
+          color: Color(0xFFF59E0B),
+          action: 'files'),
+      _ImportOption(
+          icon: Iconsax.cloud,
+          label: 'Drive',
+          color: Color(0xFF6366F1),
+          action: 'cloud'),
+      _ImportOption(
+          icon: Iconsax.camera,
+          label: 'Camera',
+          color: Color(0xFF22C55E),
+          action: 'camera'),
     ],
     featureChips: [
-      _FeatureChip(icon: Iconsax.gallery,      label: 'Multi-import'),
-      _FeatureChip(icon: Iconsax.document,     label: 'PDF merge'),
-      _FeatureChip(icon: Iconsax.magicpen,     label: 'Batch enhance'),
-      _FeatureChip(icon: Iconsax.arrange_square,label: 'Reorder pages'),
+      _FeatureChip(icon: Iconsax.gallery, label: 'Multi-import'),
+      _FeatureChip(icon: Iconsax.document, label: 'PDF merge'),
+      _FeatureChip(icon: Iconsax.magicpen, label: 'Batch enhance'),
+      _FeatureChip(icon: Iconsax.arrange_square, label: 'Reorder pages'),
     ],
   ),
 };
@@ -332,17 +756,53 @@ const Map<String, _ModeContent> _kModeContent = {
 /// Live in-app [CameraPreview] for every mode except QR (CamScanner-style viewfinder).
 bool _usesFlutterCameraPreview(String modeId) => modeId != 'qr';
 
+/// Open CamScanner-style deskew after capture for document-like modes.
+bool _useDeskewAfterCapture(String modeId) {
+  const modes = {
+    'document',
+    'id_card',
+    'driving_license',
+    'vehicle_rc',
+    'medical_prescription',
+    'bank_statement',
+    'academic_certificate',
+    'passport',
+    'receipt',
+    'book',
+    'table',
+    'whiteboard',
+  };
+  return modes.contains(modeId);
+}
+
 // ── Frame type enum ──────────────────────────────────────────────────────────
 
-enum _FrameType { document, card, qr, book, whiteboard, receipt, table }
+enum _FrameType {
+  document,
+  idCard,
+  passport,
+  license,
+  certificate,
+  qr,
+  book,
+  whiteboard,
+  receipt,
+  table,
+  photo,
+}
 
 _FrameType _frameTypeFor(String modeId) {
   switch (modeId) {
     case 'qr':
       return _FrameType.qr;
     case 'id_card':
+      return _FrameType.idCard;
     case 'passport':
-      return _FrameType.card;
+      return _FrameType.passport;
+    case 'driving_license':
+      return _FrameType.license;
+    case 'academic_certificate':
+      return _FrameType.certificate;
     case 'book':
       return _FrameType.book;
     case 'whiteboard':
@@ -351,6 +811,8 @@ _FrameType _frameTypeFor(String modeId) {
       return _FrameType.receipt;
     case 'table':
       return _FrameType.table;
+    case 'photo':
+      return _FrameType.photo;
     default:
       return _FrameType.document;
   }
@@ -360,6 +822,7 @@ _FrameType _frameTypeFor(String modeId) {
 
 class ScanScreen extends StatefulWidget {
   final String scanType;
+
   /// When set (e.g. from Templates), shown under the scan title.
   final String? templateLabel;
   const ScanScreen({super.key, required this.scanType, this.templateLabel});
@@ -374,6 +837,7 @@ class _ScanScreenState extends State<ScanScreen>
   CameraController? _cameraController;
   List<CameraDescription> _cameras = [];
   bool _isCameraReady = false;
+
   /// 0 = off, 1 = auto, 2 = torch (cycle on same button).
   int _flashMode = 0;
   bool _isCapturing = false;
@@ -384,8 +848,10 @@ class _ScanScreenState extends State<ScanScreen>
   double _maxZoom = 1.0;
   double _currentZoom = 1.0;
   double _pinchStartZoom = 1.0;
+
   /// Double-tap preview: alignment grid (no extra toolbar buttons).
   bool _showAlignmentGrid = false;
+  bool _idBackSide = false;
 
   bool _prefAutoEnhance = true;
   String _prefQuality = 'High';
@@ -455,8 +921,10 @@ class _ScanScreenState extends State<ScanScreen>
   Future<void> _bootstrapCamera() async {
     if (!mounted) return;
     setState(() {
-      _prefAutoEnhance = AppLocalStorage.getBool('autoEnhance', defaultValue: true);
-      _prefQuality = AppLocalStorage.getString('defaultQuality', defaultValue: 'High');
+      _prefAutoEnhance =
+          AppLocalStorage.getBool('autoEnhance', defaultValue: true);
+      _prefQuality =
+          AppLocalStorage.getString('defaultQuality', defaultValue: 'High');
     });
     await _initCamera();
   }
@@ -617,33 +1085,66 @@ class _ScanScreenState extends State<ScanScreen>
     if (_cameraController == null || !_isCameraReady) return;
     HapticFeedback.mediumImpact();
     setState(() => _isCapturing = true);
+    final sw = Stopwatch()..start();
     try {
       final image = await _cameraController!.takePicture();
       var outPath = image.path;
+      final targetAspectRatio =
+          _selectedMode == 'id_card' || _selectedMode == 'driving_license'
+              ? (85.6 / 54.0)
+              : (_selectedMode == 'passport' ? (125.0 / 88.0) : null);
       if (_prefAutoEnhance) {
-        outPath = await ImageEnhancementService.instance
-            .polishCaptureForScanMode(
-          image.path,
+        final processed = await ImageProcessingService.instance.processCapture(
+          imagePath: outPath,
+          modeId: _selectedMode,
+          enhanceMode: _enhanceModeFromFilter(_selectedFilter),
+          targetAspectRatio: targetAspectRatio,
+        );
+        outPath = processed.imagePath;
+      } else {
+        outPath =
+            await ImageEnhancementService.instance.polishCaptureForScanMode(
+          outPath,
           _selectedMode,
           filter: _selectedFilter,
         );
       }
+
+      if (_useDeskewAfterCapture(_selectedMode) && mounted) {
+        final deskewed = await Navigator.push<String?>(
+          context,
+          MaterialPageRoute<String?>(
+            fullscreenDialog: true,
+            builder: (_) => DocumentScanEditorScreen(
+              imagePath: outPath,
+              targetAspectRatio: targetAspectRatio,
+            ),
+          ),
+        );
+        if (deskewed != null) {
+          outPath = deskewed;
+        }
+      }
       if (!mounted) return;
       var captured = <String>[outPath];
-      if (_pendingFeatureAction == 'dual_page_split' || _selectedMode == 'book') {
+      if (_pendingFeatureAction == 'dual_page_split' ||
+          _selectedMode == 'book') {
         captured = await _splitDualPages(outPath);
       }
       setState(() {
         _capturedPages.addAll(captured);
         _isCapturing = false;
       });
+      PaintingBinding.instance.imageCache.clearLiveImages();
       final firstPath = captured.first;
       if (_pendingFeatureAction == 'ocr_text') {
         final text = await OcrService.instance.extractText(firstPath);
-        await _showTextResultSheet('OCR Text', text.isEmpty ? 'No text found.' : text);
+        await _showTextResultSheet(
+            'OCR Text', text.isEmpty ? 'No text found.' : text);
       } else if (_pendingFeatureAction == 'mrz_extract') {
         final mrz = await _extractMrzText(firstPath);
-        await _showTextResultSheet('MRZ Extract', mrz.isEmpty ? 'No MRZ detected.' : mrz);
+        await _showTextResultSheet(
+            'MRZ Extract', mrz.isEmpty ? 'No MRZ detected.' : mrz);
       } else if (_pendingFeatureAction == 'amount_extract') {
         final txt = await OcrService.instance.extractText(firstPath);
         final amounts = _extractAmounts(txt);
@@ -657,10 +1158,175 @@ class _ScanScreenState extends State<ScanScreen>
         _showInfoSnack('CSV exported: ${p.basename(csv)}');
       }
       _pendingFeatureAction = null;
+      if (_selectedMode == 'id_card' && mounted && !_longDocModeEnabled) {
+        if (_capturedPages.length < 2) {
+          _showInfoSnack('Front side captured. Now capture the back side.');
+          _afterPagesAddedSnack(captured.length);
+          return;
+        }
+        final front = _capturedPages[_capturedPages.length - 2];
+        final back = _capturedPages.last;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => IdCardResultScreen(
+              frontImagePath: front,
+              backImagePath: back,
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'driving_license' &&
+          mounted &&
+          !_longDocModeEnabled) {
+        if (_capturedPages.length < 2) {
+          _showInfoSnack('Front side captured. Now capture the back side.');
+          _afterPagesAddedSnack(captured.length);
+          return;
+        }
+        final front = _capturedPages[_capturedPages.length - 2];
+        final back = _capturedPages.last;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => DrivingLicenseResultScreen(
+              frontImagePath: front,
+              backImagePath: back,
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'vehicle_rc' && mounted && !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VehicleRcResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'medical_prescription' &&
+          mounted &&
+          !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MedicalPrescriptionResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'bank_statement' &&
+          mounted &&
+          !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BankStatementResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'academic_certificate' &&
+          mounted &&
+          !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AcademicCertificateResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'book' && mounted && !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BookResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'table' && mounted && !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TableResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'whiteboard' && mounted && !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => WhiteboardResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'photo' && mounted && !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PhotoEnhancementScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'passport' && mounted && !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PassportResultScreen(imagePath: firstPath),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
+      if (_selectedMode == 'receipt' && mounted && !_longDocModeEnabled) {
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReceiptResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        );
+        _afterPagesAddedSnack(captured.length);
+        return;
+      }
       // Auto-navigate to edit screen after capture (CamScanner style)
       if (mounted && !_longDocModeEnabled) {
-        final result = await Navigator.push<List<String>>(
-          context,
+        final result = await _pushWithCameraPause<List<String>>(
           MaterialPageRoute(
             builder: (_) => EditScanScreen(
               imagePaths: List<String>.from(_capturedPages),
@@ -677,8 +1343,45 @@ class _ScanScreenState extends State<ScanScreen>
         }
       }
       _afterPagesAddedSnack(captured.length);
+      sw.stop();
+      debugPrint('Scan post-processing took: ${sw.elapsedMilliseconds}ms');
     } catch (e) {
       setState(() => _isCapturing = false);
+      sw.stop();
+      debugPrint(
+          'Scan post-processing failed after: ${sw.elapsedMilliseconds}ms');
+    }
+  }
+
+  Future<T?> _pushWithCameraPause<T>(Route<T> route) async {
+    final shouldResume = _usesFlutterCameraPreview(_selectedMode);
+    if (shouldResume && _cameraController != null) {
+      await _cameraController?.dispose();
+      _cameraController = null;
+      if (mounted) setState(() => _isCameraReady = false);
+    }
+    if (!mounted) return null;
+    final result = await Navigator.push<T>(this.context, route);
+    if (mounted && shouldResume) {
+      await _bootstrapCamera();
+    }
+    return result;
+  }
+
+  CamScanEnhanceMode _enhanceModeFromFilter(String filterId) {
+    switch (filterId) {
+      case 'magic':
+      case 'color':
+        return CamScanEnhanceMode.magic;
+      case 'bw':
+        return CamScanEnhanceMode.blackWhite;
+      case 'grayscale':
+        return CamScanEnhanceMode.grayscale;
+      case 'none':
+        return CamScanEnhanceMode.original;
+      case 'auto':
+      default:
+        return CamScanEnhanceMode.auto;
     }
   }
 
@@ -708,7 +1411,8 @@ class _ScanScreenState extends State<ScanScreen>
       final src = img.decodeImage(bytes);
       if (src == null) return [imagePath];
       final halfW = src.width ~/ 2;
-      final left = img.copyCrop(src, x: 0, y: 0, width: halfW, height: src.height);
+      final left =
+          img.copyCrop(src, x: 0, y: 0, width: halfW, height: src.height);
       final right = img.copyCrop(
         src,
         x: halfW,
@@ -734,9 +1438,11 @@ class _ScanScreenState extends State<ScanScreen>
       final src = img.decodeImage(bytes);
       if (src == null) return '';
       final y = (src.height * 0.68).round().clamp(0, src.height - 1);
-      final mrz = img.copyCrop(src, x: 0, y: y, width: src.width, height: src.height - y);
+      final mrz = img.copyCrop(src,
+          x: 0, y: y, width: src.width, height: src.height - y);
       final dir = await getTemporaryDirectory();
-      final pathOut = p.join(dir.path, 'mrz_${DateTime.now().millisecondsSinceEpoch}.jpg');
+      final pathOut =
+          p.join(dir.path, 'mrz_${DateTime.now().millisecondsSinceEpoch}.jpg');
       await File(pathOut).writeAsBytes(img.encodeJpg(mrz, quality: 92));
       return OcrService.instance.extractText(pathOut);
     } catch (_) {
@@ -745,7 +1451,8 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   List<String> _extractAmounts(String text) {
-    final exp = RegExp(r'(?<!\d)(?:\$|USD|EUR|PKR|Rs\.?)?\s?\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{2})?(?!\d)');
+    final exp = RegExp(
+        r'(?<!\d)(?:\$|USD|EUR|PKR|Rs\.?)?\s?\d{1,3}(?:[,.\s]\d{3})*(?:[.,]\d{2})?(?!\d)');
     return exp
         .allMatches(text)
         .map((m) => m.group(0)?.trim() ?? '')
@@ -756,7 +1463,8 @@ class _ScanScreenState extends State<ScanScreen>
 
   Future<String> _saveCsvFromText(String text) async {
     final dir = await getTemporaryDirectory();
-    final filePath = p.join(dir.path, 'table_${DateTime.now().millisecondsSinceEpoch}.csv');
+    final filePath =
+        p.join(dir.path, 'table_${DateTime.now().millisecondsSinceEpoch}.csv');
     final lines = text
         .split('\n')
         .map((e) => e.trim())
@@ -771,7 +1479,7 @@ class _ScanScreenState extends State<ScanScreen>
     if (!mounted) return;
     await showModalBottomSheet<void>(
       context: context,
-      backgroundColor: const Color(0xFF0F1A2E),
+      backgroundColor: AppColors.navyDark,
       isScrollControlled: true,
       builder: (ctx) => SafeArea(
         child: Padding(
@@ -794,7 +1502,8 @@ class _ScanScreenState extends State<ScanScreen>
                 child: SingleChildScrollView(
                   child: Text(
                     text,
-                    style: GoogleFonts.nunito(color: Colors.white70, fontSize: 13),
+                    style:
+                        GoogleFonts.nunito(color: Colors.white70, fontSize: 13),
                   ),
                 ),
               ),
@@ -856,7 +1565,16 @@ class _ScanScreenState extends State<ScanScreen>
       final result = await FilePicker.platform.pickFiles(
         allowMultiple: true,
         type: FileType.custom,
-        allowedExtensions: ['jpg', 'jpeg', 'png', 'webp'],
+        allowedExtensions: [
+          'jpg',
+          'jpeg',
+          'png',
+          'webp',
+          'heic',
+          'heif',
+          'dng',
+          'raw'
+        ],
       );
       if (result != null && mounted) {
         final paths = result.files
@@ -882,6 +1600,43 @@ class _ScanScreenState extends State<ScanScreen>
     if (_selectedMode == 'receipt' && opt.label == 'Long doc') {
       setState(() => _longDocModeEnabled = true);
       _showInfoSnack('Long doc mode enabled. Capture pages, then tap Done.');
+      return;
+    }
+    if (_selectedMode == 'vehicle_rc' && opt.label == 'Multi-page') {
+      setState(() => _longDocModeEnabled = true);
+      _showInfoSnack(
+          'Multi-page mode enabled. Capture all RC pages, then tap Done.');
+      return;
+    }
+    if (_selectedMode == 'medical_prescription' && opt.label == 'Multi-page') {
+      setState(() => _longDocModeEnabled = true);
+      _showInfoSnack(
+          'Multi-page mode enabled. Capture all prescription pages, then tap Done.');
+      return;
+    }
+    if (_selectedMode == 'bank_statement' && opt.label == 'Multi-page') {
+      setState(() => _longDocModeEnabled = true);
+      _showInfoSnack(
+          'Multi-page mode enabled. Capture all statement pages, then tap Done.');
+      return;
+    }
+    if (_selectedMode == 'academic_certificate' && opt.label == 'Multi-page') {
+      setState(() => _longDocModeEnabled = true);
+      _showInfoSnack(
+          'Multi-page mode enabled. Capture all academic pages, then tap Done.');
+      return;
+    }
+    if (_selectedMode == 'book' &&
+        (opt.label == 'Batch scan' || opt.label == 'Dual page')) {
+      setState(() => _longDocModeEnabled = true);
+      _showInfoSnack(
+          'Book batch mode enabled. Capture pages/spreads, then tap Done.');
+      return;
+    }
+    if (_selectedMode == 'table' && opt.label == 'CSV export') {
+      setState(() => _longDocModeEnabled = true);
+      _showInfoSnack(
+          'Table batch mode enabled. Capture all pages, then tap Done.');
       return;
     }
     if (_selectedMode == 'table' && opt.label == 'CSV export') {
@@ -981,7 +1736,9 @@ class _ScanScreenState extends State<ScanScreen>
       setState(() => _selectedFilter = 'enhanced');
       return;
     }
-    if (key.contains('vivid') || key.contains('hdr') || key.contains('portrait')) {
+    if (key.contains('vivid') ||
+        key.contains('hdr') ||
+        key.contains('portrait')) {
       setState(() => _selectedFilter = 'vivid');
       return;
     }
@@ -1034,7 +1791,8 @@ class _ScanScreenState extends State<ScanScreen>
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text(msg, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+        content:
+            Text(msg, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
         behavior: SnackBarBehavior.floating,
       ),
     );
@@ -1080,8 +1838,7 @@ class _ScanScreenState extends State<ScanScreen>
     if (_cameraController == null || !_isCameraReady) return;
     if (_maxZoom <= _minZoom) return;
     if (details.pointerCount < 2) return;
-    final target = (_pinchStartZoom * details.scale)
-        .clamp(_minZoom, _maxZoom);
+    final target = (_pinchStartZoom * details.scale).clamp(_minZoom, _maxZoom);
     if ((target - _currentZoom).abs() < 0.01) return;
     try {
       await _cameraController!.setZoomLevel(target);
@@ -1136,8 +1893,7 @@ class _ScanScreenState extends State<ScanScreen>
     }
     if (_qrResultAction == 'open_url') {
       final uri = Uri.tryParse(raw);
-      if (uri != null &&
-          (uri.scheme == 'http' || uri.scheme == 'https')) {
+      if (uri != null && (uri.scheme == 'http' || uri.scheme == 'https')) {
         launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
         _showInfoSnack('Scanned code is not a valid URL');
@@ -1148,7 +1904,7 @@ class _ScanScreenState extends State<ScanScreen>
     showDialog<void>(
       context: context,
       builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A2A40),
+        backgroundColor: AppColors.navyMid,
         title: Text(
           'Code scanned',
           style: GoogleFonts.nunito(
@@ -1161,6 +1917,21 @@ class _ScanScreenState extends State<ScanScreen>
           style: GoogleFonts.nunito(color: Colors.white70, fontSize: 15),
         ),
         actions: [
+          TextButton(
+            onPressed: () async {
+              final uri = Uri.tryParse(raw);
+              if (uri != null &&
+                  (uri.scheme == 'http' || uri.scheme == 'https')) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } else {
+                _showInfoSnack('Scanned code is not a valid URL');
+              }
+            },
+            child: Text(
+              'Open',
+              style: GoogleFonts.nunito(color: AppColors.gold),
+            ),
+          ),
           TextButton(
             onPressed: () async {
               await Clipboard.setData(ClipboardData(text: raw));
@@ -1176,7 +1947,8 @@ class _ScanScreenState extends State<ScanScreen>
                 );
               }
             },
-            child: Text('Copy', style: GoogleFonts.nunito(color: AppColors.gold)),
+            child:
+                Text('Copy', style: GoogleFonts.nunito(color: AppColors.gold)),
           ),
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -1189,6 +1961,50 @@ class _ScanScreenState extends State<ScanScreen>
 
   void _proceedToEdit() {
     if (_capturedPages.isEmpty) return;
+    if (_selectedMode == 'book') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => BookResultScreen(
+            imagePaths: List<String>.from(_capturedPages),
+          ),
+        ),
+      );
+      return;
+    }
+    if (_selectedMode == 'table') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => TableResultScreen(
+            imagePaths: List<String>.from(_capturedPages),
+          ),
+        ),
+      );
+      return;
+    }
+    if (_selectedMode == 'whiteboard') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => WhiteboardResultScreen(
+            imagePaths: List<String>.from(_capturedPages),
+          ),
+        ),
+      );
+      return;
+    }
+    if (_selectedMode == 'photo') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => PhotoEnhancementScreen(
+            imagePaths: List<String>.from(_capturedPages),
+          ),
+        ),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -1210,6 +2026,16 @@ class _ScanScreenState extends State<ScanScreen>
         return 'Receipt_$d';
       case 'id_card':
         return 'ID_$d';
+      case 'driving_license':
+        return 'DL_$d';
+      case 'vehicle_rc':
+        return 'VehicleRC_$d';
+      case 'medical_prescription':
+        return 'Prescription_$d';
+      case 'bank_statement':
+        return 'BankStatement_$d';
+      case 'academic_certificate':
+        return 'Academic_$d';
       case 'passport':
         return 'Passport_$d';
       case 'book':
@@ -1253,7 +2079,7 @@ class _ScanScreenState extends State<ScanScreen>
     if (index < 0 || index >= _capturedPages.length) return;
     showDialog<void>(
       context: context,
-      barrierColor: Colors.black87,
+      barrierColor: AppColors.navyDark.withValues(alpha: 0.92),
       builder: (ctx) => Dialog(
         backgroundColor: Colors.black,
         insetPadding: const EdgeInsets.all(12),
@@ -1267,6 +2093,15 @@ class _ScanScreenState extends State<ScanScreen>
                   child: Image.file(
                     File(_capturedPages[index]),
                     fit: BoxFit.contain,
+                    cacheWidth: 1080,
+                    filterQuality: FilterQuality.medium,
+                    frameBuilder:
+                        (context, child, frame, wasSynchronouslyLoaded) {
+                      if (wasSynchronouslyLoaded || frame != null) return child;
+                      return const Center(
+                        child: CircularProgressIndicator(color: AppColors.gold),
+                      );
+                    },
                   ),
                 ),
               ),
@@ -1275,7 +2110,8 @@ class _ScanScreenState extends State<ScanScreen>
               top: 4,
               right: 4,
               child: IconButton(
-                icon: const Icon(Icons.close_rounded, color: Colors.white, size: 28),
+                icon: const Icon(Icons.close_rounded,
+                    color: Colors.white, size: 28),
                 onPressed: () => Navigator.pop(ctx),
               ),
             ),
@@ -1306,7 +2142,7 @@ class _ScanScreenState extends State<ScanScreen>
     final name = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0F1A2E),
+      backgroundColor: AppColors.navyDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1481,11 +2317,12 @@ class _ScanScreenState extends State<ScanScreen>
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        backgroundColor: const Color(0xFF1A2A40),
+        backgroundColor: AppColors.navyMid,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
           'Camera Permission',
-          style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800),
+          style: GoogleFonts.nunito(
+              color: Colors.white, fontWeight: FontWeight.w800),
         ),
         content: Text(
           'Camera access is needed to scan documents.',
@@ -1494,12 +2331,14 @@ class _ScanScreenState extends State<ScanScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: Text('Cancel', style: GoogleFonts.nunito(color: Colors.white54)),
+            child: Text('Cancel',
+                style: GoogleFonts.nunito(color: Colors.white54)),
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(
               backgroundColor: AppColors.gold,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10)),
             ),
             onPressed: () {
               Navigator.pop(context);
@@ -1715,8 +2554,7 @@ class _ScanScreenState extends State<ScanScreen>
                     width: 60,
                     height: 60,
                     decoration: BoxDecoration(
-                      border:
-                          Border.all(color: AppColors.gold, width: 1.5),
+                      border: Border.all(color: AppColors.gold, width: 1.5),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -1739,6 +2577,8 @@ class _ScanScreenState extends State<ScanScreen>
                 ),
               ),
             ),
+
+          _buildModeHintOverlay(),
 
           // 3. Top bar
           _buildTopBar(),
@@ -1789,7 +2629,7 @@ class _ScanScreenState extends State<ScanScreen>
                     Text(
                       _scanTypeLabel(),
                       style: GoogleFonts.nunito(
-                        color: Colors.white,
+                        color: AppColors.gold,
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                         letterSpacing: 0.3,
@@ -1829,15 +2669,6 @@ class _ScanScreenState extends State<ScanScreen>
             ),
             if (_usesFlutterCameraPreview(_selectedMode) ||
                 _selectedMode == 'qr') ...[
-              _iconBtn(
-                _timerModeEnabled ? Icons.timer : Icons.timer_outlined,
-                _toggleTimerMode,
-                color: _timerModeEnabled ? AppColors.gold : Colors.white,
-                bgColor: _timerModeEnabled
-                    ? AppColors.gold.withOpacity(0.2)
-                    : Colors.black45,
-              ),
-              const SizedBox(width: 8),
               _iconBtn(
                 _flashIcon(),
                 _cycleFlash,
@@ -1945,7 +2776,6 @@ class _ScanScreenState extends State<ScanScreen>
         key: ValueKey(_selectedMode),
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-
           const SizedBox(height: 10),
 
           // ── Filter chips row
@@ -1967,8 +2797,8 @@ class _ScanScreenState extends State<ScanScreen>
                   },
                   child: AnimatedContainer(
                     duration: const Duration(milliseconds: 180),
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 14, vertical: 6),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                     decoration: BoxDecoration(
                       color: isSelected
                           ? modeColor.withOpacity(0.18)
@@ -2009,8 +2839,8 @@ class _ScanScreenState extends State<ScanScreen>
                 return GestureDetector(
                   onTap: () => _handleFeatureChipTap(chip.label),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 5),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
                     decoration: BoxDecoration(
                       color: Colors.white.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(8),
@@ -2082,48 +2912,39 @@ class _ScanScreenState extends State<ScanScreen>
                 children: [
                   const SizedBox(height: 10),
 
-              if (_longDocModeEnabled)
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Align(
-                    alignment: Alignment.centerRight,
-                    child: TextButton.icon(
-                      onPressed: _capturedPages.isEmpty
-                          ? null
-                          : () {
-                              setState(() => _longDocModeEnabled = false);
-                              _proceedToEdit();
-                            },
-                      icon: const Icon(Icons.check_rounded, size: 16),
-                      label: Text(
-                        'Done',
-                        style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                  if (_longDocModeEnabled)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Align(
+                        alignment: Alignment.centerRight,
+                        child: TextButton.icon(
+                          onPressed: _capturedPages.isEmpty
+                              ? null
+                              : () {
+                                  setState(() => _longDocModeEnabled = false);
+                                  _proceedToEdit();
+                                },
+                          icon: const Icon(Icons.check_rounded, size: 16),
+                          label: Text(
+                            'Done',
+                            style:
+                                GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                          ),
+                        ),
                       ),
                     ),
-                  ),
-                ),
 
-              // Mode selector
-              _buildModeSelector(),
+                  // Mode selector
+                  _buildModeSelector(),
 
-                  if (_modeWasExplicitlySelected) ...[
-                    const SizedBox(height: 10),
-                    AnimatedSize(
-                      duration: const Duration(milliseconds: 280),
-                      curve: Curves.easeOut,
-                      child: _modeWasExplicitlySelected
-                          ? _buildModeFeaturesPanel()
-                          : const SizedBox.shrink(),
-                    ),
-                  ],
-
-                  const SizedBox(height: 14),
+                  const SizedBox(height: 8),
 
                   // Shutter row
                   _buildShutterRow(),
 
                   SizedBox(
-                      height: MediaQuery.of(context).padding.bottom > 0 ? 12 : 30),
+                      height:
+                          MediaQuery.of(context).padding.bottom > 0 ? 8 : 18),
                 ],
               ),
             ),
@@ -2137,62 +2958,71 @@ class _ScanScreenState extends State<ScanScreen>
 
   Widget _buildModeSelector() {
     return SizedBox(
-      height: 44,
+      height: 68,
       child: ScrollConfiguration(
         behavior: ScrollConfiguration.of(context).copyWith(scrollbars: false),
-        child: ListView.separated(
-          controller: _modeScrollController,
-          scrollDirection: Axis.horizontal,
-          physics: const BouncingScrollPhysics(),
-          padding: const EdgeInsets.symmetric(horizontal: 16),
-          itemCount: _kScanModes.length,
-          separatorBuilder: (_, __) => const SizedBox(width: 6),
-          itemBuilder: (context, i) {
-            final mode = _kScanModes[i];
-            final isSelected = _selectedMode == mode.id;
+        child: Container(
+            color: const Color(0xFF0D1B4B),
+            child: ListView.separated(
+              controller: _modeScrollController,
+              scrollDirection: Axis.horizontal,
+              physics: const BouncingScrollPhysics(),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
+              itemCount: _kScanModes.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 4),
+              itemBuilder: (context, i) {
+                final mode = _kScanModes[i];
+                final isSelected = _selectedMode == mode.id;
 
-            return GestureDetector(
-              onTap: () => _selectMode(mode.id),
-              child: AnimatedContainer(
-                duration: const Duration(milliseconds: 220),
-                curve: Curves.easeOut,
-                padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                decoration: BoxDecoration(
-                  color: isSelected
-                      ? AppColors.gold
-                      : Colors.white.withOpacity(0.08),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(
-                    color: isSelected
-                        ? AppColors.gold
-                        : Colors.white.withOpacity(0.15),
-                    width: 1.2,
+                return GestureDetector(
+                  onTap: () => _selectMode(mode.id),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 220),
+                    curve: Curves.easeOut,
+                    width: 78,
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: isSelected
+                          ? Colors.white.withValues(alpha: 0.08)
+                          : Colors.transparent,
+                      borderRadius: BorderRadius.circular(18),
+                    ),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          mode.icon,
+                          color: isSelected ? AppColors.gold : Colors.white,
+                          size: isSelected ? 15 : 14,
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          mode.label,
+                          textAlign: TextAlign.center,
+                          style: GoogleFonts.nunito(
+                            fontSize: isSelected ? 11 : 10,
+                            fontWeight:
+                                isSelected ? FontWeight.w800 : FontWeight.w600,
+                            color: isSelected ? AppColors.gold : Colors.white,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        AnimatedContainer(
+                          duration: const Duration(milliseconds: 180),
+                          height: 2.2,
+                          width: isSelected ? 34 : 0,
+                          decoration: BoxDecoration(
+                            color: AppColors.gold,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(
-                      mode.icon,
-                      color: isSelected ? AppColors.navyDark : Colors.white60,
-                      size: 15,
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      mode.label,
-                      style: GoogleFonts.nunito(
-                        fontSize: 11,
-                        fontWeight:
-                            isSelected ? FontWeight.w800 : FontWeight.w500,
-                        color: isSelected ? AppColors.navyDark : Colors.white60,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
+                );
+              },
+            )),
       ),
     );
   }
@@ -2204,7 +3034,7 @@ class _ScanScreenState extends State<ScanScreen>
     const ringW = 4.5;
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 44),
+      padding: const EdgeInsets.symmetric(horizontal: 28),
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -2212,7 +3042,7 @@ class _ScanScreenState extends State<ScanScreen>
           // Gallery picker
           GestureDetector(
             onTap: _showImportSheet,
-            child: _sideBtn(const Icon(Iconsax.gallery, color: Colors.white, size: 26)),
+            child: _galleryThumbBtn(),
           ),
 
           Column(
@@ -2220,8 +3050,8 @@ class _ScanScreenState extends State<ScanScreen>
             children: [
               if (_selectedMode == 'qr')
                 Container(
-                  width: 80,
-                  height: 80,
+                  width: 72,
+                  height: 72,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
                     border: Border.all(color: AppColors.gold, width: 2.5),
@@ -2233,7 +3063,7 @@ class _ScanScreenState extends State<ScanScreen>
                       style: GoogleFonts.nunito(
                         color: AppColors.gold,
                         fontWeight: FontWeight.w900,
-                        fontSize: 13,
+                        fontSize: 12,
                         letterSpacing: 1.5,
                       ),
                     ),
@@ -2247,8 +3077,8 @@ class _ScanScreenState extends State<ScanScreen>
                     children: [
                       AnimatedContainer(
                         duration: const Duration(milliseconds: 100),
-                        width: _isCapturing ? 74 : 80,
-                        height: _isCapturing ? 74 : 80,
+                        width: _isCapturing ? 68 : 74,
+                        height: _isCapturing ? 68 : 74,
                         decoration: BoxDecoration(
                           shape: BoxShape.circle,
                           border: Border.all(color: ringColor, width: ringW),
@@ -2256,11 +3086,12 @@ class _ScanScreenState extends State<ScanScreen>
                         child: Center(
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 100),
-                            width: 62,
-                            height: 62,
+                            width: 54,
+                            height: 54,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: _isCapturing ? Colors.white60 : Colors.white,
+                              color:
+                                  _isCapturing ? Colors.white60 : Colors.white,
                             ),
                             child: _isCapturing
                                 ? const Center(
@@ -2278,18 +3109,19 @@ class _ScanScreenState extends State<ScanScreen>
                           top: -6,
                           right: -6,
                           child: Container(
-                            width: 22,
-                            height: 22,
+                            width: 20,
+                            height: 20,
                             decoration: BoxDecoration(
                               color: AppColors.gold,
                               shape: BoxShape.circle,
-                              border: Border.all(color: Colors.black, width: 1.5),
+                              border:
+                                  Border.all(color: Colors.black, width: 1.5),
                             ),
                             child: Center(
                               child: Text(
                                 '${_capturedPages.length}',
                                 style: GoogleFonts.nunito(
-                                  fontSize: 10,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.w900,
                                   color: AppColors.navyDark,
                                 ),
@@ -2303,11 +3135,31 @@ class _ScanScreenState extends State<ScanScreen>
             ],
           ),
 
-          GestureDetector(
-            onTap: _flipCamera,
-            child: _sideBtn(const Icon(Icons.flip_camera_ios_rounded,
-                color: Colors.white, size: 26)),
-          ),
+          if (_selectedMode == 'qr')
+            GestureDetector(
+              onTap: _cycleFlash,
+              child: _sideBtn(
+                Icon(
+                  _flashMode == 0
+                      ? Icons.flashlight_off_rounded
+                      : Icons.flashlight_on_rounded,
+                  color: Colors.white,
+                  size: 21,
+                ),
+              ),
+            )
+          else if (_selectedMode == 'document' || _selectedMode == 'book')
+            GestureDetector(
+              onTap: _showImportSheet,
+              child: _sideBtn(const Icon(Iconsax.add_square,
+                  color: Colors.white, size: 21)),
+            )
+          else
+            GestureDetector(
+              onTap: _flipCamera,
+              child: _sideBtn(const Icon(Icons.flip_camera_ios_rounded,
+                  color: Colors.white, size: 22)),
+            ),
         ],
       ),
     );
@@ -2317,15 +3169,154 @@ class _ScanScreenState extends State<ScanScreen>
 
   Widget _sideBtn(Widget child) {
     return Container(
-      width: 56,
-      height: 56,
+      width: 52,
+      height: 52,
       decoration: BoxDecoration(
         color: Colors.black.withOpacity(0.28),
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(16),
         border: Border.all(color: Colors.white38, width: 1.5),
       ),
       child: child,
     );
+  }
+
+  Widget _galleryThumbBtn() {
+    if (_capturedPages.isNotEmpty) {
+      final f = File(_capturedPages.last);
+      if (f.existsSync()) {
+        return GestureDetector(
+          onTap: _showImportSheet,
+          child: Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(14),
+              border: Border.all(color: Colors.white38, width: 1.5),
+            ),
+            clipBehavior: Clip.antiAlias,
+            child: Image.file(
+              f,
+              fit: BoxFit.cover,
+              cacheWidth: 256,
+              filterQuality: FilterQuality.low,
+            ),
+          ),
+        );
+      }
+    }
+    return _sideBtn(const Icon(Iconsax.gallery, color: Colors.white, size: 22));
+  }
+
+  Widget _buildModeHintOverlay() {
+    final hint = _modeHintText();
+    return Positioned(
+      left: 16,
+      right: 16,
+      bottom: 204,
+      child: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 220),
+        child: Column(
+          key: ValueKey('${_selectedMode}_${_idBackSide ? 'b' : 'f'}'),
+          children: [
+            if (_selectedMode == 'id_card' ||
+                _selectedMode == 'driving_license')
+              Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.black.withValues(alpha: 0.55),
+                  borderRadius: BorderRadius.circular(20),
+                  border:
+                      Border.all(color: AppColors.gold.withValues(alpha: 0.5)),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    _sideToggleChip('Front', !_idBackSide,
+                        () => setState(() => _idBackSide = false)),
+                    const SizedBox(width: 6),
+                    _sideToggleChip('Back', _idBackSide,
+                        () => setState(() => _idBackSide = true)),
+                  ],
+                ),
+              ),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(20),
+                border:
+                    Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+              ),
+              child: Text(
+                hint,
+                style: GoogleFonts.nunito(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sideToggleChip(String label, bool selected, VoidCallback onTap) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 160),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+        decoration: BoxDecoration(
+          color: selected ? AppColors.gold : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+        ),
+        child: Text(
+          label,
+          style: GoogleFonts.nunito(
+            color: selected ? AppColors.navyDark : Colors.white,
+            fontWeight: FontWeight.w800,
+            fontSize: 11,
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _modeHintText() {
+    switch (_selectedMode) {
+      case 'document':
+        return 'Align document within frame';
+      case 'id_card':
+        return _idBackSide
+            ? 'Align ID card (Back side)'
+            : 'Align ID card (Front side)';
+      case 'passport':
+        return 'Align passport photo page';
+      case 'receipt':
+        return 'Align receipt';
+      case 'book':
+        return 'Place book flat';
+      case 'whiteboard':
+        return 'Align whiteboard edges';
+      case 'photo':
+        return 'Take photo';
+      case 'table':
+        return 'Align table';
+      case 'driving_license':
+        return _idBackSide
+            ? 'Align driving license (Back side)'
+            : 'Align driving license (Front side)';
+      case 'academic_certificate':
+        return 'Align certificate';
+      case 'qr':
+        return 'Point at QR or Barcode';
+      default:
+        return 'Align inside frame';
+    }
   }
 
   void _confirmRemoveThumbnail(int index) {
@@ -2455,13 +3446,37 @@ class _ScanFramePainter extends CustomPainter {
         top = size.height * 0.22;
         bottom = top + side;
         break;
-      case _FrameType.card:
+      case _FrameType.idCard:
         final w = size.width * 0.84;
         final h = w * 0.63;
         left = (size.width - w) / 2;
         right = left + w;
         top = size.height * 0.28;
         bottom = top + h;
+        break;
+      case _FrameType.passport:
+        final w = size.width * 0.84;
+        final h = w * (88 / 125);
+        left = (size.width - w) / 2;
+        right = left + w;
+        top = size.height * 0.24;
+        bottom = top + h;
+        break;
+      case _FrameType.license:
+        final w = size.width * 0.84;
+        final h = w * 0.63;
+        left = (size.width - w) / 2;
+        right = left + w;
+        top = size.height * 0.28;
+        bottom = top + h;
+        break;
+      case _FrameType.certificate:
+        final w = size.width * 0.78;
+        final h = w * 1.414;
+        left = (size.width - w) / 2;
+        right = left + w;
+        top = size.height * 0.12;
+        bottom = (top + h).clamp(top + 80, size.height * 0.86);
         break;
       case _FrameType.book:
         final w = size.width * 0.90;
@@ -2499,6 +3514,14 @@ class _ScanFramePainter extends CustomPainter {
         top = size.height * 0.24;
         bottom = top + th;
         break;
+      case _FrameType.photo:
+        final w = size.width * 0.94;
+        final h = size.height * 0.72;
+        left = (size.width - w) / 2;
+        right = left + w;
+        top = size.height * 0.14;
+        bottom = top + h;
+        break;
       case _FrameType.document:
         left = 0;
         right = size.width;
@@ -2524,7 +3547,8 @@ class _ScanFramePainter extends CustomPainter {
         ..addRect(Rect.fromLTRB(left, top, right, bottom));
       final fullPath = Path()
         ..addRect(Rect.fromLTWH(0, 0, size.width, size.height));
-      final dimPath = Path.combine(PathOperation.difference, fullPath, framePath);
+      final dimPath =
+          Path.combine(PathOperation.difference, fullPath, framePath);
       canvas.drawPath(dimPath, dimPaint);
     }
 
@@ -2541,7 +3565,9 @@ class _ScanFramePainter extends CustomPainter {
             ? 26.0
             : (frameType == _FrameType.receipt
                 ? 24.0
-                : (frameType == _FrameType.document ? 36.0 : 30.0)));
+                : (frameType == _FrameType.photo
+                    ? 18.0
+                    : (frameType == _FrameType.document ? 36.0 : 30.0))));
 
     void drawCorner(Offset a, Offset corner, Offset b) {
       final path = Path()
@@ -2592,7 +3618,17 @@ class _ScanFramePainter extends CustomPainter {
       ..strokeWidth = 1.8
       ..style = PaintingStyle.stroke;
 
-    canvas.drawLine(Offset(left + 4, scanY), Offset(right - 4, scanY), scanPaint);
+    canvas.drawLine(
+        Offset(left + 4, scanY), Offset(right - 4, scanY), scanPaint);
+
+    if (frameType == _FrameType.book) {
+      final centerX = (left + right) / 2;
+      final spine = Paint()
+        ..color = frameColor.withValues(alpha: 0.8)
+        ..strokeWidth = 1.8;
+      canvas.drawLine(
+          Offset(centerX, top + 8), Offset(centerX, bottom - 8), spine);
+    }
 
     if (showAlignmentGrid) {
       final gridPaint = Paint()
@@ -2634,7 +3670,7 @@ class _ImportSheet extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: const BoxDecoration(
-        color: Color(0xFF0F1A2E),
+        color: AppColors.navyDark,
         borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
       ),
       child: SafeArea(

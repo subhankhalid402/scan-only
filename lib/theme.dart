@@ -34,6 +34,8 @@ class AppTheme {
   static ThemeData get theme {
     return ThemeData(
       useMaterial3: true,
+      visualDensity: VisualDensity.compact,
+      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.navyMid,
         primary: AppColors.navyMid,
@@ -41,14 +43,137 @@ class AppTheme {
       ),
       textTheme: GoogleFonts.nunitoTextTheme(),
       scaffoldBackgroundColor: AppColors.background,
+      cardColor: AppColors.cardWhite,
+      canvasColor: AppColors.background,
+      dividerColor: AppColors.navyDark.withValues(alpha: 0.12),
+      iconTheme: const IconThemeData(color: AppColors.navyDark),
       appBarTheme: AppBarTheme(
         backgroundColor: AppColors.navyDark,
         foregroundColor: Colors.white,
         elevation: 0,
         titleTextStyle: GoogleFonts.nunito(
-          fontSize: 20,
+          fontSize: 18,
           fontWeight: FontWeight.w800,
           color: Colors.white,
+        ),
+      ),
+      dialogTheme: DialogThemeData(
+        backgroundColor: AppColors.cardWhite,
+        titleTextStyle: GoogleFonts.nunito(
+          color: AppColors.navyDark,
+          fontSize: 18,
+          fontWeight: FontWeight.w800,
+        ),
+        contentTextStyle: GoogleFonts.nunito(
+          color: AppColors.textDark,
+          fontSize: 14,
+          fontWeight: FontWeight.w600,
+        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+      ),
+      bottomSheetTheme: const BottomSheetThemeData(
+        backgroundColor: AppColors.navyDark,
+        surfaceTintColor: Colors.transparent,
+      ),
+      popupMenuTheme: PopupMenuThemeData(
+        color: AppColors.cardWhite,
+        textStyle: GoogleFonts.nunito(
+          color: AppColors.navyDark,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      cardTheme: CardThemeData(
+        color: AppColors.cardWhite,
+        surfaceTintColor: Colors.transparent,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      ),
+      chipTheme: ChipThemeData(
+        backgroundColor: AppColors.navyDark.withValues(alpha: 0.06),
+        selectedColor: AppColors.gold.withValues(alpha: 0.24),
+        side: BorderSide(color: AppColors.navyDark.withValues(alpha: 0.14)),
+        labelStyle: GoogleFonts.nunito(
+          color: AppColors.navyDark,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      sliderTheme: SliderThemeData(
+        activeTrackColor: AppColors.gold,
+        inactiveTrackColor: AppColors.navyDark.withValues(alpha: 0.2),
+        thumbColor: AppColors.gold,
+        overlayColor: AppColors.gold.withValues(alpha: 0.15),
+      ),
+      inputDecorationTheme: InputDecorationTheme(
+        filled: true,
+        fillColor: Colors.white,
+        isDense: true,
+        contentPadding:
+            const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        floatingLabelBehavior: FloatingLabelBehavior.auto,
+        hintStyle: GoogleFonts.nunito(
+          color: AppColors.textMuted.withValues(alpha: 0.92),
+          fontWeight: FontWeight.w600,
+        ),
+        labelStyle: GoogleFonts.nunito(
+          color: AppColors.navyMid,
+          fontWeight: FontWeight.w700,
+        ),
+        floatingLabelStyle: GoogleFonts.nunito(
+          color: AppColors.navyDark,
+          fontWeight: FontWeight.w800,
+        ),
+        helperStyle: GoogleFonts.nunito(
+          color: AppColors.textMuted,
+          fontWeight: FontWeight.w600,
+        ),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide:
+              BorderSide(color: AppColors.navyDark.withValues(alpha: 0.38)),
+        ),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide:
+              BorderSide(color: AppColors.navyDark.withValues(alpha: 0.22)),
+        ),
+        focusedBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: AppColors.gold, width: 1.8),
+        ),
+        errorBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: AppColors.red, width: 1.4),
+        ),
+        focusedErrorBorder: const OutlineInputBorder(
+          borderRadius: BorderRadius.all(Radius.circular(12)),
+          borderSide: BorderSide(color: AppColors.red, width: 1.8),
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.gold,
+          foregroundColor: AppColors.navyDark,
+          minimumSize: const Size(0, 40),
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.navyDark,
+          side: BorderSide(color: AppColors.navyDark.withValues(alpha: 0.2)),
+          minimumSize: const Size(0, 38),
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          textStyle: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.navyMid,
+          textStyle: GoogleFonts.nunito(fontWeight: FontWeight.w800),
         ),
       ),
     );

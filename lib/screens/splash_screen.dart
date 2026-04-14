@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:iconsax/iconsax.dart';
 import '../services/app_local_storage.dart';
 import '../theme.dart';
 import 'edit_scan_screen.dart';
@@ -115,32 +114,30 @@ class _SplashScreenState extends State<SplashScreen>
                 child: FadeTransition(
                   opacity: _fadeAnimation,
                   child: Container(
-                    width: 100,
-                    height: 100,
+                    width: 108,
+                    height: 108,
                     decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(24),
+                      color: Colors.white.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(26),
+                      border: Border.all(
+                        color: AppColors.gold.withValues(alpha: 0.28),
+                        width: 1.4,
+                      ),
                       boxShadow: [
                         BoxShadow(
-                          color: AppColors.gold.withOpacity(0.3),
+                          color: AppColors.gold.withValues(alpha: 0.30),
                           blurRadius: 20,
                           spreadRadius: 5,
                         ),
                       ],
                     ),
-                    child: Center(
-                      child: Container(
-                        width: 70,
-                        height: 70,
-                        decoration: BoxDecoration(
-                          color: AppColors.navyMid,
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                        child: const Icon(
-                          Iconsax.scan,
-                          color: AppColors.gold,
-                          size: 40,
-                        ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(26),
+                      child: Image.asset(
+                        'assets/images/launcher_icon.png',
+                        width: 108,
+                        height: 108,
+                        fit: BoxFit.cover,
                       ),
                     ),
                   ),

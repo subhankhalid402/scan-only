@@ -14,7 +14,8 @@ import '../services/database_service.dart';
 import '../services/pdf_service.dart';
 import '../services/ocr_service.dart';
 import '../services/watermark_service.dart';
-import '../widgets/watermark_composer_sheet.dart';
+import 'add_watermark_screen.dart';
+import 'remove_watermark_screen.dart';
 import 'annotation_screen.dart';
 import 'advanced_sharing_screen.dart';
 import 'document_conversion_screen.dart';
@@ -29,11 +30,29 @@ class DocumentViewerScreen extends StatefulWidget {
 
 class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   late DocumentModel _doc;
+  pdfx.PdfControllerPinch? _pdfController;
+  String? _pdfControllerPath;
 
   @override
   void initState() {
     super.initState();
     _doc = widget.document;
+  }
+
+  @override
+  void dispose() {
+    _pdfController?.dispose();
+    super.dispose();
+  }
+
+  Future<void> _ensurePdfController(String path) async {
+    if (_pdfControllerPath == path && _pdfController != null) return;
+    _pdfController?.dispose();
+    _pdfControllerPath = path;
+    _pdfController = pdfx.PdfControllerPinch(
+      document: pdfx.PdfDocument.openFile(path),
+    );
+    if (mounted) setState(() {});
   }
 
   // ── Share ──────────────────────────────────────────────────────────────────
@@ -83,7 +102,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       context: context,
       builder: (_) => AlertDialog(
         title: Text('Rename Document',
-          style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
         content: TextField(
           controller: controller,
           autofocus: true,
@@ -92,7 +111,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           ),
         ),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel')),
           ElevatedButton(
             onPressed: () {
               Navigator.pop(context);
@@ -101,7 +122,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
               }
             },
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
-            child: Text('Save', style: GoogleFonts.nunito(color: AppColors.navyDark, fontWeight: FontWeight.w700)),
+            child: Text('Save',
+                style: GoogleFonts.nunito(
+                    color: AppColors.navyDark, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -127,8 +150,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       context: context,
       barrierDismissible: false,
       builder: (_) => AlertDialog(
-        title: Text('Extracting Text...', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
-        content: const SizedBox(height: 50, child: Center(child: CircularProgressIndicator())),
+        title: Text('Extracting Text...',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+        content: const SizedBox(
+            height: 50, child: Center(child: CircularProgressIndicator())),
       ),
     );
 
@@ -143,7 +168,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       showDialog(
         context: context,
         builder: (_) => AlertDialog(
-          title: Text('Extracted Text', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+          title: Text('Extracted Text',
+              style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
           content: SingleChildScrollView(
             child: Text(
               ocrText.isEmpty ? 'No text found in image.' : ocrText,
@@ -151,12 +177,21 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
             ),
           ),
           actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Close')),
+            TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('Close')),
             if (ocrText.isNotEmpty)
               ElevatedButton(
-                onPressed: () { Share.share(ocrText); Navigator.pop(context); },
-                style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
-                child: Text('Share', style: GoogleFonts.nunito(color: AppColors.navyDark, fontWeight: FontWeight.w700)),
+                onPressed: () {
+                  Share.share(ocrText);
+                  Navigator.pop(context);
+                },
+                style:
+                    ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
+                child: Text('Share',
+                    style: GoogleFonts.nunito(
+                        color: AppColors.navyDark,
+                        fontWeight: FontWeight.w700)),
               ),
           ],
         ),
@@ -174,87 +209,54 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       _showInfo('Watermark is available for image files only.');
       return;
     }
-
-    final config = await showWatermarkComposerSheet(
+    final out = await Navigator.push<List<String>>(
       context,
-      imagePath: _doc.filePath,
-      initialText: 'CONFIDENTIAL',
+      MaterialPageRoute(
+          builder: (_) => AddWatermarkScreen(imagePaths: [_doc.filePath])),
     );
-    if (config == null || !mounted) return;
-    await _applyWatermark(config);
-  }
-
-  Future<void> _applyWatermark(WatermarkApplyConfig config) async {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (_) => const AlertDialog(
-        content: SizedBox(height: 50, child: Center(child: CircularProgressIndicator())),
-      ),
-    );
-    try {
-      final watermarkedPath = await WatermarkService.instance.addTextWatermark(
-        _doc.filePath,
-        text: config.text,
-        red: config.r,
-        green: config.g,
-        blue: config.b,
-        opacity: config.a,
-      );
-      final newSizeMB = await PdfService.instance.getFileSizeMB(watermarkedPath);
-      final updated = _doc.copyWith(
-        filePath: watermarkedPath,
-        name: '${p.basenameWithoutExtension(_doc.name)}_watermarked.jpg',
-        fileType: 'jpg',
-        modifiedAt: DateTime.now(),
-        fileSizeMB: newSizeMB,
-      );
-      if (_doc.id != null) {
-        await DatabaseService.instance.updateDocument(updated);
-      }
-      setState(() => _doc = updated);
-      if (mounted) Navigator.pop(context);
-      _showInfo('Watermark added successfully!');
-    } catch (e) {
-      if (mounted) Navigator.pop(context);
-      _showError('Watermark failed: $e');
-    }
+    if (out == null || out.isEmpty || !mounted) return;
+    await _replaceDocPath(out.first, suffixName: '_watermarked');
   }
 
   Future<void> _removeWatermark() async {
-    final current = _doc.filePath;
-    final name = p.basenameWithoutExtension(current);
-    if (!name.contains('_watermarked') &&
-        !name.contains('_timestamped') &&
-        !name.contains('_logo_watermarked')) {
-      _showInfo('This document does not look watermarked.');
+    final appRemoved = await WatermarkService.instance
+        .removeAppAddedWatermark(File(_doc.filePath));
+    if (appRemoved != null) {
+      await _replaceDocPath(appRemoved.path, suffixName: '_clean');
+      _showInfo('App watermark removed.');
       return;
     }
 
-    final restoredBase = name
-        .replaceAll('_watermarked', '')
-        .replaceAll('_timestamped', '')
-        .replaceAll('_logo_watermarked', '');
-    final restoredPath = p.join(p.dirname(current), '$restoredBase.jpg');
-    final restoredFile = File(restoredPath);
-    if (!restoredFile.existsSync()) {
-      _showError('Original file not found for watermark removal.');
-      return;
-    }
+    final out = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RemoveWatermarkScreen(imagePath: _doc.filePath),
+      ),
+    );
+    if (out == null || !mounted) return;
+    await _replaceDocPath(out, suffixName: '_wm_removed');
+    _showInfo('Watermark removal applied.');
+  }
 
-    final size = await PdfService.instance.getFileSizeMB(restoredPath);
+  Future<void> _replaceDocPath(String newPath,
+      {required String suffixName}) async {
+    if (_doc.fileType.toLowerCase() == 'pdf') {
+      _pdfController?.dispose();
+      _pdfController = null;
+      _pdfControllerPath = null;
+    }
+    final newSizeMB = await PdfService.instance.getFileSizeMB(newPath);
     final updated = _doc.copyWith(
-      filePath: restoredPath,
-      name: '${restoredBase}.jpg',
+      filePath: newPath,
+      name: '${p.basenameWithoutExtension(_doc.name)}$suffixName.jpg',
       fileType: 'jpg',
       modifiedAt: DateTime.now(),
-      fileSizeMB: size,
+      fileSizeMB: newSizeMB,
     );
     if (_doc.id != null) {
       await DatabaseService.instance.updateDocument(updated);
     }
     setState(() => _doc = updated);
-    _showInfo('Watermark removed.');
   }
 
   // ── Annotate ───────────────────────────────────────────────────────────────
@@ -266,7 +268,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     }
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => AnnotationScreen(imagePath: _doc.filePath)),
+      MaterialPageRoute(
+          builder: (_) => AnnotationScreen(imagePath: _doc.filePath)),
     );
   }
 
@@ -275,7 +278,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   Future<void> _convertDocument() async {
     await Navigator.push(
       context,
-      MaterialPageRoute(builder: (_) => DocumentConversionScreen(filePath: _doc.filePath)),
+      MaterialPageRoute(
+          builder: (_) => DocumentConversionScreen(filePath: _doc.filePath)),
     );
   }
 
@@ -285,14 +289,20 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (_) => AlertDialog(
-        title: Text('Delete Document', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
-        content: Text('Delete "${_doc.name}"? This cannot be undone.', style: GoogleFonts.nunito()),
+        title: Text('Delete Document',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+        content: Text('Delete "${_doc.name}"? This cannot be undone.',
+            style: GoogleFonts.nunito()),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
+          TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Cancel')),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.red),
             onPressed: () => Navigator.pop(context, true),
-            child: Text('Delete', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700)),
+            child: Text('Delete',
+                style: GoogleFonts.nunito(
+                    color: Colors.white, fontWeight: FontWeight.w700)),
           ),
         ],
       ),
@@ -506,8 +516,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         return;
       }
 
-      final stemName =
-          _doc.name.replaceAll(RegExp(r'\.pdf$', caseSensitive: false), '').trim();
+      final stemName = _doc.name
+          .replaceAll(RegExp(r'\.pdf$', caseSensitive: false), '')
+          .trim();
       final compressedName = '${stemName}_compressed';
 
       // Re-encode using PdfService — pass images or use the PDF path
@@ -550,7 +561,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         return;
       }
 
-      final compressedPath = await PdfService.instance.createCompressedPdfFromImages(
+      final compressedPath =
+          await PdfService.instance.createCompressedPdfFromImages(
         imagePaths,
         compressedName,
         jpegQuality: jpegQuality,
@@ -565,7 +577,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           : 0;
 
       // Save to library
-      final thumbPath = await PdfService.instance.generateThumbnail(imagePaths.first);
+      final thumbPath =
+          await PdfService.instance.generateThumbnail(imagePaths.first);
       final newDoc = DocumentModel(
         name: '$compressedName.pdf',
         filePath: compressedPath,
@@ -591,7 +604,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           backgroundColor: AppColors.navyMid,
           behavior: SnackBarBehavior.floating,
           duration: const Duration(seconds: 4),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape:
+              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
         ),
       );
     } catch (e) {
@@ -655,44 +669,74 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_doc.name,
-          style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
-          maxLines: 1, overflow: TextOverflow.ellipsis),
+            style: GoogleFonts.nunito(
+                fontSize: 16, fontWeight: FontWeight.w700, color: Colors.white),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis),
         backgroundColor: AppColors.navyDark,
         foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: Icon(
-              _doc.isFavorite ? Iconsax.heart5 : Iconsax.heart,
-              color: _doc.isFavorite ? Colors.red : Colors.white),
+            icon: Icon(_doc.isFavorite ? Iconsax.heart5 : Iconsax.heart,
+                color: _doc.isFavorite ? Colors.red : Colors.white),
             onPressed: _toggleFavorite,
           ),
           PopupMenuButton<String>(
             icon: const Icon(Icons.more_vert, color: Colors.white),
             onSelected: (val) {
               switch (val) {
-                case 'rename':  _showRenameDialog(); break;
-                case 'share':   _shareDocument(); break;
-                case 'print':   _printDocument(); break;
-                case 'open':    _openWithExternal(); break;
-                case 'pdf':     _generatePdf(); break;
-                case 'convert': _convertDocument(); break;
-                case 'compress': _compressPdf(); break;
-                case 'delete':  _deleteDocument(); break;
+                case 'rename':
+                  _showRenameDialog();
+                  break;
+                case 'share':
+                  _shareDocument();
+                  break;
+                case 'print':
+                  _printDocument();
+                  break;
+                case 'open':
+                  _openWithExternal();
+                  break;
+                case 'pdf':
+                  _generatePdf();
+                  break;
+                case 'convert':
+                  _convertDocument();
+                  break;
+                case 'compress':
+                  _compressPdf();
+                  break;
+                case 'add_wm':
+                  _addWatermark();
+                  break;
+                case 'remove_wm':
+                  _removeWatermark();
+                  break;
+                case 'delete':
+                  _deleteDocument();
+                  break;
               }
             },
             itemBuilder: (_) => [
-              const PopupMenuItem(value: 'rename',  child: Text('Rename')),
-              const PopupMenuItem(value: 'share',   child: Text('Share')),
-              const PopupMenuItem(value: 'print',   child: Text('Print')),
-              const PopupMenuItem(value: 'open',    child: Text('Open with...')),
+              const PopupMenuItem(value: 'rename', child: Text('Rename')),
+              const PopupMenuItem(value: 'share', child: Text('Share')),
+              const PopupMenuItem(value: 'print', child: Text('Print')),
+              const PopupMenuItem(value: 'open', child: Text('Open with...')),
               if (_isRasterDoc(_doc))
                 const PopupMenuItem(
                   value: 'pdf',
                   child: Text('Generate PDF'),
                 ),
               const PopupMenuItem(value: 'convert', child: Text('Convert')),
+              if (_isRasterDoc(_doc))
+                const PopupMenuItem(
+                    value: 'add_wm', child: Text('Add Watermark')),
+              if (_isRasterDoc(_doc))
+                const PopupMenuItem(
+                    value: 'remove_wm', child: Text('Remove Watermark')),
               if (_doc.fileType.toLowerCase() == 'pdf')
-                const PopupMenuItem(value: 'compress', child: Text('Compress PDF')),
+                const PopupMenuItem(
+                    value: 'compress', child: Text('Compress PDF')),
               const PopupMenuItem(
                 value: 'delete',
                 child: Text('Delete', style: TextStyle(color: Colors.red)),
@@ -709,14 +753,16 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
             color: AppColors.background,
             child: Row(
               children: [
-                _infoBadge('${_doc.pageCount} page${_doc.pageCount > 1 ? 's' : ''}', AppColors.navyMid),
+                _infoBadge(
+                    '${_doc.pageCount} page${_doc.pageCount > 1 ? 's' : ''}',
+                    AppColors.navyMid),
                 const SizedBox(width: 8),
                 _infoBadge(_doc.fileType.toUpperCase(), _fileTypeAccentColor()),
                 const SizedBox(width: 8),
-                _infoBadge('${_doc.fileSizeMB.toStringAsFixed(1)} MB', AppColors.gold),
+                _infoBadge(
+                    '${_doc.fileSizeMB.toStringAsFixed(1)} MB', AppColors.gold),
                 const SizedBox(width: 8),
-                if (_doc.isFavorite)
-                  _infoBadge('♥ Favorite', AppColors.gold),
+                if (_doc.isFavorite) _infoBadge('♥ Favorite', AppColors.gold),
               ],
             ),
           ),
@@ -732,31 +778,44 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _actionBtn(Iconsax.share,        'Share',     AppColors.navyMid,   _shareDocument),
+                  _actionBtn(Iconsax.share, 'Share', AppColors.navyMid,
+                      _shareDocument),
                   const SizedBox(width: 8),
-                  _actionBtn(Iconsax.printer,      'Print',     AppColors.blue,      _printDocument),
+                  _actionBtn(
+                      Iconsax.printer, 'Print', AppColors.blue, _printDocument),
                   const SizedBox(width: 8),
                   if (_isRasterDoc(_doc)) ...[
                     _actionBtn(Iconsax.document_download, 'PDF',
                         AppColors.navyMid, _generatePdf),
                     const SizedBox(width: 8),
                   ],
-                  _actionBtn(Iconsax.export,       'Open',      AppColors.navyMid,   _openWithExternal),
+                  _actionBtn(Iconsax.export, 'Open', AppColors.navyMid,
+                      _openWithExternal),
                   const SizedBox(width: 8),
-                  _actionBtn(Iconsax.text,         'OCR',       AppColors.navyMid,   _extractOcr),
+                  _actionBtn(
+                      Iconsax.text, 'OCR', AppColors.navyMid, _extractOcr),
                   const SizedBox(width: 8),
-                  _actionBtn(Iconsax.shield_tick,  'Watermark', AppColors.gold,      _addWatermark),
+                  _actionBtn(Iconsax.shield_tick, 'Watermark', AppColors.gold,
+                      _addWatermark),
                   const SizedBox(width: 8),
-                  if (_doc.fileType == 'jpg' || _doc.fileType == 'jpeg' || _doc.fileType == 'png')
-                    _actionBtn(Iconsax.eraser, 'Remove WM', AppColors.navyMid, _removeWatermark),
-                  if (_doc.fileType == 'jpg' || _doc.fileType == 'jpeg' || _doc.fileType == 'png')
+                  if (_doc.fileType == 'jpg' ||
+                      _doc.fileType == 'jpeg' ||
+                      _doc.fileType == 'png')
+                    _actionBtn(Iconsax.eraser, 'Remove WM', AppColors.navyMid,
+                        _removeWatermark),
+                  if (_doc.fileType == 'jpg' ||
+                      _doc.fileType == 'jpeg' ||
+                      _doc.fileType == 'png')
                     const SizedBox(width: 8),
-                  _actionBtn(Iconsax.pen_add,      'Annotate',  AppColors.blue,      _openAnnotation),
+                  _actionBtn(Iconsax.pen_add, 'Annotate', AppColors.blue,
+                      _openAnnotation),
                   const SizedBox(width: 8),
-                  _actionBtn(Iconsax.convert_3d_cube, 'Convert', AppColors.navyMid,  _convertDocument),
+                  _actionBtn(Iconsax.convert_3d_cube, 'Convert',
+                      AppColors.navyMid, _convertDocument),
                   const SizedBox(width: 8),
                   if (_doc.fileType.toLowerCase() == 'pdf')
-                    _actionBtn(Icons.compress_rounded, 'Compress', AppColors.navyMid, _compressPdf),
+                    _actionBtn(Icons.compress_rounded, 'Compress',
+                        AppColors.navyMid, _compressPdf),
                 ],
               ),
             ),
@@ -775,28 +834,57 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           children: [
             Icon(Iconsax.document_cloud, size: 70, color: Colors.grey[300]),
             const SizedBox(height: 16),
-            Text('File not found', style: GoogleFonts.nunito(color: AppColors.textMuted)),
+            Text('File not found',
+                style: GoogleFonts.nunito(color: AppColors.textMuted)),
             const SizedBox(height: 8),
-            Text(_doc.filePath, style: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted),
-              textAlign: TextAlign.center),
+            Text(_doc.filePath,
+                style: GoogleFonts.nunito(
+                    fontSize: 11, color: AppColors.textMuted),
+                textAlign: TextAlign.center),
           ],
         ),
       );
     }
 
-    if (_doc.fileType == 'jpg' || _doc.fileType == 'jpeg' || _doc.fileType == 'png') {
-      return InteractiveViewer(
-        child: Center(child: Image.file(file, fit: BoxFit.contain)),
+    if (_doc.fileType == 'jpg' ||
+        _doc.fileType == 'jpeg' ||
+        _doc.fileType == 'png') {
+      return Container(
+        color: Colors.black,
+        child: InteractiveViewer(
+          minScale: 0.8,
+          maxScale: 5,
+          child: Center(
+            child: Image.file(
+              file,
+              fit: BoxFit.contain,
+              cacheWidth: 1440,
+              filterQuality: FilterQuality.medium,
+              frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+                if (wasSynchronouslyLoaded || frame != null) return child;
+                return const SizedBox(
+                  height: 220,
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.gold),
+                  ),
+                );
+              },
+            ),
+          ),
+        ),
       );
     }
 
     if (_doc.fileType == 'pdf') {
-      return PdfPreview(
-        build: (_) => file.readAsBytesSync(),
-        allowPrinting: true,
-        allowSharing: true,
-        canChangePageFormat: false,
-        canDebug: false,
+      _ensurePdfController(file.path);
+      if (_pdfController == null) {
+        return const Center(
+          child: CircularProgressIndicator(color: AppColors.gold),
+        );
+      }
+      return Container(
+        color: Colors.black,
+        child: pdfx.PdfViewPinch(controller: _pdfController!),
       );
     }
 
@@ -806,7 +894,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         children: [
           Icon(Iconsax.document, size: 80, color: Colors.grey[300]),
           const SizedBox(height: 16),
-          Text(_doc.name, style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700)),
+          Text(_doc.name,
+              style: GoogleFonts.nunito(
+                  fontSize: 16, fontWeight: FontWeight.w700)),
           const SizedBox(height: 8),
           ElevatedButton.icon(
             onPressed: _openWithExternal,
@@ -827,11 +917,13 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         borderRadius: BorderRadius.circular(20),
       ),
       child: Text(text,
-        style: GoogleFonts.nunito(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+          style: GoogleFonts.nunito(
+              fontSize: 12, fontWeight: FontWeight.w700, color: color)),
     );
   }
 
-  Widget _actionBtn(IconData icon, String label, Color color, VoidCallback onTap) {
+  Widget _actionBtn(
+      IconData icon, String label, Color color, VoidCallback onTap) {
     return GestureDetector(
       onTap: onTap,
       child: Container(
@@ -844,7 +936,9 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
           children: [
             Icon(icon, color: color, size: 22),
             const SizedBox(height: 4),
-            Text(label, style: GoogleFonts.nunito(fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+            Text(label,
+                style: GoogleFonts.nunito(
+                    fontSize: 11, fontWeight: FontWeight.w700, color: color)),
           ],
         ),
       ),

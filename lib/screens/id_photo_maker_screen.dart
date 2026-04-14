@@ -2,9 +2,15 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
+import 'package:image/image.dart' as img;
 import 'package:image_picker/image_picker.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
+import '../models/document_model.dart';
+import '../services/database_service.dart';
 import '../theme.dart';
 import '../services/image_enhancement_service.dart';
+import '../services/pdf_service.dart';
 
 class IdPhotoMakerScreen extends StatefulWidget {
   const IdPhotoMakerScreen({super.key});
@@ -18,6 +24,8 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
   String _selectedSize = '4x6';
   String _selectedBackground = 'white';
   bool _isProcessing = false;
+  String? _generatedPath;
+  bool _isSaving = false;
 
   final List<Map<String, dynamic>> _photoSizes = [
     {'id': '2x2', 'label': '2x2 inch', 'width': 2.0, 'height': 2.0},
@@ -39,7 +47,10 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
     final pickedFile = await picker.pickImage(source: ImageSource.gallery);
 
     if (pickedFile != null) {
-      setState(() => _imagePath = pickedFile.path);
+      setState(() {
+        _imagePath = pickedFile.path;
+        _generatedPath = null;
+      });
     }
   }
 
@@ -48,7 +59,10 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
     final pickedFile = await picker.pickImage(source: ImageSource.camera);
 
     if (pickedFile != null) {
-      setState(() => _imagePath = pickedFile.path);
+      setState(() {
+        _imagePath = pickedFile.path;
+        _generatedPath = null;
+      });
     }
   }
 
@@ -67,11 +81,22 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
       final height = sizeData['height'] as double;
 
       // Get background color
-      final bgData = _backgrounds.firstWhere((b) => b['id'] == _selectedBackground);
+      final bgData =
+          _backgrounds.firstWhere((b) => b['id'] == _selectedBackground);
       final bgColor = bgData['color'] as Color;
 
       // Process image
-      final processedPath = await ImageEnhancementService.instance.autoEnhance(_imagePath!);
+      final processedPath =
+          await ImageEnhancementService.instance.autoEnhance(_imagePath!);
+      final out = await _composeIdPhoto(
+        processedPath: processedPath,
+        widthInch: width,
+        heightInch: height,
+        bgColor: bgColor,
+      );
+      if (mounted) {
+        setState(() => _generatedPath = out);
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -97,10 +122,88 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
     );
   }
 
+  Future<void> _saveGeneratedToApp() async {
+    final path = _generatedPath;
+    if (path == null || !File(path).existsSync()) {
+      _showError('Please generate ID photo first');
+      return;
+    }
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      final size = await PdfService.instance.getFileSizeMB(path);
+      final thumb = await PdfService.instance.generateThumbnail(path);
+      final sizeLabel = _photoSizes
+          .firstWhere((e) => e['id'] == _selectedSize)['label']
+          .toString();
+      final bgLabel = _backgrounds
+          .firstWhere((e) => e['id'] == _selectedBackground)['label']
+          .toString();
+      final doc = DocumentModel(
+        name: 'ID_Photo_${DateTime.now().millisecondsSinceEpoch}.jpg',
+        filePath: path,
+        fileType: 'jpg',
+        scanType: 'id_maker',
+        pageCount: 1,
+        fileSizeMB: size,
+        createdAt: DateTime.now(),
+        thumbnailPath: thumb,
+        tags: ['ID Maker', sizeLabel, 'BG:$bgLabel'],
+      );
+      await DatabaseService.instance.insertDocument(doc);
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Saved in app library'),
+          backgroundColor: AppColors.green,
+        ),
+      );
+    } finally {
+      if (mounted) setState(() => _isSaving = false);
+    }
+  }
+
+  Future<String> _composeIdPhoto({
+    required String processedPath,
+    required double widthInch,
+    required double heightInch,
+    required Color bgColor,
+  }) async {
+    final source = img.decodeImage(await File(processedPath).readAsBytes());
+    if (source == null) return processedPath;
+    const dpi = 300;
+    final outW = (widthInch * dpi).round();
+    final outH = (heightInch * dpi).round();
+
+    final argb = bgColor.toARGB32();
+    final r = (argb >> 16) & 0xFF;
+    final g = (argb >> 8) & 0xFF;
+    final b = argb & 0xFF;
+
+    final canvas = img.Image(width: outW, height: outH);
+    img.fill(canvas, color: img.ColorRgb8(r, g, b));
+
+    final portraitW = (outW * 0.72).round();
+    final resized = img.copyResize(source, width: portraitW);
+    final x = ((outW - resized.width) / 2).round();
+    final y = ((outH - resized.height) / 2).round().clamp(0, outH - 1);
+    img.compositeImage(canvas, resized, dstX: x, dstY: y);
+
+    final dir = await getApplicationDocumentsDirectory();
+    final outDir = Directory('${dir.path}/ScanOnly/IDMaker');
+    await outDir.create(recursive: true);
+    final path = p.join(
+      outDir.path,
+      'id_maker_${DateTime.now().millisecondsSinceEpoch}.jpg',
+    );
+    await File(path).writeAsBytes(img.encodeJpg(canvas, quality: 94));
+    return path;
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.white,
+      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text(
@@ -126,16 +229,29 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
                 width: double.infinity,
                 height: 300,
                 decoration: BoxDecoration(
-                  color: Colors.grey[200],
+                  color: Colors.white,
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey[300]!),
+                  border: Border.all(
+                      color: AppColors.navyDark.withValues(alpha: 0.14)),
                 ),
                 child: _imagePath != null
                     ? ClipRRect(
                         borderRadius: BorderRadius.circular(12),
                         child: Image.file(
-                          File(_imagePath!),
+                          File(_generatedPath ?? _imagePath!),
                           fit: BoxFit.cover,
+                          cacheWidth: 1080,
+                          frameBuilder:
+                              (context, child, frame, wasSynchronouslyLoaded) {
+                            if (wasSynchronouslyLoaded || frame != null) {
+                              return child;
+                            }
+                            return const Center(
+                              child: CircularProgressIndicator(
+                                color: AppColors.gold,
+                              ),
+                            );
+                          },
                         ),
                       )
                     : Center(
@@ -215,7 +331,10 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
                 children: _photoSizes.map((size) {
                   final isSelected = _selectedSize == size['id'];
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedSize = size['id']),
+                    onTap: () => setState(() {
+                      _selectedSize = size['id'];
+                      _generatedPath = null;
+                    }),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 14,
@@ -225,7 +344,8 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
                         color: isSelected ? AppColors.gold : Colors.grey[100],
                         borderRadius: BorderRadius.circular(20),
                         border: Border.all(
-                          color: isSelected ? AppColors.gold : Colors.grey[300]!,
+                          color:
+                              isSelected ? AppColors.gold : Colors.grey[300]!,
                         ),
                       ),
                       child: Text(
@@ -257,7 +377,10 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
                 children: _backgrounds.map((bg) {
                   final isSelected = _selectedBackground == bg['id'];
                   return GestureDetector(
-                    onTap: () => setState(() => _selectedBackground = bg['id']),
+                    onTap: () => setState(() {
+                      _selectedBackground = bg['id'];
+                      _generatedPath = null;
+                    }),
                     child: Column(
                       children: [
                         Container(
@@ -267,7 +390,9 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
                             color: bg['color'],
                             borderRadius: BorderRadius.circular(12),
                             border: Border.all(
-                              color: isSelected ? AppColors.gold : Colors.grey[300]!,
+                              color: isSelected
+                                  ? AppColors.gold
+                                  : Colors.grey[300]!,
                               width: isSelected ? 3 : 1,
                             ),
                           ),
@@ -314,6 +439,24 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
                     backgroundColor: AppColors.navyDark,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     disabledBackgroundColor: Colors.grey,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _isSaving ? null : _saveGeneratedToApp,
+                  icon: _isSaving
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(strokeWidth: 2),
+                        )
+                      : const Icon(Iconsax.folder_open),
+                  label: Text(
+                    _isSaving ? 'Saving...' : 'Save in App',
+                    style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
                   ),
                 ),
               ),

@@ -358,7 +358,7 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: AppColors.navyDark,
       body: Stack(
         children: [
           Column(
@@ -384,7 +384,7 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Colors.black, Colors.transparent],
+          colors: [AppColors.navyDark, Colors.transparent],
         ),
       ),
       child: Row(
@@ -488,7 +488,7 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
   Widget _buildBottomPanel() {
     return Container(
       decoration: BoxDecoration(
-        color: const Color(0xFF111111),
+        color: AppColors.navyMid,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
         border: Border(top: BorderSide(color: Colors.white.withOpacity(0.08))),
       ),

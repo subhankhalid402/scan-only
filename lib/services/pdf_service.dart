@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
@@ -52,6 +52,104 @@ class PdfService {
 
     final file = File(filePath);
     await file.writeAsBytes(await pdf.save());
+    return filePath;
+  }
+
+  /// ID card export: front and back side on one A4 page.
+  Future<String> createIdCardTwoSidePdf({
+    required String frontPath,
+    String? backPath,
+    required String documentName,
+  }) async {
+    final pdf = pw.Document();
+    final frontFile = File(frontPath);
+    if (!await frontFile.exists()) {
+      throw StateError('Front side image not found');
+    }
+
+    final frontBytes = await frontFile.readAsBytes();
+    final frontImage = pw.MemoryImage(frontBytes);
+    pw.MemoryImage? backImage;
+    if (backPath != null) {
+      final b = File(backPath);
+      if (await b.exists()) {
+        backImage = pw.MemoryImage(await b.readAsBytes());
+      }
+    }
+
+    pdf.addPage(
+      pw.Page(
+        pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(24),
+        build: (context) {
+          final cardAspect = 85.6 / 54.0;
+          return pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(
+                documentName,
+                style: pw.TextStyle(
+                  fontSize: 18,
+                  fontWeight: pw.FontWeight.bold,
+                ),
+              ),
+              pw.SizedBox(height: 12),
+              pw.Text(
+                'ID Card (Front/Back)',
+                style:
+                    const pw.TextStyle(fontSize: 11, color: PdfColors.grey700),
+              ),
+              pw.SizedBox(height: 16),
+              pw.Row(
+                crossAxisAlignment: pw.CrossAxisAlignment.start,
+                children: [
+                  pw.Expanded(
+                    child: pw.AspectRatio(
+                      aspectRatio: cardAspect,
+                      child: pw.Container(
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border.all(color: PdfColors.grey500),
+                        ),
+                        child: pw.Image(frontImage, fit: pw.BoxFit.cover),
+                      ),
+                    ),
+                  ),
+                  pw.SizedBox(width: 14),
+                  pw.Expanded(
+                    child: pw.AspectRatio(
+                      aspectRatio: cardAspect,
+                      child: pw.Container(
+                        decoration: pw.BoxDecoration(
+                          border: pw.Border.all(color: PdfColors.grey500),
+                        ),
+                        child: backImage != null
+                            ? pw.Image(backImage, fit: pw.BoxFit.cover)
+                            : pw.Center(
+                                child: pw.Text(
+                                  'Back side not provided',
+                                  style: const pw.TextStyle(
+                                    fontSize: 10,
+                                    color: PdfColors.grey700,
+                                  ),
+                                ),
+                              ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          );
+        },
+      ),
+    );
+
+    final outputDir = await getApplicationDocumentsDirectory();
+    final pdfDir = Directory('${outputDir.path}/ScanOnly/PDFs');
+    await pdfDir.create(recursive: true);
+    final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
+    final filePath = '${pdfDir.path}/${documentName}_id_card_$timestamp.pdf';
+    await File(filePath).writeAsBytes(await pdf.save());
     return filePath;
   }
 
@@ -157,11 +255,8 @@ class PdfService {
       if (!await imageFile.exists()) return null;
 
       final bytes = await imageFile.readAsBytes();
-      var image = img.decodeImage(bytes);
-      if (image == null) return null;
-
-      // Resize to thumbnail
-      image = img.copyResize(image, width: 300);
+      final thumbBytes = await compute(_buildThumbnailBytes, bytes);
+      if (thumbBytes == null) return null;
 
       final outputDir = await getApplicationDocumentsDirectory();
       final thumbDir = Directory('${outputDir.path}/ScanOnly/Thumbnails');
@@ -170,7 +265,7 @@ class PdfService {
       final fileName = pathLib.basenameWithoutExtension(imagePath);
       final thumbPath = '${thumbDir.path}/${fileName}_thumb.jpg';
 
-      await File(thumbPath).writeAsBytes(img.encodeJpg(image, quality: 70));
+      await File(thumbPath).writeAsBytes(thumbBytes);
       return thumbPath;
     } catch (e) {
       print('Thumbnail error: $e');
@@ -182,23 +277,11 @@ class PdfService {
   Future<String> applyFilter(String imagePath, String filterType) async {
     final imageFile = File(imagePath);
     final bytes = await imageFile.readAsBytes();
-    img.Image? image = img.decodeImage(bytes);
-    if (image == null) return imagePath;
-
-    switch (filterType) {
-      case 'grayscale':
-        image = img.grayscale(image);
-        break;
-      case 'blackwhite':
-        image = img.grayscale(image);
-        image = img.contrast(image, contrast: 200);
-        break;
-      case 'enhance':
-        image = img.adjustColor(image, brightness: 1.1, contrast: 1.2);
-        break;
-      case 'original':
-        break;
-    }
+    final filteredBytes = await compute(
+      _applyFilterIsolate,
+      <String, dynamic>{'bytes': bytes, 'filterType': filterType},
+    );
+    if (filteredBytes == null) return imagePath;
 
     final outputDir = await getApplicationDocumentsDirectory();
     final editedDir = Directory('${outputDir.path}/ScanOnly/Edited');
@@ -207,7 +290,7 @@ class PdfService {
     final timestamp = DateFormat('yyyyMMdd_HHmmss').format(DateTime.now());
     final outputPath = '${editedDir.path}/edited_$timestamp.jpg';
 
-    await File(outputPath).writeAsBytes(img.encodeJpg(image, quality: 90));
+    await File(outputPath).writeAsBytes(filteredBytes);
     return outputPath;
   }
 
@@ -259,12 +342,15 @@ class PdfService {
       if (!await imageFile.exists()) continue;
 
       final raw = await imageFile.readAsBytes();
-      var decoded = img.decodeImage(raw);
-      if (decoded == null) continue;
-      if (decoded.width > maxWidth) {
-        decoded = img.copyResize(decoded, width: maxWidth);
-      }
-      final jpg = img.encodeJpg(decoded, quality: jpegQuality);
+      final jpg = await compute(
+        _prepareCompressedJpgIsolate,
+        <String, dynamic>{
+          'bytes': raw,
+          'maxWidth': maxWidth,
+          'jpegQuality': jpegQuality,
+        },
+      );
+      if (jpg == null) continue;
       final pdfImage = pw.MemoryImage(jpg);
 
       pdf.addPage(
@@ -291,7 +377,8 @@ class PdfService {
   }
 
   /// Merge multiple PDFs into one (rasterize pages via pdfx, then build a new PDF).
-  Future<String> mergePdfFiles(List<String> pdfPaths, String documentName) async {
+  Future<String> mergePdfFiles(
+      List<String> pdfPaths, String documentName) async {
     if (pdfPaths.isEmpty) {
       throw ArgumentError('No PDF files to merge');
     }
@@ -339,4 +426,46 @@ class PdfService {
 
     return createPdfFromImages(imagePaths, '${documentName}_merged');
   }
+}
+
+Uint8List? _buildThumbnailBytes(Uint8List bytes) {
+  final image = img.decodeImage(bytes);
+  if (image == null) return null;
+  final thumb = img.copyResize(image, width: 300);
+  return Uint8List.fromList(img.encodeJpg(thumb, quality: 70));
+}
+
+Uint8List? _applyFilterIsolate(Map<String, dynamic> payload) {
+  final bytes = payload['bytes'] as Uint8List;
+  final filterType = payload['filterType'] as String;
+  img.Image? image = img.decodeImage(bytes);
+  if (image == null) return null;
+  switch (filterType) {
+    case 'grayscale':
+      image = img.grayscale(image);
+      break;
+    case 'blackwhite':
+      image = img.grayscale(image);
+      image = img.contrast(image, contrast: 200);
+      break;
+    case 'enhance':
+      image = img.adjustColor(image, brightness: 1.1, contrast: 1.2);
+      break;
+    case 'original':
+    default:
+      break;
+  }
+  return Uint8List.fromList(img.encodeJpg(image, quality: 90));
+}
+
+Uint8List? _prepareCompressedJpgIsolate(Map<String, dynamic> payload) {
+  final bytes = payload['bytes'] as Uint8List;
+  final maxWidth = payload['maxWidth'] as int;
+  final jpegQuality = payload['jpegQuality'] as int;
+  var decoded = img.decodeImage(bytes);
+  if (decoded == null) return null;
+  if (decoded.width > maxWidth) {
+    decoded = img.copyResize(decoded, width: maxWidth);
+  }
+  return Uint8List.fromList(img.encodeJpg(decoded, quality: jpegQuality));
 }

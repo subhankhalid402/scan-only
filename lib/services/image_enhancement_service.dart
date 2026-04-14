@@ -4,6 +4,15 @@ import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
 
+/// CamScanner-style single-tap filters on the document scan editor.
+enum DocumentScanFilterKind {
+  none,
+  blackWhite,
+  grayscale,
+  color,
+  magic,
+}
+
 class ImageEnhancementService {
   static final ImageEnhancementService instance = ImageEnhancementService._init();
   ImageEnhancementService._init();
@@ -253,6 +262,32 @@ class ImageEnhancementService {
     } catch (e) {
       debugPrint('magicColorDocument: $e');
       return imagePath;
+    }
+  }
+
+  Future<String> applyDocumentScanFilter(
+    String imagePath,
+    DocumentScanFilterKind kind,
+  ) async {
+    switch (kind) {
+      case DocumentScanFilterKind.none:
+        return imagePath;
+      case DocumentScanFilterKind.blackWhite:
+        return documentBlackAndWhite(imagePath);
+      case DocumentScanFilterKind.grayscale:
+        return toGrayscale(imagePath);
+      case DocumentScanFilterKind.color:
+        try {
+          var image = await _load(imagePath);
+          if (image == null) return imagePath;
+          image = _applyColorBoost(image);
+          return await _save(image, imagePath, suffix: '_scan_color');
+        } catch (e) {
+          debugPrint('applyDocumentScanFilter color: $e');
+          return imagePath;
+        }
+      case DocumentScanFilterKind.magic:
+        return magicColorDocument(imagePath);
     }
   }
 

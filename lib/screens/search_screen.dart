@@ -20,12 +20,18 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _search(String query) async {
     if (query.trim().isEmpty) {
-      setState(() { _results = []; _isSearching = false; });
+      setState(() {
+        _results = [];
+        _isSearching = false;
+      });
       return;
     }
     setState(() => _isSearching = true);
     final results = await DatabaseService.instance.searchDocuments(query);
-    setState(() { _results = results; _isSearching = false; });
+    setState(() {
+      _results = results;
+      _isSearching = false;
+    });
   }
 
   @override
@@ -42,17 +48,30 @@ class _SearchScreenState extends State<SearchScreen> {
             child: SafeArea(
               bottom: false,
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+                padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('Search',
-                      style: GoogleFonts.nunito(fontSize: 22, fontWeight: FontWeight.w800, color: Colors.white)),
-                    const SizedBox(height: 14),
+                        style: GoogleFonts.nunito(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w800,
+                            color: Colors.white)),
+                    const SizedBox(height: 10),
                     Container(
                       decoration: BoxDecoration(
                         color: Colors.white,
                         borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: AppColors.navyDark.withValues(alpha: 0.14),
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.08),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
                       ),
                       child: TextField(
                         controller: _controller,
@@ -60,15 +79,21 @@ class _SearchScreenState extends State<SearchScreen> {
                         decoration: InputDecoration(
                           hintText: 'Search by name or text inside scans…',
                           hintStyle: GoogleFonts.nunito(color: Colors.grey),
-                          prefixIcon: const Icon(Iconsax.search_normal, color: AppColors.navyMid),
+                          prefixIcon: const Icon(Iconsax.search_normal,
+                              color: AppColors.navyMid),
                           suffixIcon: _controller.text.isNotEmpty
                               ? IconButton(
-                                  icon: const Icon(Icons.clear, color: Colors.grey),
-                                  onPressed: () { _controller.clear(); _search(''); },
+                                  icon: const Icon(Icons.clear,
+                                      color: Colors.grey),
+                                  onPressed: () {
+                                    _controller.clear();
+                                    _search('');
+                                  },
                                 )
                               : null,
                           border: InputBorder.none,
-                          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                          contentPadding: const EdgeInsets.symmetric(
+                              horizontal: 12, vertical: 10),
                         ),
                       ),
                     ),
@@ -77,12 +102,13 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
             ),
           ),
-
           Expanded(
             child: _controller.text.isEmpty
                 ? _buildEmptyState()
                 : _isSearching
-                    ? const Center(child: CircularProgressIndicator(color: AppColors.navyMid))
+                    ? const Center(
+                        child:
+                            CircularProgressIndicator(color: AppColors.navyMid))
                     : _results.isEmpty
                         ? _buildNoResults()
                         : _buildResults(),
@@ -152,8 +178,7 @@ class _SearchScreenState extends State<SearchScreen> {
   Widget _suggestionChip(String label, void Function(String) onTap) {
     return ActionChip(
       label: Text(label,
-          style: GoogleFonts.nunito(
-              fontWeight: FontWeight.w700, fontSize: 13)),
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 13)),
       onPressed: () => onTap(label),
       backgroundColor: AppColors.navyMid.withValues(alpha: 0.08),
       side: BorderSide(color: AppColors.navyMid.withValues(alpha: 0.2)),
@@ -168,9 +193,12 @@ class _SearchScreenState extends State<SearchScreen> {
           Icon(Iconsax.document_cloud, size: 70, color: Colors.grey[300]),
           const SizedBox(height: 16),
           Text('No results found',
-            style: GoogleFonts.nunito(fontSize: 16, color: AppColors.textMuted, fontWeight: FontWeight.w600)),
+              style: GoogleFonts.nunito(
+                  fontSize: 16,
+                  color: AppColors.textMuted,
+                  fontWeight: FontWeight.w600)),
           Text('Try different keywords',
-            style: GoogleFonts.nunito(fontSize: 13, color: Colors.grey[400])),
+              style: GoogleFonts.nunito(fontSize: 13, color: Colors.grey[400])),
         ],
       ),
     );
@@ -178,42 +206,62 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildResults() {
     return ListView.builder(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(12),
       itemCount: _results.length,
       itemBuilder: (_, i) {
         final doc = _results[i];
         return GestureDetector(
-          onTap: () => Navigator.push(context,
-            MaterialPageRoute(builder: (_) => DocumentViewerScreen(document: doc))),
+          onTap: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => DocumentViewerScreen(document: doc))),
           child: Container(
             margin: const EdgeInsets.only(bottom: 10),
-            padding: const EdgeInsets.all(14),
+            padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(16),
-              boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), blurRadius: 8)],
+              border: Border.all(
+                color: AppColors.navyDark.withValues(alpha: 0.1),
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 3),
+                ),
+              ],
             ),
             child: Row(
               children: [
                 Container(
-                  width: 48, height: 48,
+                  width: 42,
+                  height: 42,
                   decoration: BoxDecoration(
-                    color: doc.fileType == 'pdf' ? AppColors.red : AppColors.blue,
+                    color:
+                        doc.fileType == 'pdf' ? AppColors.red : AppColors.blue,
                     borderRadius: BorderRadius.circular(14),
                   ),
-                  child: const Icon(Iconsax.document_text, color: Colors.white, size: 24),
+                  child: const Icon(Iconsax.document_text,
+                      color: Colors.white, size: 24),
                 ),
-                const SizedBox(width: 14),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Text(doc.name,
-                        style: GoogleFonts.nunito(fontSize: 14, fontWeight: FontWeight.w700, color: AppColors.textDark),
-                        maxLines: 1, overflow: TextOverflow.ellipsis),
+                          style: GoogleFonts.nunito(
+                              fontSize: 14,
+                              fontWeight: FontWeight.w700,
+                              color: AppColors.textDark),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis),
                       const SizedBox(height: 3),
-                      Text('${doc.fileType.toUpperCase()} • ${doc.pageCount} pages • ${doc.fileSizeMB.toStringAsFixed(1)} MB',
-                        style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textMuted)),
+                      Text(
+                          '${doc.fileType.toUpperCase()} • ${doc.pageCount} pages • ${doc.fileSizeMB.toStringAsFixed(1)} MB',
+                          style: GoogleFonts.nunito(
+                              fontSize: 12, color: AppColors.textMuted)),
                     ],
                   ),
                 ),

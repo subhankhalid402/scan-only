@@ -11,6 +11,7 @@ import '../services/app_local_storage.dart';
 import '../theme.dart';
 import '../models/document_model.dart';
 import '../services/database_service.dart';
+import '../services/image_processing_service.dart';
 import '../services/pdf_service.dart';
 import '../services/image_enhancement_service.dart';
 import 'text_extraction_screen.dart';
@@ -19,11 +20,12 @@ import '../services/smart_erase_service.dart';
 import 'signature_pad_screen.dart';
 import 'advanced_filters_screen.dart';
 import 'annotation_screen.dart';
-import '../services/watermark_service.dart';
-import '../widgets/watermark_composer_sheet.dart';
 import '../services/ocr_service.dart';
 import 'document_viewer_screen.dart';
 import 'advanced_sharing_screen.dart';
+import 'add_watermark_screen.dart';
+import 'remove_watermark_screen.dart';
+import 'document_scan_editor_screen.dart';
 
 class EditScanScreen extends StatefulWidget {
   final List<String> imagePaths;
@@ -46,8 +48,10 @@ class _EditScanScreenState extends State<EditScanScreen> {
   bool _isSaving = false;
   bool _isProcessing = false;
   bool _showTimestampOption = false;
+  String _selectedQuickFilter = 'auto';
   late TextEditingController _nameController;
   late PageController _pageController;
+
   /// Tags chosen in the save sheet (saved with the document).
   final List<String> _saveDraftTags = [];
 
@@ -58,7 +62,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
     _originalPages = List.from(widget.imagePaths);
     _pageController = PageController();
     _nameController = TextEditingController(text: _defaultNameForScanType());
-    WidgetsBinding.instance.addPostFrameCallback((_) => _applyLastSavedNameHint());
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _applyLastSavedNameHint());
   }
 
   Future<void> _applyLastSavedNameHint() async {
@@ -166,7 +171,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0F1A2E),
+      backgroundColor: AppColors.navyDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(22)),
       ),
@@ -230,8 +235,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
                     nav.pop();
                     nav.push(
                       MaterialPageRoute(
-                        builder: (_) =>
-                            DocumentViewerScreen(document: saved),
+                        builder: (_) => DocumentViewerScreen(document: saved),
                       ),
                     );
                   },
@@ -343,7 +347,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
                 SizedBox(
                   height: 360,
                   child: ReorderableListView.builder(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     itemCount: order.length,
                     onReorder: (oldI, newI) {
                       setSt(() {
@@ -361,11 +366,14 @@ class _EditScanScreenState extends State<EditScanScreen> {
                             width: 44,
                             height: 56,
                             fit: BoxFit.cover,
+                            cacheWidth: 220,
+                            filterQuality: FilterQuality.low,
                           ),
                         ),
                         title: Text(
                           'Page ${i + 1}',
-                          style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+                          style:
+                              GoogleFonts.nunito(fontWeight: FontWeight.w700),
                         ),
                         trailing: const Icon(Icons.drag_handle_rounded),
                       );
@@ -435,13 +443,35 @@ class _EditScanScreenState extends State<EditScanScreen> {
     }
     final dir = await getTemporaryDirectory();
     final base = p.basename(sourcePath);
-    final safe =
-        base.replaceAll(RegExp(r'[^\w.\-]'), '_').replaceAll(RegExp(r'_+'), '_');
+    final safe = base
+        .replaceAll(RegExp(r'[^\w.\-]'), '_')
+        .replaceAll(RegExp(r'_+'), '_');
     final dest = File(
-      p.join(dir.path, 'crop_in_${DateTime.now().millisecondsSinceEpoch}_$safe'),
+      p.join(
+          dir.path, 'crop_in_${DateTime.now().millisecondsSinceEpoch}_$safe'),
     );
     await src.copy(dest.path);
     return dest.path;
+  }
+
+  Future<void> _openDeskew() async {
+    if (_isProcessing) return;
+    final path = await Navigator.push<String>(
+      context,
+      MaterialPageRoute<String>(
+        fullscreenDialog: true,
+        builder: (_) =>
+            DocumentScanEditorScreen(imagePath: _pages[_currentPage]),
+      ),
+    );
+    if (path != null && mounted) {
+      FileImage(File(_pages[_currentPage])).evict();
+      setState(() {
+        _pages[_currentPage] = path;
+        _originalPages[_currentPage] = path;
+      });
+      _showSuccess('Document aligned');
+    }
   }
 
   Future<void> _cropCurrentPage() async {
@@ -460,7 +490,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
         uiSettings: [
           AndroidUiSettings(
             toolbarTitle: 'Crop',
-            toolbarColor: const Color(0xFF0F1A2E),
+            toolbarColor: AppColors.navyDark,
             toolbarWidgetColor: Colors.white,
             activeControlsWidgetColor: AppColors.gold,
             lockAspectRatio: false,
@@ -541,8 +571,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
     final i = _currentPage;
     setState(() => _isProcessing = true);
     try {
-      final out = await ImageEnhancementService.instance
-          .magicColorDocument(_pages[i]);
+      final out =
+          await ImageEnhancementService.instance.magicColorDocument(_pages[i]);
       if (!mounted) return;
       FileImage(File(_pages[i])).evict();
       setState(() {
@@ -592,6 +622,146 @@ class _EditScanScreenState extends State<EditScanScreen> {
     }
   }
 
+  Future<void> _applyQuickFilter(String filterId) async {
+    if (widget.scanType != 'document' || _isProcessing) return;
+    final i = _currentPage;
+    setState(() {
+      _isProcessing = true;
+      _selectedQuickFilter = filterId;
+    });
+    try {
+      final source = _originalPages[i];
+      String out = source;
+      switch (filterId) {
+        case 'auto':
+          out = await ImageProcessingService.instance.applyEnhancement(
+            imagePath: source,
+            modeId: 'document',
+            enhanceMode: CamScanEnhanceMode.auto,
+          );
+          break;
+        case 'magic':
+          out =
+              await ImageEnhancementService.instance.magicColorDocument(source);
+          break;
+        case 'bw':
+          out = await ImageEnhancementService.instance
+              .documentBlackAndWhite(source);
+          break;
+        case 'gray':
+          out = await ImageEnhancementService.instance.applyDocumentScanFilter(
+            source,
+            DocumentScanFilterKind.grayscale,
+          );
+          break;
+        case 'original':
+        default:
+          out = source;
+      }
+      if (!mounted) return;
+      FileImage(File(_pages[i])).evict();
+      setState(() => _pages[i] = out);
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
+    }
+  }
+
+  Future<void> _openToneAdjustSheet() async {
+    if (_isProcessing) return;
+    var localBrightness = 0.0;
+    var localContrast = 100.0;
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.navyMid,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(18)),
+      ),
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setLocal) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _sheetHandle(),
+                Text(
+                  'Brightness & Contrast',
+                  style: GoogleFonts.nunito(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Text('Brightness',
+                    style: GoogleFonts.nunito(color: Colors.white70)),
+                Slider(
+                  value: localBrightness,
+                  min: -0.35,
+                  max: 0.35,
+                  activeColor: AppColors.gold,
+                  thumbColor: AppColors.gold,
+                  onChanged: (v) => setLocal(() => localBrightness = v),
+                ),
+                Text('Contrast',
+                    style: GoogleFonts.nunito(color: Colors.white70)),
+                Slider(
+                  value: localContrast,
+                  min: 60,
+                  max: 190,
+                  activeColor: AppColors.gold,
+                  thumbColor: AppColors.gold,
+                  onChanged: (v) => setLocal(() => localContrast = v),
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  children: [
+                    OutlinedButton(
+                      onPressed: () {
+                        setLocal(() {
+                          localBrightness = 0;
+                          localContrast = 100;
+                        });
+                      },
+                      child: const Text('Reset'),
+                    ),
+                    const Spacer(),
+                    ElevatedButton(
+                      onPressed: () async {
+                        Navigator.pop(ctx);
+                        final i = _currentPage;
+                        setState(() => _isProcessing = true);
+                        try {
+                          final out = await ImageProcessingService.instance
+                              .applyBrightnessContrast(
+                            imagePath: _pages[i],
+                            brightness: localBrightness,
+                            contrast: localContrast,
+                          );
+                          if (!mounted) return;
+                          FileImage(File(_pages[i])).evict();
+                          setState(() => _pages[i] = out);
+                        } finally {
+                          if (mounted) setState(() => _isProcessing = false);
+                        }
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: AppColors.gold,
+                        foregroundColor: AppColors.navyDark,
+                      ),
+                      child: const Text('Apply'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          );
+        },
+      ),
+    );
+  }
+
   // ── Rotate ─────────────────────────────────────────────────────────────────
 
   Future<void> _rotateImage(int degrees) async {
@@ -599,8 +769,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
     final pageIndex = _currentPage;
     setState(() => _isProcessing = true);
     try {
-      final rotatedPath =
-          await ImageEnhancementService.instance.rotate(_pages[pageIndex], degrees);
+      final rotatedPath = await ImageEnhancementService.instance
+          .rotate(_pages[pageIndex], degrees);
       if (mounted) {
         FileImage(File(_pages[pageIndex])).evict();
         setState(() {
@@ -618,7 +788,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
   void _showRotateOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: AppColors.navyMid,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -626,12 +796,18 @@ class _EditScanScreenState extends State<EditScanScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _sheetHandle(),
-          _sheetTile(Icons.rotate_right_rounded, 'Clockwise 90°',
-              () { Navigator.pop(context); _rotateImage(90); }),
-          _sheetTile(Icons.rotate_left_rounded, 'Counter-clockwise 90°',
-              () { Navigator.pop(context); _rotateImage(-90); }),
-          _sheetTile(Icons.flip_rounded, 'Flip 180°',
-              () { Navigator.pop(context); _rotateImage(180); }),
+          _sheetTile(Icons.rotate_right_rounded, 'Clockwise 90°', () {
+            Navigator.pop(context);
+            _rotateImage(90);
+          }),
+          _sheetTile(Icons.rotate_left_rounded, 'Counter-clockwise 90°', () {
+            Navigator.pop(context);
+            _rotateImage(-90);
+          }),
+          _sheetTile(Icons.flip_rounded, 'Flip 180°', () {
+            Navigator.pop(context);
+            _rotateImage(180);
+          }),
           const SizedBox(height: 20),
         ],
       ),
@@ -642,7 +818,10 @@ class _EditScanScreenState extends State<EditScanScreen> {
 
   void _deletePage(int index) {
     HapticFeedback.mediumImpact();
-    if (_pages.length == 1) { Navigator.pop(context); return; }
+    if (_pages.length == 1) {
+      Navigator.pop(context);
+      return;
+    }
     setState(() {
       _pages.removeAt(index);
       _originalPages.removeAt(index);
@@ -673,7 +852,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
   void _showPageOptions(int pageIndex) {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: AppColors.navyMid,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -681,17 +860,24 @@ class _EditScanScreenState extends State<EditScanScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           _sheetHandle(),
-          _sheetTile(Icons.delete_rounded, 'Delete Page',
-              () { Navigator.pop(context); _deletePage(pageIndex); },
-              color: Colors.redAccent),
-          _sheetTile(Icons.content_copy_rounded, 'Duplicate Page',
-              () { Navigator.pop(context); _duplicatePage(pageIndex); }),
+          _sheetTile(Icons.delete_rounded, 'Delete Page', () {
+            Navigator.pop(context);
+            _deletePage(pageIndex);
+          }, color: Colors.redAccent),
+          _sheetTile(Icons.content_copy_rounded, 'Duplicate Page', () {
+            Navigator.pop(context);
+            _duplicatePage(pageIndex);
+          }),
           if (pageIndex > 0)
-            _sheetTile(Icons.arrow_upward_rounded, 'Move Up',
-                () { Navigator.pop(context); _movePage(pageIndex, pageIndex - 1); }),
+            _sheetTile(Icons.arrow_upward_rounded, 'Move Up', () {
+              Navigator.pop(context);
+              _movePage(pageIndex, pageIndex - 1);
+            }),
           if (pageIndex < _pages.length - 1)
-            _sheetTile(Icons.arrow_downward_rounded, 'Move Down',
-                () { Navigator.pop(context); _movePage(pageIndex, pageIndex + 1); }),
+            _sheetTile(Icons.arrow_downward_rounded, 'Move Down', () {
+              Navigator.pop(context);
+              _movePage(pageIndex, pageIndex + 1);
+            }),
           const SizedBox(height: 20),
         ],
       ),
@@ -706,7 +892,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
     setState(() => _isProcessing = true);
     try {
       final path = await ImageEnhancementService.instance.addTimestamp(
-        _pages[pageIndex], format: 'dd/MM/yyyy HH:mm:ss',
+        _pages[pageIndex],
+        format: 'dd/MM/yyyy HH:mm:ss',
       );
       if (mounted) {
         FileImage(File(_pages[pageIndex])).evict();
@@ -728,7 +915,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
   void _showEraseOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF1A1A2E),
+      backgroundColor: AppColors.navyMid,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
@@ -829,26 +1016,26 @@ class _EditScanScreenState extends State<EditScanScreen> {
   // ── Extract / Signature ────────────────────────────────────────────────────
 
   void _extractText() => Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => TextExtractionScreen(imagePath: _pages[_currentPage]),
-    ),
-  );
+        context,
+        MaterialPageRoute(
+          builder: (_) => TextExtractionScreen(imagePath: _pages[_currentPage]),
+        ),
+      );
 
   void _addSignature() => Navigator.push(
-    context,
-    MaterialPageRoute(
-      builder: (_) => SignaturePadScreen(
-        imagePath: _pages[_currentPage],
-        onSignatureAdded: (signedPath) {
-          if (mounted) {
-            FileImage(File(_pages[_currentPage])).evict();
-            setState(() => _pages[_currentPage] = signedPath);
-          }
-        },
-      ),
-    ),
-  );
+        context,
+        MaterialPageRoute(
+          builder: (_) => SignaturePadScreen(
+            imagePath: _pages[_currentPage],
+            onSignatureAdded: (signedPath) {
+              if (mounted) {
+                FileImage(File(_pages[_currentPage])).evict();
+                setState(() => _pages[_currentPage] = signedPath);
+              }
+            },
+          ),
+        ),
+      );
 
   Future<void> _openAnnotate() async {
     final path = await Navigator.push<String>(
@@ -867,38 +1054,39 @@ class _EditScanScreenState extends State<EditScanScreen> {
   }
 
   Future<void> _addWatermarkText() async {
-    final config = await showWatermarkComposerSheet(
+    final out = await Navigator.push<List<String>>(
       context,
-      imagePath: _pages[_currentPage],
-      initialText: 'CONFIDENTIAL',
+      MaterialPageRoute(builder: (_) => AddWatermarkScreen(imagePaths: _pages)),
     );
-    if (config == null || !mounted) return;
-
-    setState(() => _isProcessing = true);
-    try {
-      final out = await WatermarkService.instance.addTextWatermark(
-        _pages[_currentPage],
-        text: config.text,
-        red: config.r,
-        green: config.g,
-        blue: config.b,
-        opacity: config.a,
-      );
-      if (mounted) {
-        FileImage(File(_pages[_currentPage])).evict();
-        setState(() {
-          _pages[_currentPage] = out;
-          _originalPages[_currentPage] = out;
-        });
+    if (out == null || out.isEmpty || !mounted) return;
+    setState(() {
+      for (var i = 0; i < out.length && i < _pages.length; i++) {
+        FileImage(File(_pages[i])).evict();
+        _pages[i] = out[i];
+        _originalPages[i] = out[i];
       }
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
+    });
+  }
+
+  Future<void> _removeWatermarkTool() async {
+    final out = await Navigator.push<String>(
+      context,
+      MaterialPageRoute(
+        builder: (_) => RemoveWatermarkScreen(imagePath: _pages[_currentPage]),
+      ),
+    );
+    if (out == null || !mounted) return;
+    FileImage(File(_pages[_currentPage])).evict();
+    setState(() {
+      _pages[_currentPage] = out;
+      _originalPages[_currentPage] = out;
+    });
   }
 
   // ── Save ───────────────────────────────────────────────────────────────────
 
-  Future<void> _saveDocument(String saveType, {bool compressedPdf = false}) async {
+  Future<void> _saveDocument(String saveType,
+      {bool compressedPdf = false}) async {
     if (_isSaving || !mounted) return;
 
     final docName = _nameController.text.trim().isEmpty
@@ -913,7 +1101,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
         pagesToSave = [];
         for (final page in _pages) {
           pagesToSave.add(await ImageEnhancementService.instance.addTimestamp(
-            page, format: 'dd/MM/yyyy HH:mm:ss',
+            page,
+            format: 'dd/MM/yyyy HH:mm:ss',
           ));
         }
       }
@@ -924,14 +1113,16 @@ class _EditScanScreenState extends State<EditScanScreen> {
         filePath = compressedPdf
             ? await PdfService.instance
                 .createCompressedPdfFromImages(pagesToSave, docName)
-            : await PdfService.instance.createPdfFromImages(pagesToSave, docName);
+            : await PdfService.instance
+                .createPdfFromImages(pagesToSave, docName);
         fileType = 'pdf';
       } else {
         filePath = pagesToSave[0];
         fileType = 'jpg';
       }
 
-      final thumbPath = await PdfService.instance.generateThumbnail(pagesToSave[0]);
+      final thumbPath =
+          await PdfService.instance.generateThumbnail(pagesToSave[0]);
       final fileSizeMB = await PdfService.instance.getFileSizeMB(filePath);
 
       final doc = DocumentModel(
@@ -964,7 +1155,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
     _saveDraftTags.clear();
     showModalBottomSheet(
       context: context,
-      backgroundColor: const Color(0xFF0F1A2E),
+      backgroundColor: AppColors.navyDark,
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
@@ -972,7 +1163,9 @@ class _EditScanScreenState extends State<EditScanScreen> {
       builder: (sheetContext) => StatefulBuilder(
         builder: (sheetContext, setSheetState) => Padding(
           padding: EdgeInsets.fromLTRB(
-            24, 20, 24,
+            24,
+            20,
+            24,
             MediaQuery.of(sheetContext).viewInsets.bottom + 28,
           ),
           child: Column(
@@ -981,7 +1174,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
             children: [
               Center(
                 child: Container(
-                  width: 40, height: 4,
+                  width: 40,
+                  height: 4,
                   decoration: BoxDecoration(
                     color: Colors.white24,
                     borderRadius: BorderRadius.circular(2),
@@ -990,21 +1184,26 @@ class _EditScanScreenState extends State<EditScanScreen> {
               ),
               const SizedBox(height: 20),
               Text('Document Name',
-                  style: GoogleFonts.nunito(fontSize: 13, color: Colors.white54, fontWeight: FontWeight.w600)),
+                  style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      color: Colors.white54,
+                      fontWeight: FontWeight.w600)),
               const SizedBox(height: 8),
               TextField(
                 controller: _nameController,
-                style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700),
+                style: GoogleFonts.nunito(
+                    color: Colors.white, fontWeight: FontWeight.w700),
                 decoration: InputDecoration(
                   hintText: 'Enter document name',
                   hintStyle: GoogleFonts.nunito(color: Colors.white38),
                   filled: true,
-                  fillColor: Colors.white.withOpacity(0.07),
+                  fillColor: Colors.white.withValues(alpha: 0.07),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
                     borderSide: BorderSide.none,
                   ),
-                  contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 ),
               ),
               if (_pages.length > 1) ...[
@@ -1078,22 +1277,30 @@ class _EditScanScreenState extends State<EditScanScreen> {
                   children: [
                     AnimatedContainer(
                       duration: const Duration(milliseconds: 200),
-                      width: 22, height: 22,
+                      width: 22,
+                      height: 22,
                       decoration: BoxDecoration(
-                        color: _showTimestampOption ? AppColors.gold : Colors.white12,
+                        color: _showTimestampOption
+                            ? AppColors.gold
+                            : Colors.white12,
                         borderRadius: BorderRadius.circular(6),
                         border: Border.all(
-                          color: _showTimestampOption ? AppColors.gold : Colors.white30,
+                          color: _showTimestampOption
+                              ? AppColors.gold
+                              : Colors.white30,
                         ),
                       ),
                       child: _showTimestampOption
-                          ? const Icon(Icons.check_rounded, color: Colors.black, size: 14)
+                          ? const Icon(Icons.check_rounded,
+                              color: Colors.black, size: 14)
                           : null,
                     ),
                     const SizedBox(width: 10),
                     Text('Add timestamp to all pages',
                         style: GoogleFonts.nunito(
-                          color: Colors.white70, fontWeight: FontWeight.w600, fontSize: 13,
+                          color: Colors.white70,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 13,
                         )),
                   ],
                 ),
@@ -1128,7 +1335,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
                     Navigator.pop(sheetContext);
                     _saveDocument('pdf');
                   },
-                  icon: const Icon(Iconsax.document_text, color: Colors.white, size: 22),
+                  icon: const Icon(Iconsax.document_text,
+                      color: Colors.white, size: 22),
                   label: Text(
                     _pages.length > 1
                         ? 'Save as PDF (all pages)'
@@ -1158,7 +1366,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
                     Navigator.pop(sheetContext);
                     _saveDocument('jpg');
                   },
-                  icon: const Icon(Iconsax.image, color: Color(0xFF64B5F6), size: 20),
+                  icon: const Icon(Iconsax.image,
+                      color: Color(0xFF64B5F6), size: 20),
                   label: Text(
                     _pages.length > 1
                         ? 'Save as image (first page only)'
@@ -1171,7 +1380,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
                   ),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.white,
-                    side: const BorderSide(color: Color(0xFF42A5F5), width: 1.5),
+                    side:
+                        const BorderSide(color: Color(0xFF42A5F5), width: 1.5),
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(14),
@@ -1187,7 +1397,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
                     Navigator.pop(sheetContext);
                     _saveDocument('pdf', compressedPdf: true);
                   },
-                  icon: const Icon(Iconsax.document_cloud, color: AppColors.gold, size: 20),
+                  icon: const Icon(Iconsax.document_cloud,
+                      color: AppColors.gold, size: 20),
                   label: Text(
                     'Compressed PDF (smaller file)',
                     style: GoogleFonts.nunito(
@@ -1217,7 +1428,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
   void _showError(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+      content:
+          Text(msg, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
       backgroundColor: Colors.redAccent,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1228,7 +1440,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
   void _showSuccess(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(msg, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+      content:
+          Text(msg, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
       backgroundColor: AppColors.green,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -1238,22 +1451,44 @@ class _EditScanScreenState extends State<EditScanScreen> {
   }
 
   Widget _sheetHandle() => Padding(
-    padding: const EdgeInsets.only(top: 12, bottom: 8),
-    child: Center(child: Container(
-      width: 40, height: 4,
-      decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2)),
-    )),
-  );
+        padding: const EdgeInsets.only(top: 12, bottom: 8),
+        child: Center(
+            child: Container(
+          width: 40,
+          height: 4,
+          decoration: BoxDecoration(
+            color: AppColors.gold.withValues(alpha: 0.7),
+            borderRadius: BorderRadius.circular(2),
+          ),
+        )),
+      );
 
   Widget _sheetTile(IconData icon, String label, VoidCallback onTap,
       {Color color = Colors.white70}) {
-    return ListTile(
-      leading: Icon(icon, color: color, size: 22),
-      title: Text(label, style: GoogleFonts.nunito(
-        color: color == Colors.white70 ? Colors.white : color,
-        fontWeight: FontWeight.w600,
-      )),
-      onTap: onTap,
+    final isDefaultColor = color == Colors.white70;
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.08)),
+      ),
+      child: ListTile(
+        leading: Icon(icon, color: color, size: 22),
+        title: Text(
+          label,
+          style: GoogleFonts.nunito(
+            color: isDefaultColor ? Colors.white : color,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.arrow_forward_ios_rounded,
+          size: 14,
+          color: Colors.white54,
+        ),
+        onTap: onTap,
+      ),
     );
   }
 
@@ -1287,8 +1522,10 @@ class _EditScanScreenState extends State<EditScanScreen> {
           child: Row(
             children: [
               IconButton(
-                icon: Icon(Icons.close_rounded, color: Colors.white.withValues(alpha: 0.95)),
-                onPressed: () => Navigator.pop(context, List<String>.from(_pages)),
+                icon: Icon(Icons.close_rounded,
+                    color: Colors.white.withValues(alpha: 0.95)),
+                onPressed: () =>
+                    Navigator.pop(context, List<String>.from(_pages)),
               ),
               GestureDetector(
                 onTap: () async {
@@ -1298,11 +1535,12 @@ class _EditScanScreenState extends State<EditScanScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.08),
+                    color: Colors.white.withValues(alpha: 0.08),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(color: Colors.white24),
                   ),
-                  child: Icon(Icons.add_rounded, color: Colors.white70, size: 18),
+                  child:
+                      Icon(Icons.add_rounded, color: Colors.white70, size: 18),
                 ),
               ),
             ],
@@ -1357,7 +1595,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
                       ],
                     ),
                     child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 22, vertical: 10),
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 22, vertical: 10),
                       child: Text(
                         'Save',
                         style: GoogleFonts.nunito(
@@ -1378,7 +1617,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
               child: SizedBox(
                 width: 22,
                 height: 22,
-                child: CircularProgressIndicator(color: AppColors.gold, strokeWidth: 2.2),
+                child: CircularProgressIndicator(
+                    color: AppColors.gold, strokeWidth: 2.2),
               ),
             ),
         ],
@@ -1431,11 +1671,14 @@ class _EditScanScreenState extends State<EditScanScreen> {
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          const CircularProgressIndicator(color: AppColors.gold),
+                          const CircularProgressIndicator(
+                              color: AppColors.gold),
                           const SizedBox(height: 14),
                           Text('Processing…',
                               style: GoogleFonts.nunito(
-                                color: Colors.white70, fontSize: 14, fontWeight: FontWeight.w600)),
+                                  color: Colors.white70,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w600)),
                         ],
                       ),
                     ),
@@ -1444,7 +1687,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
                 // Page counter
                 if (_pages.length > 1)
                   Positioned(
-                    top: MediaQuery.of(context).padding.top + kToolbarHeight + 6,
+                    top:
+                        MediaQuery.of(context).padding.top + kToolbarHeight + 6,
                     left: 0,
                     right: 0,
                     child: Center(
@@ -1453,7 +1697,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
                         child: BackdropFilter(
                           filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 7),
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 16, vertical: 7),
                             decoration: BoxDecoration(
                               color: Colors.white.withValues(alpha: 0.14),
                               borderRadius: BorderRadius.circular(20),
@@ -1478,6 +1723,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
               ],
             ),
           ),
+
+          if (widget.scanType == 'document') _quickFilterBar(),
 
           // ── Edit tools (premium dock) ──
           Container(
@@ -1504,15 +1751,19 @@ class _EditScanScreenState extends State<EditScanScreen> {
                 ),
               ],
             ),
-            padding: const EdgeInsets.fromLTRB(12, 14, 12, 12),
+            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
                 children: [
-                  _editTool(Iconsax.crop,        'Crop',      _cropCurrentPage),
-                  _editTool(Iconsax.rotate_left, 'Rotate',    _showRotateOptions),
+                  _editTool(Iconsax.crop, 'Crop', _cropCurrentPage),
+                  _editTool(Iconsax.scan, 'Deskew', _openDeskew,
+                      color: AppColors.gold),
+                  _editTool(Iconsax.rotate_left, 'Rotate', _showRotateOptions),
                   // ← Filters button: opens AdvancedFiltersScreen
-                  _editTool(Iconsax.filter,      'Filters',   _openFilters,
+                  _editTool(Iconsax.filter, 'Filters', _openFilters,
+                      color: AppColors.gold),
+                  _editTool(Iconsax.sun_1, 'Tone', _openToneAdjustSheet,
                       color: AppColors.gold),
                   if (widget.scanType == 'document') ...[
                     _editTool(
@@ -1528,19 +1779,21 @@ class _EditScanScreenState extends State<EditScanScreen> {
                       color: const Color(0xFF94A3B8),
                     ),
                   ],
-                  _editTool(Iconsax.clock,       'Timestamp', _addTimestamp),
-                  _editTool(Iconsax.text,        'Extract',   _extractText),
-                  _editTool(Iconsax.eraser,      'Erase',     _showEraseOptions),
-                  _editTool(Iconsax.pen_add,     'Sign',      _addSignature),
-                  _editTool(Iconsax.note_text,   'Annotate',  _openAnnotate,
+                  _editTool(Iconsax.clock, 'Timestamp', _addTimestamp),
+                  _editTool(Iconsax.text, 'Extract', _extractText),
+                  _editTool(Iconsax.eraser, 'Erase', _showEraseOptions),
+                  _editTool(Iconsax.pen_add, 'Sign', _addSignature),
+                  _editTool(Iconsax.note_text, 'Annotate', _openAnnotate,
                       color: AppColors.orange),
                   _editTool(Iconsax.shield_tick, 'Watermark', _addWatermarkText,
                       color: AppColors.blue),
+                  _editTool(Iconsax.eraser, 'Remove WM', _removeWatermarkTool,
+                      color: AppColors.gold),
                   if (_pages.length > 1)
                     _editTool(Iconsax.sort, 'Reorder', _openReorderPages,
                         color: AppColors.green),
-                  _editTool(Iconsax.trash,       'Delete',
-                      () => _deletePage(_currentPage),
+                  _editTool(
+                      Iconsax.trash, 'Delete', () => _deletePage(_currentPage),
                       color: Colors.redAccent),
                 ],
               ),
@@ -1560,10 +1813,10 @@ class _EditScanScreenState extends State<EditScanScreen> {
                   ],
                 ),
               ),
-              height: 96,
+              height: 86,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(12, 10, 12, 14),
+                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
                 itemCount: _pages.length,
                 itemBuilder: (_, i) {
                   final isSelected = _currentPage == i;
@@ -1578,7 +1831,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
                     child: AnimatedContainer(
                       duration: const Duration(milliseconds: 220),
                       curve: Curves.easeOutCubic,
-                      width: 64,
+                      width: 58,
                       margin: const EdgeInsets.symmetric(horizontal: 5),
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(10),
@@ -1604,13 +1857,15 @@ class _EditScanScreenState extends State<EditScanScreen> {
                         children: [
                           ClipRRect(
                             borderRadius: BorderRadius.circular(8),
-                            child: _FilteredImage(path: _pages[i], fit: BoxFit.cover),
+                            child: _FilteredImage(
+                                path: _pages[i], fit: BoxFit.cover),
                           ),
                           Positioned(
                             bottom: 4,
                             right: 4,
                             child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1.5),
                               decoration: BoxDecoration(
                                 color: Colors.black.withValues(alpha: 0.72),
                                 borderRadius: BorderRadius.circular(6),
@@ -1622,7 +1877,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
                                 '${i + 1}',
                                 style: GoogleFonts.nunito(
                                   color: Colors.white,
-                                  fontSize: 10,
+                                  fontSize: 9,
                                   fontWeight: FontWeight.w800,
                                 ),
                               ),
@@ -1640,6 +1895,82 @@ class _EditScanScreenState extends State<EditScanScreen> {
     );
   }
 
+  Widget _quickFilterBar() {
+    Widget chip(String id, String label) {
+      final selected = _selectedQuickFilter == id;
+      return Padding(
+        padding: const EdgeInsets.only(right: 8),
+        child: InkWell(
+          onTap: _isProcessing ? null : () => _applyQuickFilter(id),
+          borderRadius: BorderRadius.circular(16),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 180),
+            width: 68,
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
+            decoration: BoxDecoration(
+              color: selected
+                  ? AppColors.gold.withValues(alpha: 0.2)
+                  : Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: selected ? AppColors.gold : Colors.white24,
+                width: selected ? 1.4 : 1,
+              ),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Container(
+                  width: 40,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Iconsax.image,
+                      color: Colors.white70, size: 12),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  label,
+                  style: GoogleFonts.nunito(
+                    color: selected ? AppColors.gold : Colors.white70,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      decoration: BoxDecoration(
+        color: AppColors.navyDark,
+        border: Border(
+          top: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.06)),
+        ),
+      ),
+      child: SingleChildScrollView(
+        scrollDirection: Axis.horizontal,
+        child: Row(
+          children: [
+            chip('auto', 'Auto'),
+            chip('magic', 'Magic'),
+            chip('bw', 'B&W'),
+            chip('gray', 'Grey'),
+            chip('original', 'Original'),
+          ],
+        ),
+      ),
+    );
+  }
+
   Widget _editTool(IconData icon, String label, VoidCallback onTap,
       {Color color = Colors.white}) {
     final accent = color == Colors.white ? Colors.white : color;
@@ -1650,13 +1981,13 @@ class _EditScanScreenState extends State<EditScanScreen> {
       child: Opacity(
         opacity: _isProcessing ? 0.45 : 1.0,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
+          padding: const EdgeInsets.symmetric(horizontal: 4),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
               Container(
-                width: 50,
-                height: 50,
+                width: 44,
+                height: 44,
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: AppColors.editorIconBg,
@@ -1675,11 +2006,11 @@ class _EditScanScreenState extends State<EditScanScreen> {
                   ],
                 ),
                 alignment: Alignment.center,
-                child: Icon(icon, color: accent, size: 22),
+                child: Icon(icon, color: accent, size: 19),
               ),
-              const SizedBox(height: 6),
+              const SizedBox(height: 4),
               SizedBox(
-                width: 68,
+                width: 60,
                 child: Text(
                   label,
                   textAlign: TextAlign.center,
@@ -1687,7 +2018,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
                   overflow: TextOverflow.ellipsis,
                   style: GoogleFonts.nunito(
                     color: labelColor,
-                    fontSize: 10,
+                    fontSize: 9,
                     fontWeight: FontWeight.w700,
                     letterSpacing: 0.15,
                   ),
@@ -1713,12 +2044,15 @@ class _FilteredImage extends StatefulWidget {
 }
 
 class _FilteredImageState extends State<_FilteredImage> {
-  late FileImage _fileImage;
+  late ImageProvider _fileImage;
 
   @override
   void initState() {
     super.initState();
-    _fileImage = FileImage(File(widget.path));
+    _fileImage = ResizeImage(
+      FileImage(File(widget.path)),
+      width: widget.fit == BoxFit.cover ? 900 : 1440,
+    );
   }
 
   @override
@@ -1726,7 +2060,10 @@ class _FilteredImageState extends State<_FilteredImage> {
     super.didUpdateWidget(old);
     if (old.path != widget.path) {
       FileImage(File(old.path)).evict();
-      _fileImage = FileImage(File(widget.path));
+      _fileImage = ResizeImage(
+        FileImage(File(widget.path)),
+        width: widget.fit == BoxFit.cover ? 900 : 1440,
+      );
     }
   }
 
@@ -1735,8 +2072,17 @@ class _FilteredImageState extends State<_FilteredImage> {
     return Image(
       image: _fileImage,
       fit: widget.fit,
+      filterQuality: FilterQuality.medium,
+      frameBuilder: (context, child, frame, wasSynchronouslyLoaded) {
+        if (wasSynchronouslyLoaded || frame != null) return child;
+        return const Center(
+          child:
+              CircularProgressIndicator(color: AppColors.gold, strokeWidth: 2),
+        );
+      },
       errorBuilder: (_, __, ___) => const Center(
-        child: Icon(Icons.broken_image_rounded, color: Colors.white24, size: 64),
+        child:
+            Icon(Icons.broken_image_rounded, color: Colors.white24, size: 64),
       ),
     );
   }

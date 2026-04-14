@@ -156,9 +156,9 @@ class _ManualEraseScreenState extends State<ManualEraseScreen> {
   Widget build(BuildContext context) {
     if (_loadError != null) {
       return Scaffold(
-        backgroundColor: const Color(0xFF0F0F0F),
+        backgroundColor: AppColors.navyDark,
         appBar: AppBar(
-          backgroundColor: const Color(0xFF0F1A2E),
+          backgroundColor: AppColors.navyDark,
           leading: IconButton(
             icon: const Icon(Iconsax.arrow_left_2),
             onPressed: () => Navigator.pop(context),
@@ -177,7 +177,7 @@ class _ManualEraseScreenState extends State<ManualEraseScreen> {
 
     if (_iw == null || _ih == null) {
       return const Scaffold(
-        backgroundColor: Color(0xFF0F0F0F),
+        backgroundColor: AppColors.navyDark,
         body: Center(child: CircularProgressIndicator(color: AppColors.gold)),
       );
     }
@@ -186,9 +186,9 @@ class _ManualEraseScreenState extends State<ManualEraseScreen> {
     final ih = _ih!;
 
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: AppColors.navyDark,
       appBar: AppBar(
-        backgroundColor: const Color(0xFF0F1A2E),
+        backgroundColor: AppColors.navyDark,
         foregroundColor: Colors.white,
         leading: IconButton(
           icon: const Icon(Iconsax.arrow_left_2),
@@ -271,14 +271,14 @@ class _ManualEraseScreenState extends State<ManualEraseScreen> {
                   onPressed: _busy ? null : _apply,
                   style: FilledButton.styleFrom(
                     backgroundColor: AppColors.gold,
-                    foregroundColor: const Color(0xFF0F1A2E),
+                    foregroundColor: AppColors.navyDark,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
                   ),
                   child: _busy
                       ? const SizedBox(
                           width: 24,
                           height: 24,
-                          child: CircularProgressIndicator(strokeWidth: 2.5, color: Color(0xFF0F1A2E)),
+                          child: CircularProgressIndicator(strokeWidth: 2.5, color: AppColors.navyDark),
                         )
                       : Text(
                           'Remove selected area',

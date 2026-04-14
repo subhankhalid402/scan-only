@@ -10,12 +10,13 @@ import '../models/document_model.dart';
 import '../services/database_service.dart';
 import '../services/pdf_service.dart';
 import 'scan_screen.dart';
-import 'documents_screen.dart';
+import 'smart_gallery_screen.dart';
 import 'search_screen.dart';
 import 'settings_screen.dart';
 import 'document_viewer_screen.dart';
 import 'features_hub_screen.dart';
 import 'advanced_sharing_screen.dart';
+import 'id_photo_maker_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -35,7 +36,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-
   @override
   void initState() {
     super.initState();
@@ -50,6 +50,13 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _openScanScreen({String scanType = 'document'}) {
+    if (scanType == 'id_maker') {
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const IdPhotoMakerScreen()),
+      );
+      return;
+    }
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => ScanScreen(scanType: scanType)),
@@ -81,8 +88,7 @@ class _HomeScreenState extends State<HomeScreen> {
           controller: controller,
           autofocus: true,
           decoration: InputDecoration(
-            border:
-                OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
           ),
         ),
         actions: [
@@ -104,9 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ],
       ),
     );
-    if (saved == true &&
-        controller.text.trim().isNotEmpty &&
-        mounted) {
+    if (saved == true && controller.text.trim().isNotEmpty && mounted) {
       await DatabaseService.instance.updateDocument(
         doc.copyWith(
           name: controller.text.trim(),
@@ -124,17 +128,15 @@ class _HomeScreenState extends State<HomeScreen> {
     final dot = d.filePath.lastIndexOf('.');
     if (dot < 0 || dot >= d.filePath.length - 1) return false;
     final ext = d.filePath.substring(dot + 1).toLowerCase();
-    return ext == 'jpg' ||
-        ext == 'jpeg' ||
-        ext == 'png' ||
-        ext == 'webp';
+    return ext == 'jpg' || ext == 'jpeg' || ext == 'png' || ext == 'webp';
   }
 
   Future<void> _generatePdf(DocumentModel doc) async {
     if (!_isRasterDoc(doc)) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Generate PDF is for JPG/PNG scans only.')),
+        const SnackBar(
+            content: Text('Generate PDF is for JPG/PNG scans only.')),
       );
       return;
     }
@@ -211,7 +213,7 @@ class _HomeScreenState extends State<HomeScreen> {
         index: _selectedIndex,
         children: [
           _buildHomePage(),
-          DocumentsScreen(
+          SmartGalleryScreen(
             onRefresh: _loadRecentDocs,
             refreshToken: _docsRefreshToken,
           ),
@@ -279,15 +281,21 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: 38,
                     height: 38,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [Color(0xFF2A4BAA), Color(0xFF162460)],
-                      ),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.white.withOpacity(0.15)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.15),
+                      ),
                     ),
-                    child: const Icon(Iconsax.scan, color: Colors.white, size: 20),
+                    clipBehavior: Clip.antiAlias,
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: Image.asset(
+                        'assets/images/launcher_icon.png',
+                        width: 38,
+                        height: 38,
+                        fit: BoxFit.cover,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 10),
                   Text(
@@ -307,28 +315,73 @@ class _HomeScreenState extends State<HomeScreen> {
             // Scan type grid — 2 rows of 4
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              child: LayoutBuilder(
+                builder: (context, constraints) {
+                  const spacing = 8.0;
+                  final tileWidth = (constraints.maxWidth - (spacing * 4)) / 5;
+                  return Wrap(
+                    spacing: spacing,
+                    runSpacing: 12,
                     children: [
-                      _scanTile(Iconsax.document_text, 'Document',  'document',   AppColors.gold),
-                      _scanTile(Iconsax.card,          'ID Card',   'id_card',    AppColors.gold),
-                      _scanTile(Iconsax.receipt,       'Receipt',   'receipt',    AppColors.gold),
-                      _scanTile(Iconsax.scan_barcode,  'QR Code',   'qr',         AppColors.gold),
+                      _scanTile(
+                        Iconsax.document_text,
+                        'Document',
+                        'document',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
+                      _scanTile(
+                        Iconsax.card,
+                        'ID Card',
+                        'id_card',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
+                      _scanTile(
+                        Iconsax.receipt,
+                        'Receipt',
+                        'receipt',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
+                      _scanTile(
+                        Iconsax.scan_barcode,
+                        'QR Code',
+                        'qr',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
+                      _scanTile(
+                        Iconsax.book,
+                        'Book',
+                        'book',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
+                      _scanTile(
+                        Iconsax.camera,
+                        'Photo',
+                        'photo',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
+                      _scanTile(
+                        Iconsax.user_square,
+                        'ID Maker',
+                        'id_maker',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
+                      _scanTile(
+                        Iconsax.text_block,
+                        'Whiteboard',
+                        'whiteboard',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
                     ],
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      _scanTile(Iconsax.book,          'Book',       'book',       AppColors.gold),
-                      _scanTile(Iconsax.camera,        'Photo',      'photo',      AppColors.gold),
-                      _scanTile(Iconsax.gallery,       'Gallery',    'gallery',    AppColors.gold),
-                      _scanTile(Iconsax.text_block,    'Whiteboard', 'whiteboard', AppColors.gold),
-                    ],
-                  ),
-                ],
+                  );
+                },
               ),
             ),
 
@@ -346,7 +399,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   width: double.infinity,
                   padding: const EdgeInsets.symmetric(vertical: 13),
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.10),
+                    color: Colors.white.withValues(alpha: 0.10),
                     borderRadius: BorderRadius.circular(14),
                     border: Border.all(color: Colors.white12),
                   ),
@@ -362,7 +415,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.chevron_right_rounded, color: Colors.white, size: 20),
+                      const Icon(Icons.chevron_right_rounded,
+                          color: Colors.white, size: 20),
                     ],
                   ),
                 ),
@@ -376,40 +430,50 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
-  Widget _scanTile(IconData icon, String label, String type, Color color) {
+  Widget _scanTile(
+    IconData icon,
+    String label,
+    String type,
+    Color color, {
+    double? width,
+  }) {
     return GestureDetector(
       onTap: () => _openScanScreen(scanType: type),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 64, height: 64,
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(16),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.10),
-                  blurRadius: 8,
-                  offset: const Offset(0, 2),
-                ),
-              ],
+      child: SizedBox(
+        width: width,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Container(
+              width: 54,
+              height: 54,
+              decoration: BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.circular(14),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.10),
+                    blurRadius: 8,
+                    offset: const Offset(0, 2),
+                  ),
+                ],
+              ),
+              child: Icon(icon, color: color, size: 23),
             ),
-            child: Icon(icon, color: color, size: 28),
-          ),
-          const SizedBox(height: 7),
-          Text(
-            label,
-            style: GoogleFonts.nunito(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              color: Colors.white,
+            const SizedBox(height: 5),
+            Text(
+              label,
+              style: GoogleFonts.nunito(
+                fontSize: 10,
+                fontWeight: FontWeight.w700,
+                color: Colors.white,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
             ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -517,11 +581,11 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceAround,
           children: [
-            _navItem(0, Iconsax.home_2,         'Home'),
-            _navItem(1, Iconsax.folder_2,       'Docs'),
+            _navItem(0, Iconsax.home_2, 'Home'),
+            _navItem(1, Iconsax.folder_2, 'Docs'),
             const SizedBox(width: 56),
-            _navItem(2, Iconsax.search_normal,  'Search'),
-            _navItem(3, Iconsax.setting_2,      'Settings'),
+            _navItem(2, Iconsax.search_normal, 'Search'),
+            _navItem(3, Iconsax.setting_2, 'Settings'),
           ],
         ),
       ),
@@ -540,15 +604,15 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon,
-              color: isActive ? AppColors.navyMid : const Color(0xFFAAAAAA),
-              size: 22),
+                color: isActive ? AppColors.navyMid : const Color(0xFFAAAAAA),
+                size: 22),
             const SizedBox(height: 3),
             Text(label,
-              style: GoogleFonts.nunito(
-                fontSize: 11,
-                fontWeight: FontWeight.w700,
-                color: isActive ? AppColors.navyMid : const Color(0xFFAAAAAA),
-              )),
+                style: GoogleFonts.nunito(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w700,
+                  color: isActive ? AppColors.navyMid : const Color(0xFFAAAAAA),
+                )),
           ],
         ),
       ),
@@ -576,14 +640,35 @@ class _DocCard extends StatelessWidget {
   });
 
   Color _accentColor() {
-    switch (doc.fileType) {
-      case 'pdf':             return AppColors.navyDark;
+    final t = doc.fileType.toLowerCase();
+    switch (t) {
+      case 'pdf':
+        return AppColors.red;
+      case 'doc':
+      case 'docx':
+        return AppColors.blue;
+      case 'xls':
+      case 'xlsx':
+      case 'csv':
+        return AppColors.green;
+      case 'ppt':
+      case 'pptx':
+        return AppColors.orange;
+      case 'txt':
+      case 'json':
+      case 'xml':
+        return AppColors.purple;
       case 'jpg':
       case 'jpeg':
-      case 'png':             return AppColors.navyMid;
-      case 'docx':
-      case 'doc':             return AppColors.gold;
-      default:                return AppColors.navyMid;
+      case 'png':
+      case 'webp':
+        return AppColors.navyMid;
+      case 'zip':
+      case 'rar':
+      case '7z':
+        return AppColors.gold;
+      default:
+        return AppColors.navyMid;
     }
   }
 
@@ -604,7 +689,7 @@ class _DocCard extends StatelessWidget {
       child: Material(
         color: Colors.white,
         elevation: 1.5,
-        shadowColor: Colors.black.withOpacity(0.08),
+        shadowColor: Colors.black.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
         child: InkWell(
@@ -627,7 +712,7 @@ class _DocCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: color.withOpacity(0.12),
+                    color: color.withValues(alpha: 0.12),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(Iconsax.document_text, color: color, size: 24),
@@ -682,7 +767,8 @@ class _DocCard extends StatelessWidget {
                   ),
                 ),
                 PopupMenuButton<String>(
-                  icon: const Icon(Icons.more_vert, color: Colors.grey, size: 20),
+                  icon:
+                      const Icon(Icons.more_vert, color: Colors.grey, size: 20),
                   onSelected: (val) {
                     switch (val) {
                       case 'share':
