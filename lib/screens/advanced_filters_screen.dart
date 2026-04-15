@@ -6,6 +6,8 @@ import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:image/image.dart' as img;
 import '../theme.dart';
+import '../services/image_enhancement_service.dart';
+import '../services/image_processing_service.dart';
 
 // ─── Isolate payload ──────────────────────────────────────────────────────────
 
@@ -173,6 +175,7 @@ class _Preset {
   final String name;
   final IconData icon;
   final Color color;
+  final String? quickMode;
   final double brightness;
   final double contrast;
   final double saturation;
@@ -188,6 +191,7 @@ class _Preset {
     required this.name,
     required this.icon,
     required this.color,
+    this.quickMode,
     this.brightness = 0,
     this.contrast = 1.0,
     this.saturation = 1.0,
@@ -202,17 +206,36 @@ class _Preset {
 }
 
 const List<_Preset> _kPresets = [
-  _Preset(name: 'Original',  icon: Iconsax.image,        color: Color(0xFF888888)),
-  _Preset(name: 'Auto',      icon: Iconsax.magic_star,   color: Color(0xFFD4A017), brightness: 0.05, contrast: 1.25, saturation: 1.1, sharpness: 0.3),
-  _Preset(name: 'Sharp Doc', icon: Iconsax.scan,         color: Color(0xFF3B82F6), brightness: -0.05, contrast: 1.6, saturation: 0.7, sharpness: 0.8),
-  _Preset(name: 'B&W',       icon: Iconsax.record,       color: Color(0xFF555555), blackWhite: true),
-  _Preset(name: 'Grayscale', icon: Iconsax.color_swatch, color: Color(0xFF777777), grayscale: true),
-  _Preset(name: 'Sepia',     icon: Iconsax.coffee,       color: Color(0xFFA0522D), sepia: true),
-  _Preset(name: 'Vivid',     icon: Iconsax.sun_1,        color: Color(0xFFF97316), brightness: 0.05, contrast: 1.3, saturation: 1.8),
-  _Preset(name: 'Soft',      icon: Iconsax.cloud,        color: Color(0xFFA855F7), brightness: 0.12, contrast: 0.85, saturation: 0.85),
-  _Preset(name: 'Cool',      icon: Iconsax.wind,         color: Color(0xFF06B6D4), cool: true, contrast: 1.05),
-  _Preset(name: 'Warm',      icon: Iconsax.sun,          color: Color(0xFFEF4444), warm: true, contrast: 1.05),
-  _Preset(name: 'Invert',    icon: Iconsax.repeat,       color: Color(0xFF6366F1), invert: true),
+  _Preset(
+    name: 'Original',
+    icon: Iconsax.image,
+    color: Color(0xFF888888),
+    quickMode: 'original',
+  ),
+  _Preset(
+    name: 'Auto',
+    icon: Iconsax.magic_star,
+    color: Color(0xFFD4A017),
+    quickMode: 'auto',
+  ),
+  _Preset(
+    name: 'Magic',
+    icon: Iconsax.scan,
+    color: Color(0xFF3B82F6),
+    quickMode: 'magic',
+  ),
+  _Preset(
+    name: 'B&W',
+    icon: Iconsax.record,
+    color: Color(0xFF555555),
+    quickMode: 'bw',
+  ),
+  _Preset(
+    name: 'Grey',
+    icon: Iconsax.color_swatch,
+    color: Color(0xFF777777),
+    quickMode: 'gray',
+  ),
 ];
 
 // ─── Screen ───────────────────────────────────────────────────────────────────
@@ -313,7 +336,7 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
     }
   }
 
-  void _applyPreset(_Preset p, int index) {
+  Future<void> _applyPreset(_Preset p, int index) async {
     HapticFeedback.selectionClick();
     setState(() {
       _selectedPreset = index;
@@ -329,11 +352,66 @@ class _AdvancedFiltersScreenState extends State<AdvancedFiltersScreen>
       _warm       = p.warm;
     });
 
+    if (p.quickMode != null) {
+      await _applyQuickDocumentPreset(p.quickMode!);
+      return;
+    }
+
     if (index == 0) {
       // Original — no processing needed
       setState(() { _previewPath = widget.imagePath; _errorMsg = null; });
     } else {
       _updatePreview();
+    }
+  }
+
+  Future<void> _applyQuickDocumentPreset(String mode) async {
+    if (!mounted) return;
+    if (mode == 'original') {
+      setState(() {
+        _previewPath = widget.imagePath;
+        _errorMsg = null;
+        _isProcessing = false;
+      });
+      return;
+    }
+
+    setState(() => _isProcessing = true);
+    try {
+      String outPath = widget.imagePath;
+      switch (mode) {
+        case 'auto':
+          outPath = await ImageProcessingService.instance.applyEnhancement(
+            imagePath: widget.imagePath,
+            modeId: 'document',
+            enhanceMode: CamScanEnhanceMode.auto,
+          );
+          break;
+        case 'magic':
+          outPath = await ImageEnhancementService.instance
+              .magicColorDocument(widget.imagePath);
+          break;
+        case 'bw':
+          outPath = await ImageEnhancementService.instance
+              .documentBlackAndWhite(widget.imagePath);
+          break;
+        case 'gray':
+          outPath = await ImageEnhancementService.instance.applyDocumentScanFilter(
+            widget.imagePath,
+            DocumentScanFilterKind.grayscale,
+          );
+          break;
+      }
+      if (!mounted) return;
+      setState(() {
+        _previewPath = outPath;
+        _errorMsg = null;
+      });
+    } catch (e) {
+      if (!mounted) return;
+      setState(() => _errorMsg = 'Filter failed: $e');
+    } finally {
+      if (mounted) setState(() => _isProcessing = false);
     }
   }
 

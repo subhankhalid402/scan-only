@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:async';
 import 'dart:ui' show ImageFilter;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
@@ -11,14 +12,15 @@ import '../services/app_local_storage.dart';
 import '../theme.dart';
 import '../models/document_model.dart';
 import '../services/database_service.dart';
+import '../services/cloud_backup_service.dart';
 import '../services/image_processing_service.dart';
 import '../services/pdf_service.dart';
 import '../services/image_enhancement_service.dart';
+import '../services/photo_enhancement_service.dart';
 import 'text_extraction_screen.dart';
 import 'manual_erase_screen.dart';
 import '../services/smart_erase_service.dart';
 import 'signature_pad_screen.dart';
-import 'advanced_filters_screen.dart';
 import 'annotation_screen.dart';
 import '../services/ocr_service.dart';
 import 'document_viewer_screen.dart';
@@ -54,6 +56,39 @@ class _EditScanScreenState extends State<EditScanScreen> {
 
   /// Tags chosen in the save sheet (saved with the document).
   final List<String> _saveDraftTags = [];
+  static const Set<String> _textToolScanTypes = {
+    'document',
+    'receipt',
+    'book',
+    'whiteboard',
+    'table',
+    'photo',
+    'gallery',
+    'id_card',
+    'passport',
+    'driving_license',
+    'academic_certificate',
+    'medical_prescription',
+    'bank_statement',
+    'vehicle_rc',
+  };
+  static const Set<String> _watermarkToolScanTypes = {
+    'document',
+    'receipt',
+    'book',
+    'whiteboard',
+    'table',
+    'photo',
+    'gallery',
+    'id_card',
+    'passport',
+    'driving_license',
+    'academic_certificate',
+    'medical_prescription',
+    'bank_statement',
+    'vehicle_rc',
+    'merged',
+  };
 
   @override
   void initState() {
@@ -433,6 +468,12 @@ class _EditScanScreenState extends State<EditScanScreen> {
     super.dispose();
   }
 
+  bool _canShowExtractTextTool() =>
+      _textToolScanTypes.contains(widget.scanType.toLowerCase());
+
+  bool _canShowWatermarkTools() =>
+      _watermarkToolScanTypes.contains(widget.scanType.toLowerCase());
+
   // ── Crop ───────────────────────────────────────────────────────────────────
 
   /// UCrop on Android often cannot read camera/gallery paths; copy into app temp first.
@@ -546,81 +587,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
     });
   }
 
-  // ── Advanced Filters (opens AdvancedFiltersScreen) ─────────────────────────
-
-  Future<void> _openFilters() async {
-    if (!mounted) return;
-    final result = await Navigator.push<String>(
-      context,
-      MaterialPageRoute(
-        builder: (_) => AdvancedFiltersScreen(
-          imagePath: _originalPages[_currentPage],
-        ),
-      ),
-    );
-    if (result != null && mounted) {
-      FileImage(File(_pages[_currentPage])).evict();
-      setState(() => _pages[_currentPage] = result);
-    }
-  }
-
   // ── Document quick modes (CamScanner-style) ────────────────────────────────
-
-  Future<void> _documentMagicColor() async {
-    if (widget.scanType != 'document' || _isProcessing) return;
-    final i = _currentPage;
-    setState(() => _isProcessing = true);
-    try {
-      final out =
-          await ImageEnhancementService.instance.magicColorDocument(_pages[i]);
-      if (!mounted) return;
-      FileImage(File(_pages[i])).evict();
-      setState(() {
-        _pages[i] = out;
-        _originalPages[i] = out;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Magic color applied to page ${i + 1}',
-            style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
-          ),
-          backgroundColor: AppColors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
-
-  Future<void> _documentBlackAndWhite() async {
-    if (widget.scanType != 'document' || _isProcessing) return;
-    final i = _currentPage;
-    setState(() => _isProcessing = true);
-    try {
-      final out = await ImageEnhancementService.instance
-          .documentBlackAndWhite(_pages[i]);
-      if (!mounted) return;
-      FileImage(File(_pages[i])).evict();
-      setState(() {
-        _pages[i] = out;
-        _originalPages[i] = out;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'B&W scan applied to page ${i + 1}',
-            style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
-          ),
-          backgroundColor: AppColors.green,
-          behavior: SnackBarBehavior.floating,
-        ),
-      );
-    } finally {
-      if (mounted) setState(() => _isProcessing = false);
-    }
-  }
 
   Future<void> _applyQuickFilter(String filterId) async {
     if (widget.scanType != 'document' || _isProcessing) return;
@@ -640,6 +607,9 @@ class _EditScanScreenState extends State<EditScanScreen> {
             enhanceMode: CamScanEnhanceMode.auto,
           );
           break;
+        case 'sharp':
+          out = await ImageEnhancementService.instance.highContrast(source);
+          break;
         case 'magic':
           out =
               await ImageEnhancementService.instance.magicColorDocument(source);
@@ -653,6 +623,24 @@ class _EditScanScreenState extends State<EditScanScreen> {
             source,
             DocumentScanFilterKind.grayscale,
           );
+          break;
+        case 'sepia':
+          out = await ImageEnhancementService.instance.sepia(source);
+          break;
+        case 'vivid':
+          out = await ImageEnhancementService.instance.vivid(source);
+          break;
+        case 'soft':
+          out = await ImageEnhancementService.instance.soft(source);
+          break;
+        case 'cool':
+          out = await ImageEnhancementService.instance.cool(source);
+          break;
+        case 'warm':
+          out = await ImageEnhancementService.instance.warm(source);
+          break;
+        case 'invert':
+          out = await ImageEnhancementService.instance.invert(source);
           break;
         case 'original':
         default:
@@ -669,7 +657,9 @@ class _EditScanScreenState extends State<EditScanScreen> {
   Future<void> _openToneAdjustSheet() async {
     if (_isProcessing) return;
     var localBrightness = 0.0;
-    var localContrast = 100.0;
+    var localContrast = 1.0;
+    var localSaturation = 1.0;
+    var localSharpness = 0.0;
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: AppColors.navyMid,
@@ -686,7 +676,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
               children: [
                 _sheetHandle(),
                 Text(
-                  'Brightness & Contrast',
+                  'Adjust',
                   style: GoogleFonts.nunito(
                     color: Colors.white,
                     fontWeight: FontWeight.w800,
@@ -694,12 +684,12 @@ class _EditScanScreenState extends State<EditScanScreen> {
                   ),
                 ),
                 const SizedBox(height: 14),
-                Text('Brightness',
+                Text('Light',
                     style: GoogleFonts.nunito(color: Colors.white70)),
                 Slider(
                   value: localBrightness,
-                  min: -0.35,
-                  max: 0.35,
+                  min: -1.0,
+                  max: 1.0,
                   activeColor: AppColors.gold,
                   thumbColor: AppColors.gold,
                   onChanged: (v) => setLocal(() => localBrightness = v),
@@ -708,11 +698,31 @@ class _EditScanScreenState extends State<EditScanScreen> {
                     style: GoogleFonts.nunito(color: Colors.white70)),
                 Slider(
                   value: localContrast,
-                  min: 60,
-                  max: 190,
+                  min: 0.5,
+                  max: 2.0,
                   activeColor: AppColors.gold,
                   thumbColor: AppColors.gold,
                   onChanged: (v) => setLocal(() => localContrast = v),
+                ),
+                Text('Color',
+                    style: GoogleFonts.nunito(color: Colors.white70)),
+                Slider(
+                  value: localSaturation,
+                  min: 0.0,
+                  max: 2.0,
+                  activeColor: AppColors.gold,
+                  thumbColor: AppColors.gold,
+                  onChanged: (v) => setLocal(() => localSaturation = v),
+                ),
+                Text('Sharp',
+                    style: GoogleFonts.nunito(color: Colors.white70)),
+                Slider(
+                  value: localSharpness,
+                  min: 0.0,
+                  max: 2.0,
+                  activeColor: AppColors.gold,
+                  thumbColor: AppColors.gold,
+                  onChanged: (v) => setLocal(() => localSharpness = v),
                 ),
                 const SizedBox(height: 8),
                 Row(
@@ -721,7 +731,9 @@ class _EditScanScreenState extends State<EditScanScreen> {
                       onPressed: () {
                         setLocal(() {
                           localBrightness = 0;
-                          localContrast = 100;
+                          localContrast = 1.0;
+                          localSaturation = 1.0;
+                          localSharpness = 0.0;
                         });
                       },
                       child: const Text('Reset'),
@@ -733,11 +745,13 @@ class _EditScanScreenState extends State<EditScanScreen> {
                         final i = _currentPage;
                         setState(() => _isProcessing = true);
                         try {
-                          final out = await ImageProcessingService.instance
-                              .applyBrightnessContrast(
-                            imagePath: _pages[i],
-                            brightness: localBrightness,
+                          final out = await PhotoEnhancementService.instance
+                              .applyManual(
+                            _originalPages[i],
+                            brightness: 1.0 + localBrightness,
                             contrast: localContrast,
+                            saturation: localSaturation,
+                            sharpness: localSharpness,
                           );
                           if (!mounted) return;
                           FileImage(File(_pages[i])).evict();
@@ -1124,6 +1138,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
       final thumbPath =
           await PdfService.instance.generateThumbnail(pagesToSave[0]);
       final fileSizeMB = await PdfService.instance.getFileSizeMB(filePath);
+      final cloudBackupEnabled = AppLocalStorage.getBool('cloudBackupEnabled');
 
       final doc = DocumentModel(
         name: docName,
@@ -1135,9 +1150,13 @@ class _EditScanScreenState extends State<EditScanScreen> {
         createdAt: DateTime.now(),
         thumbnailPath: thumbPath,
         tags: List<String>.from(_saveDraftTags),
+        syncStatus: cloudBackupEnabled ? 'queued_for_upload' : 'local_only',
       );
 
       final id = await DatabaseService.instance.insertDocument(doc);
+      if (doc.syncStatus == 'queued_for_upload') {
+        unawaited(CloudBackupService.instance.syncPendingUploads());
+      }
       await AppLocalStorage.setString('lastSavedDocName', docName);
       final saved = doc.copyWith(id: id);
       _scheduleOcrIndex(id, pagesToSave);
@@ -1535,12 +1554,28 @@ class _EditScanScreenState extends State<EditScanScreen> {
                 child: Container(
                   padding: const EdgeInsets.all(7),
                   decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.08),
+                    gradient: const LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [Color(0xFFFFE082), AppColors.gold],
+                    ),
                     borderRadius: BorderRadius.circular(10),
-                    border: Border.all(color: Colors.white24),
+                    border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.75),
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.gold.withValues(alpha: 0.35),
+                        blurRadius: 10,
+                        offset: const Offset(0, 3),
+                      ),
+                    ],
                   ),
-                  child:
-                      Icon(Icons.add_rounded, color: Colors.white70, size: 18),
+                  child: const Icon(
+                    Icons.add_rounded,
+                    color: AppColors.navyDark,
+                    size: 18,
+                  ),
                 ),
               ),
             ],
@@ -1760,35 +1795,21 @@ class _EditScanScreenState extends State<EditScanScreen> {
                   _editTool(Iconsax.scan, 'Deskew', _openDeskew,
                       color: AppColors.gold),
                   _editTool(Iconsax.rotate_left, 'Rotate', _showRotateOptions),
-                  // ← Filters button: opens AdvancedFiltersScreen
-                  _editTool(Iconsax.filter, 'Filters', _openFilters,
+                  _editTool(Iconsax.filter, 'Adjust', _openToneAdjustSheet,
                       color: AppColors.gold),
-                  _editTool(Iconsax.sun_1, 'Tone', _openToneAdjustSheet,
-                      color: AppColors.gold),
-                  if (widget.scanType == 'document') ...[
-                    _editTool(
-                      Iconsax.magic_star,
-                      'Magic',
-                      _documentMagicColor,
-                      color: const Color(0xFF22C55E),
-                    ),
-                    _editTool(
-                      Iconsax.document_text,
-                      'B & W',
-                      _documentBlackAndWhite,
-                      color: const Color(0xFF94A3B8),
-                    ),
-                  ],
                   _editTool(Iconsax.clock, 'Timestamp', _addTimestamp),
-                  _editTool(Iconsax.text, 'Extract', _extractText),
+                  if (_canShowExtractTextTool())
+                    _editTool(Iconsax.text, 'Extract', _extractText),
                   _editTool(Iconsax.eraser, 'Erase', _showEraseOptions),
                   _editTool(Iconsax.pen_add, 'Sign', _addSignature),
                   _editTool(Iconsax.note_text, 'Annotate', _openAnnotate,
                       color: AppColors.orange),
-                  _editTool(Iconsax.shield_tick, 'Watermark', _addWatermarkText,
-                      color: AppColors.blue),
-                  _editTool(Iconsax.eraser, 'Remove WM', _removeWatermarkTool,
-                      color: AppColors.gold),
+                  if (_canShowWatermarkTools()) ...[
+                    _editTool(Iconsax.shield_tick, 'Watermark', _addWatermarkText,
+                        color: AppColors.blue),
+                    _editTool(Iconsax.eraser, 'Remove WM', _removeWatermarkTool,
+                        color: AppColors.gold),
+                  ],
                   if (_pages.length > 1)
                     _editTool(Iconsax.sort, 'Reorder', _openReorderPages,
                         color: AppColors.green),
@@ -1898,6 +1919,45 @@ class _EditScanScreenState extends State<EditScanScreen> {
   Widget _quickFilterBar() {
     Widget chip(String id, String label) {
       final selected = _selectedQuickFilter == id;
+      Color tintColor;
+      switch (id) {
+        case 'auto':
+          tintColor = const Color(0xFFFFD54F);
+          break;
+        case 'sharp':
+          tintColor = const Color(0xFF60A5FA);
+          break;
+        case 'magic':
+          tintColor = const Color(0xFF4FC3F7);
+          break;
+        case 'bw':
+          tintColor = const Color(0xFFB0BEC5);
+          break;
+        case 'gray':
+          tintColor = const Color(0xFF9E9E9E);
+          break;
+        case 'sepia':
+          tintColor = const Color(0xFFA1887F);
+          break;
+        case 'vivid':
+          tintColor = const Color(0xFFFF8A65);
+          break;
+        case 'soft':
+          tintColor = const Color(0xFFCE93D8);
+          break;
+        case 'cool':
+          tintColor = const Color(0xFF80DEEA);
+          break;
+        case 'warm':
+          tintColor = const Color(0xFFEF9A9A);
+          break;
+        case 'invert':
+          tintColor = const Color(0xFF9FA8DA);
+          break;
+        case 'original':
+        default:
+          tintColor = Colors.transparent;
+      }
       return Padding(
         padding: const EdgeInsets.only(right: 8),
         child: InkWell(
@@ -1905,8 +1965,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
           borderRadius: BorderRadius.circular(16),
           child: AnimatedContainer(
             duration: const Duration(milliseconds: 180),
-            width: 68,
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 7),
+            width: 98,
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 7),
             decoration: BoxDecoration(
               color: selected
                   ? AppColors.gold.withValues(alpha: 0.2)
@@ -1920,15 +1980,27 @@ class _EditScanScreenState extends State<EditScanScreen> {
             child: Column(
               mainAxisSize: MainAxisSize.min,
               children: [
-                Container(
-                  width: 40,
-                  height: 24,
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.06),
-                    borderRadius: BorderRadius.circular(8),
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(8),
+                  child: Stack(
+                    children: [
+                      Image.file(
+                        File(_originalPages[_currentPage]),
+                        width: 72,
+                        height: 46,
+                        fit: BoxFit.cover,
+                        filterQuality: FilterQuality.low,
+                      ),
+                      if (id != 'original')
+                        Positioned.fill(
+                          child: Container(
+                            color: tintColor.withValues(
+                              alpha: id == 'bw' || id == 'gray' ? 0.28 : 0.22,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-                  child: const Icon(Iconsax.image,
-                      color: Colors.white70, size: 12),
                 ),
                 const SizedBox(height: 4),
                 Text(
@@ -1961,9 +2033,16 @@ class _EditScanScreenState extends State<EditScanScreen> {
         child: Row(
           children: [
             chip('auto', 'Auto'),
+            chip('sharp', 'Sharp'),
             chip('magic', 'Magic'),
             chip('bw', 'B&W'),
             chip('gray', 'Grey'),
+            chip('sepia', 'Sepia'),
+            chip('vivid', 'Vivid'),
+            chip('soft', 'Soft'),
+            chip('cool', 'Cool'),
+            chip('warm', 'Warm'),
+            chip('invert', 'Invert'),
             chip('original', 'Original'),
           ],
         ),

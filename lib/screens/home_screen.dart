@@ -7,8 +7,11 @@ import 'package:iconsax/iconsax.dart';
 import 'package:intl/intl.dart';
 import '../theme.dart';
 import '../models/document_model.dart';
+import '../services/app_local_storage.dart';
+import '../services/cloud_backup_service.dart';
 import '../services/database_service.dart';
 import '../services/pdf_service.dart';
+import '../services/storage_monitor_service.dart';
 import 'scan_screen.dart';
 import 'smart_gallery_screen.dart';
 import 'search_screen.dart';
@@ -40,6 +43,12 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _loadRecentDocs();
+    if (AppLocalStorage.getBool('cloudBackupEnabled')) {
+      CloudBackupService.instance.syncPendingUploads();
+    }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkStorageLimitWarning();
+    });
   }
 
   Future<void> _loadRecentDocs() async {
@@ -47,6 +56,64 @@ class _HomeScreenState extends State<HomeScreen> {
     if (mounted) {
       setState(() => _recentDocs = docs);
     }
+  }
+
+  Future<void> _checkStorageLimitWarning() async {
+    final cloudBackupEnabled = AppLocalStorage.getBool('cloudBackupEnabled');
+    if (cloudBackupEnabled) return;
+    if (!StorageMonitorService.instance.shouldShowWarningNow()) return;
+
+    final usage = await StorageMonitorService.instance.getUsage();
+    if (!mounted || !usage.nearLimit) return;
+
+    await StorageMonitorService.instance.markWarningShownNow();
+    if (!mounted) return;
+
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text(
+          'Storage almost full',
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+        ),
+        content: Text(
+          'Aapka local data ${usage.usedMb.toStringAsFixed(0)} MB tak pohanch gaya hai. '
+          'Loss se bachne ke liye Cloud Backup on kar den.',
+          style: GoogleFonts.nunito(height: 1.45),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Later'),
+          ),
+          ElevatedButton(
+            style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
+            onPressed: () {
+              AppLocalStorage.setBool('cloudBackupEnabled', true);
+              CloudBackupService.instance.syncPendingUploads();
+              Navigator.pop(ctx);
+              _openTab(3); // open settings tab
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text(
+                      'Cloud backup enabled. Configure Supabase keys in launch args.',
+                    ),
+                  ),
+                );
+              }
+            },
+            child: Text(
+              'Keep Data Online',
+              style: GoogleFonts.nunito(
+                color: AppColors.navyDark,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _openScanScreen({String scanType = 'document'}) {
@@ -312,7 +379,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
             const SizedBox(height: 20),
 
-            // Scan type grid — 2 rows of 4
+            // Scan type grid — 2 rows of 5
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: LayoutBuilder(
@@ -373,9 +440,23 @@ class _HomeScreenState extends State<HomeScreen> {
                         width: tileWidth,
                       ),
                       _scanTile(
+                        Iconsax.personalcard,
+                        'Passport',
+                        'passport',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
+                      _scanTile(
                         Iconsax.text_block,
                         'Whiteboard',
                         'whiteboard',
+                        AppColors.gold,
+                        width: tileWidth,
+                      ),
+                      _scanTile(
+                        Iconsax.element_3,
+                        'Table',
+                        'table',
                         AppColors.gold,
                         width: tileWidth,
                       ),

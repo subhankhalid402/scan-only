@@ -378,8 +378,7 @@ class ImageEnhancementService {
     try {
       var image = await _load(imagePath);
       if (image == null) return imagePath;
-      image = img.contrast(image, contrast: 1.5);
-      image = img.adjustColor(image, saturation: 1.4);
+      image = _applyVivid(image);
       return await _save(image, imagePath, suffix: '_vivid');
     } catch (e) {
       print('vivid error: $e');
@@ -455,7 +454,8 @@ class ImageEnhancementService {
     try {
       var image = await _load(imagePath);
       if (image == null) return imagePath;
-      image = img.contrast(image, contrast: 2.0);
+      image = _applyDeblur(image);
+      image = img.contrast(image, contrast: 175);
       return await _save(image, imagePath, suffix: '_highcontrast');
     } catch (e) {
       print('highContrast error: $e');
@@ -467,8 +467,9 @@ class ImageEnhancementService {
     try {
       var image = await _load(imagePath);
       if (image == null) return imagePath;
-      image = img.adjustColor(image, brightness: 0.15);
-      image = img.contrast(image, contrast: 0.9);
+      image = img.adjustColor(image, brightness: 1.10, saturation: 0.88);
+      image = img.contrast(image, contrast: 116);
+      image = img.gaussianBlur(image, radius: 1);
       return await _save(image, imagePath, suffix: '_soft');
     } catch (e) {
       print('soft error: $e');

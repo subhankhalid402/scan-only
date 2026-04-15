@@ -216,32 +216,6 @@ const Map<String, List<_FilterOption>> _kModeFilters = {
   ],
 };
 
-const Map<String, List<String>> _kModeFeatures = {
-  'document': ['Auto-crop', 'Shadow remove', 'Flatten page'],
-  'id_card': ['MRZ detect', 'Glare fix', 'Straighten'],
-  'driving_license': ['DLIMS detect', 'Glare fix', 'Auto-align'],
-  'vehicle_rc': ['RC detect', 'Token tax check', 'Ownership history'],
-  'medical_prescription': [
-    'Handwriting OCR',
-    'Medicine parsing',
-    'Reminder setup'
-  ],
-  'bank_statement': ['Transaction OCR', 'IBFT/RAAST detect', 'Analytics'],
-  'academic_certificate': [
-    'HEC QR detect',
-    'Seal/watermark',
-    'Academic profile'
-  ],
-  'passport': ['MRZ extract', 'Photo page only', 'Auto-align'],
-  'receipt': ['Auto-straighten', 'Fade fix', 'Long doc mode'],
-  'book': ['Spine shadow fix', 'Page flatten', 'Dual page'],
-  'table': ['Table detect', 'Border enhance', 'OCR cells'],
-  'whiteboard': ['Glare remove', 'Perspective fix', 'Enhance text'],
-  'photo': ['HDR mode', 'Portrait', 'Full res'],
-  'gallery': ['Multi-import', 'PDF merge', 'Batch enhance'],
-  'qr': ['URL open', 'Copy code', 'Share'],
-};
-
 class _ModeContent {
   final String tip;
   final List<_ImportOption> importOptions;
@@ -862,7 +836,6 @@ class _ScanScreenState extends State<ScanScreen>
   // Mode
   late String _selectedMode;
   String _selectedFilter = 'auto';
-  bool _modeWasExplicitlySelected = false;
 
   // Scan-line animation
   late AnimationController _scanLineCtrl;
@@ -896,8 +869,6 @@ class _ScanScreenState extends State<ScanScreen>
     super.initState();
     _selectedMode =
         _kScanModeIds.contains(widget.scanType) ? widget.scanType : 'document';
-    // Show mode features on first open as well (especially default document mode).
-    _modeWasExplicitlySelected = true;
 
     if (_selectedMode == 'qr') {
       _qrController = MobileScannerController();
@@ -1060,11 +1031,6 @@ class _ScanScreenState extends State<ScanScreen>
         _captureImage(fromTimerCapture: true);
       }
     });
-  }
-
-  void _toggleTimerMode() {
-    HapticFeedback.lightImpact();
-    setState(() => _timerModeEnabled = !_timerModeEnabled);
   }
 
   Future<void> _captureImage({bool fromTimerCapture = false}) async {
@@ -1531,6 +1497,11 @@ class _ScanScreenState extends State<ScanScreen>
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (ctx) => _ImportSheet(
+        modeOptions: (_kModeContent[_selectedMode]?.importOptions ?? const []),
+        onModeOptionTap: (opt) {
+          Navigator.pop(ctx);
+          _handleImportOption(opt);
+        },
         onPickGallery: () {
           Navigator.pop(ctx);
           _pickFromGallery();
@@ -2409,7 +2380,6 @@ class _ScanScreenState extends State<ScanScreen>
       _selectedFilter = 'auto';
     });
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
-    setState(() => _modeWasExplicitlySelected = true);
   }
 
   @override
@@ -2703,6 +2673,7 @@ class _ScanScreenState extends State<ScanScreen>
       right: 16,
       child: GestureDetector(
         onTap: _proceedToEdit,
+        onLongPress: _showQuickSaveSheet,
         child: Container(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
           decoration: BoxDecoration(
@@ -2938,6 +2909,8 @@ class _ScanScreenState extends State<ScanScreen>
                   _buildModeSelector(),
 
                   const SizedBox(height: 8),
+                  _buildModeFeaturesPanel(),
+                  const SizedBox(height: 4),
 
                   // Shutter row
                   _buildShutterRow(),
@@ -3186,6 +3159,7 @@ class _ScanScreenState extends State<ScanScreen>
       if (f.existsSync()) {
         return GestureDetector(
           onTap: _showImportSheet,
+          onLongPress: () => _previewCapturedPage(_capturedPages.length - 1),
           child: Container(
             width: 52,
             height: 52,
@@ -3317,56 +3291,6 @@ class _ScanScreenState extends State<ScanScreen>
       default:
         return 'Align inside frame';
     }
-  }
-
-  void _confirmRemoveThumbnail(int index) {
-    HapticFeedback.mediumImpact();
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: const Color(0xFF1A2A40),
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: Text(
-          'Remove page?',
-          style: GoogleFonts.nunito(
-            color: Colors.white,
-            fontWeight: FontWeight.w800,
-          ),
-        ),
-        content: Text(
-          'Page ${index + 1} will be removed from this scan.',
-          style: GoogleFonts.nunito(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(
-              'Cancel',
-              style: GoogleFonts.nunito(color: Colors.white54),
-            ),
-          ),
-          ElevatedButton(
-            style: ElevatedButton.styleFrom(
-              backgroundColor: AppColors.gold,
-              shape: RoundedRectangleBorder(
-                borderRadius: BorderRadius.circular(10),
-              ),
-            ),
-            onPressed: () {
-              Navigator.pop(ctx);
-              setState(() => _capturedPages.removeAt(index));
-            },
-            child: Text(
-              'Remove',
-              style: GoogleFonts.nunito(
-                color: AppColors.navyDark,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 
   IconData _flashIcon() {
@@ -3654,12 +3578,16 @@ class _ScanFramePainter extends CustomPainter {
 }
 
 class _ImportSheet extends StatelessWidget {
+  final List<_ImportOption> modeOptions;
+  final void Function(_ImportOption opt)? onModeOptionTap;
   final VoidCallback onPickGallery;
   final VoidCallback onPickFiles;
   final VoidCallback onPickCamera;
   final VoidCallback onScanFromAlbum;
 
   const _ImportSheet({
+    this.modeOptions = const [],
+    this.onModeOptionTap,
     required this.onPickGallery,
     required this.onPickFiles,
     required this.onPickCamera,
@@ -3752,6 +3680,19 @@ class _ImportSheet extends StatelessWidget {
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
               child: Column(
                 children: [
+                  if (modeOptions.isNotEmpty) ...[
+                    for (final opt in modeOptions.take(3)) ...[
+                      _listRow(
+                        context: context,
+                        icon: opt.icon,
+                        label: opt.label,
+                        sub: 'Mode option',
+                        color: const Color(0xFFD4A017),
+                        onTap: () => onModeOptionTap?.call(opt),
+                      ),
+                      const SizedBox(height: 8),
+                    ],
+                  ],
                   _listRow(
                     context: context,
                     icon: Icons.cloud_download_outlined,

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_theme_controller.dart';
 import 'services/app_local_storage.dart';
+import 'services/supabase_service.dart';
 import 'theme.dart';
 import 'screens/splash_screen.dart';
 import 'widgets/app_lifecycle_lock.dart';
@@ -21,6 +22,17 @@ void main() async {
 
   await AppLocalStorage.init();
   await AppThemeController.init();
+  await SupabaseService.init(
+    url: const String.fromEnvironment(
+      'SUPABASE_URL',
+      defaultValue: 'https://aowgmjiezwydhluigkuc.supabase.co',
+    ),
+    anonKey: const String.fromEnvironment(
+      'SUPABASE_ANON_KEY',
+      defaultValue:
+          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvd2dtamllend5ZGhsdWlna3VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMzcwNDYsImV4cCI6MjA5MTgxMzA0Nn0.Ek-gst2tcNLoppK6LHpx8SrVt4gqm1nm07o_mgOmSGw',
+    ),
+  );
 
   const channel = MethodChannel('scanonly/openwith');
   String? initialSharedFile;

@@ -22,7 +22,7 @@ class DatabaseService {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 2,
+      version: 3,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -43,13 +43,26 @@ class DatabaseService {
         isFavorite INTEGER NOT NULL DEFAULT 0,
         thumbnailPath TEXT,
         ocrText TEXT,
-        tags TEXT
+        tags TEXT,
+        syncStatus TEXT NOT NULL DEFAULT 'local_only',
+        cloudPath TEXT,
+        cloudUpdatedAt TEXT
       )
     ''');
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
-    // Handle future migrations here
+    if (oldVersion < 3) {
+      await db.execute(
+        "ALTER TABLE documents ADD COLUMN syncStatus TEXT NOT NULL DEFAULT 'local_only'",
+      );
+      await db.execute(
+        'ALTER TABLE documents ADD COLUMN cloudPath TEXT',
+      );
+      await db.execute(
+        'ALTER TABLE documents ADD COLUMN cloudUpdatedAt TEXT',
+      );
+    }
   }
 
   Future<int> insertDocument(DocumentModel doc) async {
@@ -119,6 +132,17 @@ class DatabaseService {
     return result.map((map) => DocumentModel.fromMap(map)).toList();
   }
 
+  Future<List<DocumentModel>> getBySyncStatus(String syncStatus) async {
+    final db = await instance.database;
+    final result = await db.query(
+      'documents',
+      where: 'syncStatus = ?',
+      whereArgs: [syncStatus],
+      orderBy: 'createdAt ASC',
+    );
+    return result.map((map) => DocumentModel.fromMap(map)).toList();
+  }
+
   Future<int> updateDocument(DocumentModel doc) async {
     final db = await instance.database;
     return await db.update(
@@ -173,6 +197,25 @@ class DatabaseService {
     return await db.update(
       'documents',
       {'thumbnailPath': thumbnailPath},
+      where: 'id = ?',
+      whereArgs: [id],
+    );
+  }
+
+  Future<int> updateCloudSyncFields({
+    required int id,
+    required String syncStatus,
+    String? cloudPath,
+  }) async {
+    final db = await instance.database;
+    return await db.update(
+      'documents',
+      {
+        'syncStatus': syncStatus,
+        'cloudPath': cloudPath,
+        'cloudUpdatedAt': DateTime.now().toIso8601String(),
+        'modifiedAt': DateTime.now().toIso8601String(),
+      },
       where: 'id = ?',
       whereArgs: [id],
     );

@@ -12,6 +12,9 @@ class DocumentModel {
   final String? thumbnailPath;
   final String? ocrText;
   final List<String> tags;
+  final String syncStatus; // local_only, queued_for_upload, synced, upload_failed
+  final String? cloudPath;
+  final DateTime? cloudUpdatedAt;
 
   DocumentModel({
     this.id,
@@ -27,6 +30,9 @@ class DocumentModel {
     this.thumbnailPath,
     this.ocrText,
     this.tags = const [],
+    this.syncStatus = 'local_only',
+    this.cloudPath,
+    this.cloudUpdatedAt,
   });
 
   Map<String, dynamic> toMap() {
@@ -44,6 +50,9 @@ class DocumentModel {
       'thumbnailPath': thumbnailPath,
       'ocrText': ocrText,
       'tags': tags.join(','),
+      'syncStatus': syncStatus,
+      'cloudPath': cloudPath,
+      'cloudUpdatedAt': cloudUpdatedAt?.toIso8601String(),
     };
   }
 
@@ -66,6 +75,14 @@ class DocumentModel {
       tags: map['tags'] != null && map['tags'].toString().isNotEmpty
           ? map['tags'].toString().split(',')
           : [],
+      syncStatus:
+          (map['syncStatus']?.toString().isNotEmpty ?? false)
+              ? map['syncStatus'].toString()
+              : 'local_only',
+      cloudPath: map['cloudPath'],
+      cloudUpdatedAt: map['cloudUpdatedAt'] != null
+          ? DateTime.tryParse(map['cloudUpdatedAt'].toString())
+          : null,
     );
   }
 
@@ -83,6 +100,9 @@ class DocumentModel {
     String? thumbnailPath,
     String? ocrText,
     List<String>? tags,
+    String? syncStatus,
+    String? cloudPath,
+    DateTime? cloudUpdatedAt,
   }) {
     return DocumentModel(
       id: id ?? this.id,
@@ -98,6 +118,9 @@ class DocumentModel {
       thumbnailPath: thumbnailPath ?? this.thumbnailPath,
       ocrText: ocrText ?? this.ocrText,
       tags: tags ?? this.tags,
+      syncStatus: syncStatus ?? this.syncStatus,
+      cloudPath: cloudPath ?? this.cloudPath,
+      cloudUpdatedAt: cloudUpdatedAt ?? this.cloudUpdatedAt,
     );
   }
 }

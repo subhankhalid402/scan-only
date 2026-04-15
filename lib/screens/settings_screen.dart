@@ -7,8 +7,11 @@ import 'package:share_plus/share_plus.dart';
 import '../app_theme_controller.dart';
 import '../services/app_local_storage.dart';
 import '../services/biometric_service.dart';
+import '../services/cloud_backup_service.dart';
 import '../services/database_service.dart';
 import '../services/document_export_service.dart';
+import '../services/storage_monitor_service.dart';
+import '../services/supabase_service.dart';
 import '../theme.dart';
 import 'all_features_screen.dart';
 import 'onboarding_screen.dart';
@@ -39,6 +42,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _prefsLoaded = false;
   bool _biometricLock = false;
   bool _exportingZip = false;
+  bool _syncingNow = false;
+  bool _cloudBackupEnabled = false;
+  double _localWarningLimitMb = 600;
 
   static const _formats = ['PDF', 'JPG'];
 
@@ -81,6 +87,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _language =
           AppLocalStorage.getString('language', defaultValue: 'English');
       _biometricLock = bio;
+      _cloudBackupEnabled = AppLocalStorage.getBool('cloudBackupEnabled');
+      _localWarningLimitMb = StorageMonitorService.instance.warningLimitMb;
       _prefsLoaded = true;
     });
   }
@@ -335,6 +343,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   },
                 ),
                 _toggleTile(
+                  icon: Iconsax.cloud,
+                  color: AppColors.blue,
+                  title: 'Cloud Backup (Supabase)',
+                  subtitle: SupabaseService.isAvailable
+                      ? 'Local save ke baad cloud backup queue karein'
+                      : 'Supabase keys missing — toggle disabled',
+                  value: _cloudBackupEnabled && SupabaseService.isAvailable,
+                  onChanged: SupabaseService.isAvailable
+                      ? (v) {
+                          setState(() => _cloudBackupEnabled = v);
+                          AppLocalStorage.setBool('cloudBackupEnabled', v);
+                          if (v) {
+                            CloudBackupService.instance.syncPendingUploads();
+                          }
+                        }
+                      : (_) {},
+                ),
+                _actionTile(
+                  icon: Iconsax.refresh_circle,
+                  color: AppColors.navyMid,
+                  title: _syncingNow ? 'Syncing…' : 'Sync now',
+                  subtitle: 'Queued local files ko cloud par upload karein',
+                  onTap: _syncingNow ? () {} : _syncNow,
+                ),
+                _toggleTile(
                   icon: Iconsax.element_3,
                   color: AppColors.blue,
                   title: 'Grid View',
@@ -434,6 +467,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 // ── 2. Storage ────────────────────────────────
                 _sectionLabel('Storage', Iconsax.folder_2, AppColors.gold),
                 _storageTile(),
+                _tile(
+                  icon: Iconsax.notification,
+                  color: AppColors.orange,
+                  title: 'Local Storage Warning Limit',
+                  subtitle:
+                      '${_localWarningLimitMb.toStringAsFixed(0)} MB par warning dikhaye',
+                  trailing: SizedBox(
+                    width: 170,
+                    child: Slider(
+                      value: _localWarningLimitMb,
+                      min: 200,
+                      max: 2000,
+                      divisions: 18,
+                      label: '${_localWarningLimitMb.toStringAsFixed(0)} MB',
+                      onChanged: (v) async {
+                        setState(() => _localWarningLimitMb = v);
+                        await StorageMonitorService.instance
+                            .setWarningLimitMb(v);
+                      },
+                    ),
+                  ),
+                ),
                 _actionTile(
                   icon: Iconsax.broom,
                   color: AppColors.gold,
@@ -957,6 +1012,34 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _syncNow() async {
+    if (_syncingNow) return;
+    if (!SupabaseService.isAvailable) {
+      _showInfo(
+        'Supabase not configured',
+        'Run app with SUPABASE_URL and SUPABASE_ANON_KEY dart-defines.',
+      );
+      return;
+    }
+    if (!_cloudBackupEnabled) {
+      _showInfo(
+        'Cloud backup is off',
+        'Enable Cloud Backup toggle first.',
+      );
+      return;
+    }
+    setState(() => _syncingNow = true);
+    try {
+      final result = await CloudBackupService.instance.syncPendingUploads();
+      if (!mounted) return;
+      _showSuccess(
+        'Sync done: ${result.uploaded} uploaded, ${result.failed} failed.',
+      );
+    } finally {
+      if (mounted) setState(() => _syncingNow = false);
+    }
   }
 
   // ── App badge ─────────────────────────────────────────────────
