@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'image_enhancement_service.dart';
 
@@ -25,7 +26,7 @@ class BatchProcessingService {
         );
         results.add(enhanced);
       } catch (e) {
-        print('Batch enhance error for $path: $e');
+        debugPrint('Batch enhance error for $path: $e');
         results.add(path); // Add original if enhancement fails
       }
     }
@@ -42,7 +43,7 @@ class BatchProcessingService {
         final grayscale = await ImageEnhancementService.instance.toGrayscale(path);
         results.add(grayscale);
       } catch (e) {
-        print('Batch grayscale error for $path: $e');
+        debugPrint('Batch grayscale error for $path: $e');
         results.add(path);
       }
     }
@@ -59,7 +60,7 @@ class BatchProcessingService {
         final rotated = await ImageEnhancementService.instance.rotate(path, degrees);
         results.add(rotated);
       } catch (e) {
-        print('Batch rotate error for $path: $e');
+        debugPrint('Batch rotate error for $path: $e');
         results.add(path);
       }
     }
@@ -91,7 +92,7 @@ class BatchProcessingService {
           results.add(path);
         }
       } catch (e) {
-        print('Batch resize error for $path: $e');
+        debugPrint('Batch resize error for $path: $e');
         results.add(path);
       }
     }
@@ -111,7 +112,7 @@ class BatchProcessingService {
         final watermarked = await _addWatermark(path, watermarkText);
         results.add(watermarked);
       } catch (e) {
-        print('Batch watermark error for $path: $e');
+        debugPrint('Batch watermark error for $path: $e');
         results.add(path);
       }
     }

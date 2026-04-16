@@ -1,4 +1,5 @@
 import 'package:google_mlkit_object_detection/google_mlkit_object_detection.dart';
+import 'package:flutter/foundation.dart';
 
 class ObjectDetectionService {
   static final ObjectDetectionService _instance = ObjectDetectionService._internal();
@@ -23,7 +24,7 @@ class ObjectDetectionService {
         ),
       );
     } catch (e) {
-      print('Object detection initialization error: $e');
+      debugPrint('Object detection initialization error: $e');
     }
   }
 

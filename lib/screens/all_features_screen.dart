@@ -24,10 +24,10 @@ import 'merge_pdfs_screen.dart';
 import 'office_export_hub_screen.dart';
 
 // ══════════════════════════════════════════════════════════════
-//  AllFeaturesScreen  –  category + horizontal tiles layout
-//  • Vertical scroll karo (page ke through)
-//  • Har category ek horizontal scrollable row hai
-//  • No deep scrolling needed — sab kuch visible aur accessible
+//  AllFeaturesScreen  -  category + feature grid layout
+//  • Vertical scrolling through sections
+//  • Each section uses a compact and readable grid
+//  • Keep all core tools visible without deep nesting
 // ══════════════════════════════════════════════════════════════
 
 class AllFeaturesScreen extends StatelessWidget {
@@ -445,7 +445,7 @@ class AllFeaturesScreen extends StatelessWidget {
     final docs = await DatabaseService.instance.getAllDocuments();
     if (!context.mounted) return;
     if (docs.isEmpty) {
-      _showInfo(context, 'Pehle koi document scan karein ya import karein.');
+      _showInfo(context, 'Please scan or import a document first.');
       return;
     }
     showModalBottomSheet<void>(
@@ -467,7 +467,7 @@ class AllFeaturesScreen extends StatelessWidget {
           ),
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('Document chunein',
+            child: Text('Select a Document',
                 style: GoogleFonts.nunito(
                     fontWeight: FontWeight.w800, fontSize: 16)),
           ),
@@ -561,10 +561,10 @@ class _CategorySection extends StatelessWidget {
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
             gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 4,
-              mainAxisSpacing: 8,
-              crossAxisSpacing: 8,
-              childAspectRatio: 0.88,
+              crossAxisCount: 3,
+              mainAxisSpacing: 10,
+              crossAxisSpacing: 10,
+              childAspectRatio: 0.90,
             ),
             itemCount: section.items.length,
             itemBuilder: (_, i) => _FeatureTile(item: section.items[i]),
@@ -631,6 +631,20 @@ class _FeatureTile extends StatelessWidget {
                   fontWeight: FontWeight.w700,
                   fontSize: 9.5,
                   color: const Color(0xFF1E2A4A),
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+            const SizedBox(height: 2),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 6),
+              child: Text(
+                item.subtitle,
+                style: GoogleFonts.nunito(
+                  fontSize: 8.5,
+                  color: AppColors.textMuted,
                 ),
                 textAlign: TextAlign.center,
                 maxLines: 2,

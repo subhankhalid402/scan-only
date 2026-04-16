@@ -144,9 +144,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _clearCache() async {
     final confirmed = await _confirm(
-      title: 'Cache Clear Karein?',
+      title: 'Clear Cache?',
       body:
-          '${_cacheSize.toStringAsFixed(1)} MB temporary files delete ho jaayengi.',
+          '${_cacheSize.toStringAsFixed(1)} MB of temporary files will be deleted.',
       confirmLabel: 'Clear',
       danger: false,
     );
@@ -163,18 +163,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
       final freed = _cacheSize;
       await _calculateStorage();
-      _showSuccess('${freed.toStringAsFixed(1)} MB cache clear ho gayi!');
+      _showSuccess('${freed.toStringAsFixed(1)} MB cache was cleared.');
     } catch (e) {
-      _showError('Cache clear nahi ho saka: $e');
+      _showError('Could not clear cache: $e');
     }
   }
 
   Future<void> _clearAllDocuments() async {
     final confirmed = await _confirm(
-      title: 'Sare Documents Delete Karein?',
+      title: 'Delete All Documents?',
       body:
-          'Yeh action undo nahi ho sakta. Library se sare scans aur database entries delete ho jaayengi.',
-      confirmLabel: 'Delete Karein',
+          'This action cannot be undone. All scans and library records will be permanently deleted.',
+      confirmLabel: 'Delete',
       danger: true,
     );
     if (!confirmed) return;
@@ -182,9 +182,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       await DatabaseService.instance.deleteAllDocumentsWithFiles();
       await _calculateStorage();
-      _showSuccess('Sare documents delete ho gaye.');
+      _showSuccess('All documents were deleted.');
     } catch (e) {
-      _showError('Delete nahi ho saka: $e');
+      _showError('Could not delete documents: $e');
     }
   }
 
@@ -208,7 +208,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   borderRadius: BorderRadius.circular(2))),
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 16),
-            child: Text('Zaban Chunein',
+            child: Text('Choose Language',
                 style: GoogleFonts.nunito(
                     fontWeight: FontWeight.w800, fontSize: 16)),
           ),
@@ -227,7 +227,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   if (!mounted) return;
                   Navigator.pop(context);
                   _showSuccess(
-                    'Zaban save ho gayi. Poori app ke liye app ek dafa band karke kholein.',
+                    'Language saved. Restart the app to apply it everywhere.',
                   );
                 },
               )),
@@ -335,7 +335,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Iconsax.magic_star,
                   color: AppColors.gold,
                   title: 'Auto Enhance',
-                  subtitle: 'Scan quality automatically improve karein',
+                  subtitle: 'Automatically improve scan quality',
                   value: _autoEnhance,
                   onChanged: (v) {
                     setState(() => _autoEnhance = v);
@@ -347,7 +347,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: AppColors.blue,
                   title: 'Cloud Backup (Supabase)',
                   subtitle: SupabaseService.isAvailable
-                      ? 'Local save ke baad cloud backup queue karein'
+                      ? 'Queue cloud backup after local save'
                       : 'Supabase keys missing — toggle disabled',
                   value: _cloudBackupEnabled && SupabaseService.isAvailable,
                   onChanged: SupabaseService.isAvailable
@@ -364,14 +364,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Iconsax.refresh_circle,
                   color: AppColors.navyMid,
                   title: _syncingNow ? 'Syncing…' : 'Sync now',
-                  subtitle: 'Queued local files ko cloud par upload karein',
+                  subtitle: 'Upload queued local files to cloud',
                   onTap: _syncingNow ? () {} : _syncNow,
                 ),
                 _toggleTile(
                   icon: Iconsax.element_3,
                   color: AppColors.blue,
                   title: 'Grid View',
-                  subtitle: 'Documents grid mein dikhao',
+                  subtitle: 'Show documents in a grid layout',
                   value: _gridView,
                   onChanged: (v) {
                     setState(() => _gridView = v);
@@ -382,7 +382,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Iconsax.document_text,
                   color: AppColors.navyMid,
                   title: 'Default Format',
-                  subtitle: 'Save format select karein',
+                  subtitle: 'Choose the default save format',
                   value: _defaultFormat,
                   options: _formats,
                   onChanged: (v) {
@@ -472,7 +472,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: AppColors.orange,
                   title: 'Local Storage Warning Limit',
                   subtitle:
-                      '${_localWarningLimitMb.toStringAsFixed(0)} MB par warning dikhaye',
+                      'Show warning at ${_localWarningLimitMb.toStringAsFixed(0)} MB',
                   trailing: SizedBox(
                     width: 170,
                     child: Slider(
@@ -502,7 +502,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Iconsax.trash,
                   color: AppColors.red,
                   title: 'Clear All Documents',
-                  subtitle: 'Sare saved documents delete karein',
+                  subtitle: 'Delete all saved documents',
                   onTap: _clearAllDocuments,
                   isDanger: true,
                 ),
@@ -516,7 +516,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   color: AppColors.navyDark,
                   title: 'Dark Mode',
                   subtitle:
-                      _darkMode ? 'Dark theme on hai' : 'Light theme on hai',
+                      _darkMode ? 'Dark theme is enabled' : 'Light theme is enabled',
                   value: _darkMode,
                   onChanged: (v) {
                     setState(() => _darkMode = v);
@@ -578,7 +578,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Privacy Policy',
                   subtitle: 'Data handling policy',
                   onTap: () => _showInfo('Privacy Policy',
-                      'Aapka data sirf aapke device pe rehta hai. Koi server pe upload nahi hota.'),
+                      'Your data stays on your device. Nothing is uploaded to external servers by default.'),
                 ),
                 _navTile(
                   icon: Iconsax.document_text,
@@ -586,7 +586,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Terms of Use',
                   subtitle: 'Usage terms',
                   onTap: () => _showInfo('Terms of Use',
-                      'Personal aur commercial use ke liye free. Redistribution allowed nahi.'),
+                      'Free for personal and commercial use. Redistribution is not allowed.'),
                 ),
 
                 const SizedBox(height: 16),
@@ -704,7 +704,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 style: GoogleFonts.nunito(
                     fontSize: 13,
                     fontWeight: FontWeight.w800,
-                    color: AppColors.navyDark.withValues(alpha: 0.7),
+                    color: AppColors.navyDark,
                     letterSpacing: 0.3)),
           ],
         ),

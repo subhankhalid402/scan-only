@@ -77,8 +77,8 @@ class _HomeScreenState extends State<HomeScreen> {
           style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
         ),
         content: Text(
-          'Aapka local data ${usage.usedMb.toStringAsFixed(0)} MB tak pohanch gaya hai. '
-          'Loss se bachne ke liye Cloud Backup on kar den.',
+          'Your local data has reached ${usage.usedMb.toStringAsFixed(0)} MB. '
+          'Enable Cloud Backup to help prevent accidental data loss.',
           style: GoogleFonts.nunito(height: 1.45),
         ),
         actions: [
@@ -377,18 +377,18 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            const SizedBox(height: 20),
+            const SizedBox(height: 14),
 
             // Scan type grid — 2 rows of 5
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
+              padding: const EdgeInsets.symmetric(horizontal: 10),
               child: LayoutBuilder(
                 builder: (context, constraints) {
-                  const spacing = 8.0;
+                  const spacing = 6.0;
                   final tileWidth = (constraints.maxWidth - (spacing * 4)) / 5;
                   return Wrap(
                     spacing: spacing,
-                    runSpacing: 12,
+                    runSpacing: 10,
                     children: [
                       _scanTile(
                         Iconsax.document_text,
@@ -526,8 +526,8 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 54,
-              height: 54,
+              width: 46,
+              height: 46,
               decoration: BoxDecoration(
                 color: Colors.white,
                 borderRadius: BorderRadius.circular(14),
@@ -539,7 +539,7 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
               ),
-              child: Icon(icon, color: color, size: 23),
+              child: Icon(icon, color: color, size: 20),
             ),
             const SizedBox(height: 5),
             Text(
@@ -654,7 +654,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return BottomAppBar(
       shape: const CircularNotchedRectangle(),
       notchMargin: 8,
-      color: Colors.white,
+      color: AppColors.navyDark,
       elevation: 16,
       padding: EdgeInsets.zero,
       child: SizedBox(
@@ -685,14 +685,14 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Icon(icon,
-                color: isActive ? AppColors.navyMid : const Color(0xFFAAAAAA),
+                color: isActive ? AppColors.gold : Colors.white54,
                 size: 22),
             const SizedBox(height: 3),
             Text(label,
                 style: GoogleFonts.nunito(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: isActive ? AppColors.navyMid : const Color(0xFFAAAAAA),
+                  color: isActive ? AppColors.gold : Colors.white54,
                 )),
           ],
         ),

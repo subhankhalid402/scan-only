@@ -164,6 +164,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
         setState(() => _doc = _doc.copyWith(ocrText: ocrText));
       }
       if (mounted) Navigator.pop(context);
+      if (!mounted) return;
 
       showDialog(
         context: context,
@@ -226,6 +227,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       _showInfo('App watermark removed.');
       return;
     }
+    if (!mounted) return;
 
     final out = await Navigator.push<String>(
       context,
@@ -309,6 +311,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
     );
     if (confirm == true && mounted) {
       await DatabaseService.instance.deleteDocument(_doc.id!);
+      if (!mounted) return;
       Navigator.pop(context);
     }
   }

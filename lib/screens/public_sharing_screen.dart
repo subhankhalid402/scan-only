@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import '../services/public_url_service.dart';
-import '../widgets/public_url_widget.dart';
 
 /// Screen to manage and share public URLs
 class PublicSharingScreen extends StatefulWidget {
@@ -46,13 +45,17 @@ class _PublicSharingScreenState extends State<PublicSharingScreen> {
     setState(() => _isLoading = true);
     try {
       final urls = await PublicUrlService.getUserPublicUrls(widget.userId);
+      if (!mounted) return;
       setState(() => _userUrls = urls);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('Error loading URLs: $e')),
       );
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

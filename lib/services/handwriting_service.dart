@@ -1,4 +1,4 @@
-import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 class HandwritingService {
@@ -24,7 +24,7 @@ class HandwritingService {
       
       return extractedText.trim();
     } catch (e) {
-      print('Handwriting Recognition Error: $e');
+      debugPrint('Handwriting Recognition Error: $e');
       return '';
     }
   }
@@ -49,7 +49,7 @@ class HandwritingService {
       
       return elementCount > 0 ? totalConfidence / elementCount : 0;
     } catch (e) {
-      print('Confidence Score Error: $e');
+      debugPrint('Confidence Score Error: $e');
       return 0;
     }
   }

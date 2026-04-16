@@ -28,7 +28,7 @@ class BackendHealthCheck {
 
     // Check 3: Test connection with a simple query
     try {
-      final response = await client.from('cloud_documents').select('id').limit(1);
+      await client.from('cloud_documents').select('id').limit(1);
       status.connectionWorking = true;
       status.message = 'Backend connection successful.';
       debugPrint('[Backend Check] Connection Working: true');

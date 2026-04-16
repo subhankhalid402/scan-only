@@ -1,4 +1,3 @@
-import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
@@ -17,7 +16,7 @@ class PdfEditingService {
   Future<String> addWatermarkToPdf(String pdfPath, String watermarkText) async {
     try {
       final file = File(pdfPath);
-      final bytes = await file.readAsBytes();
+      await file.readAsBytes();
       
       final pdf = pw.Document();
       pdf.addPage(
@@ -49,7 +48,7 @@ class PdfEditingService {
 
       for (var pdfPath in pdfPaths) {
         final file = File(pdfPath);
-        final bytes = await file.readAsBytes();
+        await file.readAsBytes();
         // Add pages from each PDF
       }
 

@@ -531,7 +531,7 @@ class _ComprehensiveFeaturesScreenState
     if (!mounted) return null;
     if (docs.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('Pehle koi document scan ya import karein',
+        content: Text('Please scan or import a document first.',
             style: GoogleFonts.nunito()),
         backgroundColor: AppColors.navyMid,
         behavior: SnackBarBehavior.floating,
@@ -549,7 +549,7 @@ class _ComprehensiveFeaturesScreenState
         children: [
           Padding(
             padding: const EdgeInsets.all(16),
-            child: Text('Document chunein',
+            child: Text('Select a Document',
                 style: GoogleFonts.nunito(
                     fontWeight: FontWeight.w800, fontSize: 16)),
           ),

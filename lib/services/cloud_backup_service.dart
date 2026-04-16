@@ -18,7 +18,7 @@ class CloudBackupService {
   CloudBackupService._();
   static final CloudBackupService instance = CloudBackupService._();
 
-  static const String bucketName = 'scan-olny';
+  static const String bucketName = 'scan-only';
   bool _running = false;
 
   Future<CloudSyncResult> syncPendingUploads() async {

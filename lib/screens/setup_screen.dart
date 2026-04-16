@@ -14,7 +14,7 @@ class SetupScreen extends StatefulWidget {
 class _SetupScreenState extends State<SetupScreen> {
   String _status = 'Ready to test...';
   bool _isLoading = false;
-  List<String> _logs = [];
+  final List<String> _logs = [];
 
   void _addLog(String message) {
     setState(() {
@@ -64,7 +64,7 @@ class _SetupScreenState extends State<SetupScreen> {
       }
 
       // Final status
-      _addLog('\n' + ('=' * 50));
+      _addLog('\n${'=' * 50}');
       if (status.isHealthy) {
         _addLog('✅ Backend is HEALTHY and ready to use!');
         setState(() => _status = 'Connected ✅');
@@ -173,8 +173,8 @@ class _SetupScreenState extends State<SetupScreen> {
                       _status.contains('✅')
                           ? Icons.check_circle
                           : _status.contains('Error')
-                              ? Icons.error_circle
-                              : Icons.info_circle,
+                              ? Icons.error_outline
+                              : Icons.info_outline,
                       color: _status.contains('✅')
                           ? Colors.green
                           : _status.contains('Error')

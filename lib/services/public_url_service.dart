@@ -5,7 +5,7 @@ import 'supabase_service.dart';
 class PublicUrlService {
   PublicUrlService._();
 
-  static const String bucketName = 'scan-olny';
+  static const String bucketName = 'scan-only';
   static const String baseUrl = 'https://aowgmjiezwydhluigkuc.supabase.co/storage/v1/object/public';
 
   /// Generate public URL for a document

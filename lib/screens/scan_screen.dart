@@ -53,12 +53,6 @@ class _ScanMode {
   });
 }
 
-class _FilterOption {
-  final String id;
-  final String label;
-  const _FilterOption({required this.id, required this.label});
-}
-
 /// All capture modes (horizontal scroll).
 const List<_ScanMode> _kScanModes = [
   _ScanMode(
@@ -113,108 +107,6 @@ const List<_ScanMode> _kScanModes = [
 ];
 
 Set<String> get _kScanModeIds => _kScanModes.map((m) => m.id).toSet();
-
-const Map<String, List<_FilterOption>> _kModeFilters = {
-  'document': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'color', label: 'Color'),
-    _FilterOption(id: 'grayscale', label: 'Grayscale'),
-    _FilterOption(id: 'whitening', label: 'Whitening'),
-    _FilterOption(id: 'none', label: 'No Filter'),
-  ],
-  'id_card': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'color', label: 'Color'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'id_clear', label: 'ID Clear'),
-    _FilterOption(id: 'enhanced', label: 'Enhanced'),
-  ],
-  'driving_license': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'color', label: 'Color'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'id_clear', label: 'Glare Fix'),
-    _FilterOption(id: 'enhanced', label: 'Enhanced'),
-  ],
-  'vehicle_rc': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'color', label: 'Color'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'contrast', label: 'High Contrast'),
-    _FilterOption(id: 'enhanced', label: 'Enhanced'),
-  ],
-  'medical_prescription': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'contrast', label: 'High Contrast'),
-    _FilterOption(id: 'thermal', label: 'Text Boost'),
-    _FilterOption(id: 'enhanced', label: 'Enhanced'),
-  ],
-  'bank_statement': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'contrast', label: 'High Contrast'),
-    _FilterOption(id: 'thermal', label: 'Text Boost'),
-    _FilterOption(id: 'enhanced', label: 'Enhanced'),
-  ],
-  'academic_certificate': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'color', label: 'Color'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'contrast', label: 'High Contrast'),
-    _FilterOption(id: 'enhanced', label: 'Enhanced'),
-  ],
-  'passport': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'color', label: 'Color'),
-    _FilterOption(id: 'id_clear', label: 'ID Clear'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'mrz', label: 'MRZ Boost'),
-  ],
-  'receipt': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'contrast', label: 'High Contrast'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'thermal', label: 'Thermal'),
-    _FilterOption(id: 'brighten', label: 'Brighten'),
-  ],
-  'book': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'flatten', label: 'Flatten'),
-    _FilterOption(id: 'warm', label: 'Warm'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'deblur', label: 'Deblur'),
-  ],
-  'table': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'color', label: 'Color'),
-    _FilterOption(id: 'contrast', label: 'High Contrast'),
-    _FilterOption(id: 'grid', label: 'Grid View'),
-  ],
-  'whiteboard': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'whitening', label: 'Whitening'),
-    _FilterOption(id: 'contrast', label: 'High Contrast'),
-    _FilterOption(id: 'color', label: 'Color'),
-  ],
-  'photo': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'vivid', label: 'Vivid'),
-    _FilterOption(id: 'warm', label: 'Warm'),
-    _FilterOption(id: 'cool', label: 'Cool'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-  ],
-  'gallery': [
-    _FilterOption(id: 'auto', label: 'Auto'),
-    _FilterOption(id: 'color', label: 'Color'),
-    _FilterOption(id: 'bw', label: 'B&W'),
-    _FilterOption(id: 'grayscale', label: 'Grayscale'),
-  ],
-  'qr': [
-    _FilterOption(id: 'auto', label: 'Auto Detect'),
-  ],
-};
 
 class _ModeContent {
   final String tip;
@@ -857,7 +749,7 @@ class _ScanScreenState extends State<ScanScreen>
   bool _showFocusRing = false;
   Timer? _focusRingTimer;
 
-  bool _timerModeEnabled = false;
+  final bool _timerModeEnabled = false;
   int _timerCountdown = 0;
   Timer? _countdownTimer;
   String? _pendingFeatureAction;
@@ -1327,7 +1219,7 @@ class _ScanScreenState extends State<ScanScreen>
       if (mounted) setState(() => _isCameraReady = false);
     }
     if (!mounted) return null;
-    final result = await Navigator.push<T>(this.context, route);
+    final result = await Navigator.push<T>(context, route);
     if (mounted && shouldResume) {
       await _bootstrapCamera();
     }
@@ -2749,53 +2641,7 @@ class _ScanScreenState extends State<ScanScreen>
         children: [
           const SizedBox(height: 10),
 
-          // ── Filter chips row
-          SizedBox(
-            height: 34,
-            child: ListView.separated(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              itemCount: (_kModeFilters[_selectedMode] ?? []).length,
-              separatorBuilder: (_, __) => const SizedBox(width: 8),
-              itemBuilder: (context, i) {
-                final filters = _kModeFilters[_selectedMode] ?? [];
-                final f = filters[i];
-                final isSelected = _selectedFilter == f.id;
-                return GestureDetector(
-                  onTap: () {
-                    HapticFeedback.selectionClick();
-                    setState(() => _selectedFilter = f.id);
-                  },
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 180),
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? modeColor.withOpacity(0.18)
-                          : Colors.white.withOpacity(0.07),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: isSelected ? modeColor : Colors.white24,
-                        width: isSelected ? 1.5 : 1.0,
-                      ),
-                    ),
-                    child: Text(
-                      f.label,
-                      style: GoogleFonts.nunito(
-                        fontSize: 11,
-                        fontWeight:
-                            isSelected ? FontWeight.w700 : FontWeight.w500,
-                        color: isSelected ? modeColor : Colors.white54,
-                      ),
-                    ),
-                  ),
-                );
-              },
-            ),
-          ),
-
-          const SizedBox(height: 10),
+          const SizedBox(height: 6),
 
           // ── Feature chips row
           SizedBox(

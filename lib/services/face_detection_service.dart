@@ -1,6 +1,4 @@
 import 'package:google_mlkit_face_detection/google_mlkit_face_detection.dart';
-import 'package:image/image.dart' as img;
-import 'dart:io';
 
 class FaceDetectionService {
   static final FaceDetectionService _instance = FaceDetectionService._internal();

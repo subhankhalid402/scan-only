@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:path_provider/path_provider.dart';
-import 'package:path/path.dart' as pathLib;
+import 'package:path/path.dart' as path_lib;
 import 'package:intl/intl.dart';
 import 'package:image/image.dart' as img;
 import 'package:pdfx/pdfx.dart' as pdfx;
@@ -154,7 +154,7 @@ class PdfService {
   }
 
   static String _pdfNameStem(String displayName) {
-    var stem = pathLib.basenameWithoutExtension(displayName);
+    var stem = path_lib.basenameWithoutExtension(displayName);
     stem = stem.replaceAll(RegExp(r'[^\w\-\s\(\)]'), '_').trim();
     if (stem.isEmpty) stem = 'Scan';
     return stem;
@@ -262,13 +262,13 @@ class PdfService {
       final thumbDir = Directory('${outputDir.path}/ScanOnly/Thumbnails');
       await thumbDir.create(recursive: true);
 
-      final fileName = pathLib.basenameWithoutExtension(imagePath);
+      final fileName = path_lib.basenameWithoutExtension(imagePath);
       final thumbPath = '${thumbDir.path}/${fileName}_thumb.jpg';
 
       await File(thumbPath).writeAsBytes(thumbBytes);
       return thumbPath;
     } catch (e) {
-      print('Thumbnail error: $e');
+      debugPrint('Thumbnail error: $e');
       return null;
     }
   }

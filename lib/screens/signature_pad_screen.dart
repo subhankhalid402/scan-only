@@ -80,7 +80,7 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
   // ── Preview dialog ────────────────────────────────────────────
   Future<void> _previewAndSave() async {
     if (!_hasStrokes) {
-      _showError('Pehle signature draw karein');
+      _showError('Please draw a signature first.');
       return;
     }
     final bytes = await _captureSignatureBytes();
@@ -121,7 +121,7 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
                             borderRadius: BorderRadius.circular(12)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: Text('Dobara Draw',
+                      child: Text('Draw Again',
                           style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
                     ),
                   ),
@@ -136,7 +136,7 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
                             borderRadius: BorderRadius.circular(12)),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: Text('Save Karein',
+                      child: Text('Save Signature',
                           style: GoogleFonts.nunito(
                               fontWeight: FontWeight.w800, color: Colors.white)),
                     ),
@@ -168,11 +168,11 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
       }
 
       if (mounted) {
-        _showSuccess('Signature save ho gayi!');
+        _showSuccess('Signature saved successfully.');
         Navigator.pop(context, signaturePath);
       }
     } catch (e) {
-      _showError('Save nahi ho saka: $e');
+      _showError('Could not save signature: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -224,7 +224,7 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
                         Icon(Iconsax.edit, size: 13,
                             color: AppColors.textMuted),
                         const SizedBox(width: 5),
-                        Text('Neeche signature draw karein',
+                        Text('Draw your signature below',
                             style: GoogleFonts.nunito(
                                 fontSize: 11, color: AppColors.textMuted)),
                       ],

@@ -176,32 +176,22 @@ class _Preset {
   final IconData icon;
   final Color color;
   final String? quickMode;
-  final double brightness;
-  final double contrast;
-  final double saturation;
-  final double sharpness;
-  final bool grayscale;
-  final bool blackWhite;
-  final bool sepia;
-  final bool invert;
-  final bool cool;
-  final bool warm;
+  final double brightness = 0;
+  final double contrast = 1.0;
+  final double saturation = 1.0;
+  final double sharpness = 0;
+  final bool grayscale = false;
+  final bool blackWhite = false;
+  final bool sepia = false;
+  final bool invert = false;
+  final bool cool = false;
+  final bool warm = false;
 
   const _Preset({
     required this.name,
     required this.icon,
     required this.color,
     this.quickMode,
-    this.brightness = 0,
-    this.contrast = 1.0,
-    this.saturation = 1.0,
-    this.sharpness = 0,
-    this.grayscale = false,
-    this.blackWhite = false,
-    this.sepia = false,
-    this.invert = false,
-    this.cool = false,
-    this.warm = false,
   });
 }
 

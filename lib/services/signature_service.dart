@@ -1,5 +1,5 @@
 import 'dart:io';
-import 'dart:typed_data';
+import 'package:flutter/foundation.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 import 'package:path/path.dart' as path;
@@ -42,7 +42,7 @@ class SignatureService {
       final signedPath = await _saveSignedImage(image, imagePath);
       return signedPath;
     } catch (e) {
-      print('Signature Error: $e');
+      debugPrint('Signature Error: $e');
       return imagePath;
     }
   }
@@ -57,7 +57,7 @@ class SignatureService {
       await file.writeAsBytes(signatureBytes);
       return filePath;
     } catch (e) {
-      print('Save Signature Error: $e');
+      debugPrint('Save Signature Error: $e');
       return '';
     }
   }
@@ -71,7 +71,7 @@ class SignatureService {
       }
       return null;
     } catch (e) {
-      print('Load Signature Error: $e');
+      debugPrint('Load Signature Error: $e');
       return null;
     }
   }
@@ -86,7 +86,7 @@ class SignatureService {
           .map((f) => f.path)
           .toList();
     } catch (e) {
-      print('Get Signatures Error: $e');
+      debugPrint('Get Signatures Error: $e');
       return [];
     }
   }
@@ -101,7 +101,7 @@ class SignatureService {
       }
       return false;
     } catch (e) {
-      print('Delete Signature Error: $e');
+      debugPrint('Delete Signature Error: $e');
       return false;
     }
   }

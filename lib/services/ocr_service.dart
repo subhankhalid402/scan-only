@@ -1,4 +1,5 @@
 import 'dart:ui' show Rect;
+import 'package:flutter/foundation.dart';
 import 'package:google_mlkit_text_recognition/google_mlkit_text_recognition.dart';
 
 class OcrTextLine {
@@ -45,7 +46,7 @@ class OcrService {
       }
       return boxes;
     } catch (e) {
-      print('OCR boxes error: $e');
+      debugPrint('OCR boxes error: $e');
       return [];
     }
   }
@@ -65,7 +66,7 @@ class OcrService {
 
       return extractedText.trim();
     } catch (e) {
-      print('OCR Error: $e');
+      debugPrint('OCR Error: $e');
       return '';
     }
   }
@@ -96,7 +97,7 @@ class OcrService {
       }
       return out;
     } catch (e) {
-      print('OCR lines error: $e');
+      debugPrint('OCR lines error: $e');
       return const [];
     }
   }
@@ -120,7 +121,7 @@ class OcrService {
           ? 'No text detected. Try better lighting.'
           : extractedText.trim();
     } catch (e) {
-      print('Urdu OCR Error: $e');
+      debugPrint('Urdu OCR Error: $e');
       return '';
     }
   }
@@ -156,7 +157,7 @@ class OcrService {
             .fold(0, (sum, b) => sum + b.lines.length),
       };
     } catch (e) {
-      print('OCR Details Error: $e');
+      debugPrint('OCR Details Error: $e');
       return {'text': '', 'confidence': 0.0, 'wordCount': 0, 'lineCount': 0};
     }
   }
@@ -174,7 +175,7 @@ class OcrService {
       }
       return text.trim();
     } catch (e) {
-      print('Chinese OCR Error: $e');
+      debugPrint('Chinese OCR Error: $e');
       return '';
     }
   }

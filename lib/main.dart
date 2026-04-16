@@ -25,12 +25,11 @@ void main() async {
   await SupabaseService.init(
     url: const String.fromEnvironment(
       'SUPABASE_URL',
-      defaultValue: 'https://aowgmjiezwydhluigkuc.supabase.co',
+      defaultValue: '',
     ),
     anonKey: const String.fromEnvironment(
       'SUPABASE_ANON_KEY',
-      defaultValue:
-          'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvd2dtamllend5ZGhsdWlna3VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMzcwNDYsImV4cCI6MjA5MTgxMzA0Nn0.Ek-gst2tcNLoppK6LHpx8SrVt4gqm1nm07o_mgOmSGw',
+      defaultValue: '',
     ),
   );
 

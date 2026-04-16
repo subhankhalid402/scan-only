@@ -70,6 +70,7 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
         fileName: widget.fileName,
       );
 
+      if (!mounted) return;
       if (success) {
         _showSuccess('Email sent successfully');
         Navigator.pop(context);
@@ -77,9 +78,12 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
         _showError('Failed to send email');
       }
     } catch (e) {
+      if (!mounted) return;
       _showError('Error: $e');
     } finally {
-      setState(() => _isSharing = false);
+      if (mounted) {
+        setState(() => _isSharing = false);
+      }
     }
   }
 
@@ -209,12 +213,6 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
   void _showSuccess(String msg) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(msg), backgroundColor: AppColors.green),
-    );
-  }
-
-  void _showInfo(String msg) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(msg), backgroundColor: AppColors.blue),
     );
   }
 

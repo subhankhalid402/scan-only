@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:file_picker/file_picker.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:path_provider/path_provider.dart';
@@ -7,10 +8,6 @@ class FileManagerService {
   static final FileManagerService instance = FileManagerService._init();
   FileManagerService._init();
 
-  static const _docExtensions = [
-    'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx', 'txt'
-  ];
-  static const _imgExtensions = ['jpg', 'jpeg', 'png'];
   static const _allExtensions = [
     'pdf', 'doc', 'docx', 'xls', 'xlsx', 'ppt', 'pptx',
     'jpg', 'jpeg', 'png', 'txt'
@@ -26,7 +23,7 @@ class FileManagerService {
       );
       return result?.files.firstOrNull?.path;
     } catch (e) {
-      print('pickDocument error: $e');
+      debugPrint('pickDocument error: $e');
       return null;
     }
   }
@@ -54,7 +51,7 @@ class FileManagerService {
 
       return paths;
     } catch (e) {
-      print('pickMultipleDocuments error: $e');
+      debugPrint('pickMultipleDocuments error: $e');
       return [];
     }
   }
@@ -67,7 +64,7 @@ class FileManagerService {
       final images = await picker.pickMultiImage(imageQuality: 95);
       return images.map((img) => img.path).toList();
     } catch (e) {
-      print('pickMultipleImages error: $e');
+      debugPrint('pickMultipleImages error: $e');
       return [];
     }
   }
@@ -88,7 +85,7 @@ class FileManagerService {
               }
             }
           } catch (e) {
-            print('Error reading dir ${dir.path}: $e');
+            debugPrint('Error reading dir ${dir.path}: $e');
           }
         }
       }
@@ -106,7 +103,7 @@ class FileManagerService {
 
       return allFiles;
     } catch (e) {
-      print('getAllDocumentsFromDevice error: $e');
+      debugPrint('getAllDocumentsFromDevice error: $e');
       return [];
     }
   }
@@ -137,7 +134,7 @@ class FileManagerService {
         dirs.add(tmp);
       }
     } catch (e) {
-      print('_getCommonDocumentDirectories error: $e');
+      debugPrint('_getCommonDocumentDirectories error: $e');
     }
 
     return dirs;

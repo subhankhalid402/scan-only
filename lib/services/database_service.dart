@@ -22,7 +22,7 @@ class DatabaseService {
     final path = join(dbPath, filePath);
     return await openDatabase(
       path,
-      version: 3,
+      version: 4,
       onCreate: _createDB,
       onUpgrade: _upgradeDB,
     );
@@ -49,6 +49,9 @@ class DatabaseService {
         cloudUpdatedAt TEXT
       )
     ''');
+    await db.execute(
+      'CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_filePath_unique ON documents(filePath)',
+    );
   }
 
   Future _upgradeDB(Database db, int oldVersion, int newVersion) async {
@@ -63,10 +66,26 @@ class DatabaseService {
         'ALTER TABLE documents ADD COLUMN cloudUpdatedAt TEXT',
       );
     }
+    if (oldVersion < 4) {
+      await _removeDuplicateFilePathRows(db);
+      await db.execute(
+        'CREATE UNIQUE INDEX IF NOT EXISTS idx_documents_filePath_unique ON documents(filePath)',
+      );
+    }
   }
 
   Future<int> insertDocument(DocumentModel doc) async {
     final db = await instance.database;
+    final existing = await db.query(
+      'documents',
+      columns: ['id'],
+      where: 'filePath = ?',
+      whereArgs: [doc.filePath],
+      limit: 1,
+    );
+    if (existing.isNotEmpty) {
+      return (existing.first['id'] as int?) ?? 0;
+    }
     return await db.insert('documents', doc.toMap());
   }
 
@@ -264,5 +283,24 @@ class DatabaseService {
   Future close() async {
     final db = await instance.database;
     db.close();
+  }
+
+  Future<void> _removeDuplicateFilePathRows(Database db) async {
+    final rows = await db.query(
+      'documents',
+      columns: ['id', 'filePath'],
+      orderBy: 'createdAt DESC, id DESC',
+    );
+    final seen = <String>{};
+    for (final row in rows) {
+      final id = row['id'] as int?;
+      final filePath = (row['filePath'] as String?) ?? '';
+      if (id == null || filePath.isEmpty) continue;
+      if (seen.contains(filePath)) {
+        await db.delete('documents', where: 'id = ?', whereArgs: [id]);
+      } else {
+        seen.add(filePath);
+      }
+    }
   }
 }

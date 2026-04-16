@@ -37,10 +37,10 @@ Future<void> testSupabaseConnection() async {
     // Test 4: Full Test Suite
     debugPrint('\n🧪 Running Full Test Suite');
     debugPrint('─' * 70);
-    final results = await BackendTestUtils.runAllTests();
+    await BackendTestUtils.runAllTests();
 
     // Summary
-    debugPrint('\n' + '=' * 70);
+    debugPrint('\n${'=' * 70}');
     debugPrint('✅ TEST COMPLETE');
     debugPrint('=' * 70);
 
@@ -60,7 +60,7 @@ Future<void> testSupabaseConnection() async {
       debugPrint('4. Verify RLS policies are enabled');
     }
 
-    debugPrint('\n' + '=' * 70);
+    debugPrint('\n${'=' * 70}');
   } catch (e) {
     debugPrint('❌ ERROR: $e');
     debugPrint('=' * 70);

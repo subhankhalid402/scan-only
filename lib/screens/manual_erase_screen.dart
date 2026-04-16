@@ -79,7 +79,6 @@ class _ManualEraseScreenState extends State<ManualEraseScreen> {
     final layout = _lastLayout;
     if (layout == null) return;
 
-    final disp = layout.dispSize;
     final scale = layout.scale;
     final dispRect = _displayRect();
     if (dispRect == null) {

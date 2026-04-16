@@ -314,7 +314,7 @@ class ImageEnhancementService {
       image = img.adjustColor(image, brightness: 0.1, saturation: 1.1);
       return await _save(image, imagePath, suffix: '_enhance');
     } catch (e) {
-      print('autoEnhance error: $e');
+      debugPrint('autoEnhance error: $e');
       return imagePath;
     }
   }
@@ -333,7 +333,7 @@ class ImageEnhancementService {
       if (saturation != 1.0) image = img.adjustColor(image, saturation: saturation);
       return await _save(image, imagePath, suffix: '_custom');
     } catch (e) {
-      print('enhanceWithValues error: $e');
+      debugPrint('enhanceWithValues error: $e');
       return imagePath;
     }
   }
@@ -345,7 +345,7 @@ class ImageEnhancementService {
       image = img.grayscale(image);
       return await _save(image, imagePath, suffix: '_grayscale');
     } catch (e) {
-      print('grayscale error: $e');
+      debugPrint('grayscale error: $e');
       return imagePath;
     }
   }
@@ -357,7 +357,7 @@ class ImageEnhancementService {
       image = img.copyRotate(image, angle: degrees.toDouble());
       return await _save(image, imagePath, suffix: '_rotated');
     } catch (e) {
-      print('rotate error: $e');
+      debugPrint('rotate error: $e');
       return imagePath;
     }
   }
@@ -369,7 +369,7 @@ class ImageEnhancementService {
       image = horizontal ? img.flipHorizontal(image) : img.flipVertical(image);
       return await _save(image, imagePath, suffix: '_flipped');
     } catch (e) {
-      print('flip error: $e');
+      debugPrint('flip error: $e');
       return imagePath;
     }
   }
@@ -381,7 +381,7 @@ class ImageEnhancementService {
       image = _applyVivid(image);
       return await _save(image, imagePath, suffix: '_vivid');
     } catch (e) {
-      print('vivid error: $e');
+      debugPrint('vivid error: $e');
       return imagePath;
     }
   }
@@ -407,7 +407,7 @@ class ImageEnhancementService {
       }
       return await _save(out, imagePath, suffix: '_cool');
     } catch (e) {
-      print('cool error: $e');
+      debugPrint('cool error: $e');
       return imagePath;
     }
   }
@@ -433,7 +433,7 @@ class ImageEnhancementService {
       }
       return await _save(out, imagePath, suffix: '_warm');
     } catch (e) {
-      print('warm error: $e');
+      debugPrint('warm error: $e');
       return imagePath;
     }
   }
@@ -445,7 +445,7 @@ class ImageEnhancementService {
       image = img.sepia(image);
       return await _save(image, imagePath, suffix: '_sepia');
     } catch (e) {
-      print('sepia error: $e');
+      debugPrint('sepia error: $e');
       return imagePath;
     }
   }
@@ -458,7 +458,7 @@ class ImageEnhancementService {
       image = img.contrast(image, contrast: 175);
       return await _save(image, imagePath, suffix: '_highcontrast');
     } catch (e) {
-      print('highContrast error: $e');
+      debugPrint('highContrast error: $e');
       return imagePath;
     }
   }
@@ -472,7 +472,7 @@ class ImageEnhancementService {
       image = img.gaussianBlur(image, radius: 1);
       return await _save(image, imagePath, suffix: '_soft');
     } catch (e) {
-      print('soft error: $e');
+      debugPrint('soft error: $e');
       return imagePath;
     }
   }
@@ -484,7 +484,7 @@ class ImageEnhancementService {
       image = img.invert(image);
       return await _save(image, imagePath, suffix: '_invert');
     } catch (e) {
-      print('invert error: $e');
+      debugPrint('invert error: $e');
       return imagePath;
     }
   }
@@ -522,7 +522,7 @@ class ImageEnhancementService {
 
       return await _save(newImage, imagePath, suffix: '_timestamp');
     } catch (e) {
-      print('addTimestamp error: $e');
+      debugPrint('addTimestamp error: $e');
       return imagePath;
     }
   }
@@ -555,7 +555,7 @@ class ImageEnhancementService {
     final baseName = path.basenameWithoutExtension(originalPath);
     // Timestamp makes every saved file unique → no Flutter image cache collisions
     final ts = DateTime.now().millisecondsSinceEpoch;
-    final outPath = path.join(dir.path, '${baseName}${suffix}_$ts.jpg');
+    final outPath = path.join(dir.path, '$baseName${suffix}_$ts.jpg');
     await File(outPath).writeAsBytes(img.encodeJpg(image, quality: 92));
     return outPath;
   }

@@ -18,6 +18,12 @@ class _SearchScreenState extends State<SearchScreen> {
   List<DocumentModel> _results = [];
   bool _isSearching = false;
 
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
   Future<void> _search(String query) async {
     if (query.trim().isEmpty) {
       setState(() {
@@ -28,6 +34,7 @@ class _SearchScreenState extends State<SearchScreen> {
     }
     setState(() => _isSearching = true);
     final results = await DatabaseService.instance.searchDocuments(query);
+    if (!mounted) return;
     setState(() {
       _results = results;
       _isSearching = false;

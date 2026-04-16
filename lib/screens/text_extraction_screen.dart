@@ -93,7 +93,7 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isExtracting = false);
-        _showError('Text extract nahi ho saka: $e');
+        _showError('Could not extract text: $e');
       }
     }
   }
@@ -102,17 +102,17 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
 
   Future<void> _copyToClipboard() async {
     final text = _currentText;
-    if (text.isEmpty) { _showError('Copy karne ke liye koi text nahi hai'); return; }
+    if (text.isEmpty) { _showError('No text available to copy.'); return; }
 
     await Clipboard.setData(ClipboardData(text: text));
-    _showSuccess('Text clipboard pe copy ho gaya!');
+    _showSuccess('Text copied to clipboard.');
   }
 
   // ── Share ─────────────────────────────────────────────────────
 
   Future<void> _shareText() async {
     final text = _currentText;
-    if (text.isEmpty) { _showError('Share karne ke liye koi text nahi hai'); return; }
+    if (text.isEmpty) { _showError('No text available to share.'); return; }
 
     await Share.share(
       text,
@@ -124,7 +124,7 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
 
   Future<void> _saveAsFile() async {
     final text = _currentText;
-    if (text.isEmpty) { _showError('Save karne ke liye koi text nahi hai'); return; }
+    if (text.isEmpty) { _showError('No text available to save.'); return; }
 
     setState(() => _isSaving = true);
     try {
@@ -132,9 +132,9 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final file = File('${dir.path}/extracted_$timestamp.txt');
       await file.writeAsString(text);
-      _showSuccess('File save ho gayi:\nextracted_$timestamp.txt');
+      _showSuccess('File saved:\nextracted_$timestamp.txt');
     } catch (e) {
-      _showError('Save nahi ho saka: $e');
+      _showError('Could not save file: $e');
     } finally {
       if (mounted) setState(() => _isSaving = false);
     }
@@ -164,7 +164,7 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
       final lines = _extractedText.trim().split('\n').where((l) => l.isNotEmpty).length;
       _stats = {..._stats, 'wordCount': words, 'lineCount': lines};
     });
-    _showSuccess('Changes save ho gaaye!');
+    _showSuccess('Changes saved.');
   }
 
   void _selectAll() {
@@ -282,9 +282,9 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
       context: context,
       builder: (_) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
-        title: Text('Changes discard karein?',
+        title: Text('Discard changes?',
             style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
-        content: Text('Aapki editing save nahi hogi.',
+        content: Text('Your edits will not be saved.',
             style: GoogleFonts.nunito()),
         actions: [
           TextButton(
@@ -431,11 +431,11 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
         children: [
           const CircularProgressIndicator(color: AppColors.gold, strokeWidth: 3),
           const SizedBox(height: 20),
-          Text('Text extract ho raha hai…',
+          Text('Extracting text…',
               style: GoogleFonts.nunito(fontSize: 15, fontWeight: FontWeight.w600,
                   color: AppColors.navyDark)),
           const SizedBox(height: 6),
-          Text('Thoda intezaar karein',
+          Text('Please wait a moment',
               style: GoogleFonts.nunito(fontSize: 12, color: AppColors.textMuted)),
         ],
       ),
@@ -534,17 +534,17 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
           children: [
             Icon(Iconsax.document_text, size: 52, color: Colors.grey[300]),
             const SizedBox(height: 14),
-            Text('Koi text nahi mila',
+            Text('No text found',
                 style: GoogleFonts.nunito(fontSize: 16, fontWeight: FontWeight.w700,
                     color: Colors.grey[500])),
             const SizedBox(height: 6),
-            Text('Roshan tasveer se dobara koshish karein',
+            Text('Try again with a clearer image',
                 style: GoogleFonts.nunito(fontSize: 12, color: Colors.grey[400])),
             const SizedBox(height: 20),
             OutlinedButton.icon(
               onPressed: _extractText,
               icon: const Icon(Iconsax.refresh, size: 18),
-              label: Text('Dobara Extract Karein',
+              label: Text('Extract Again',
                   style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
               style: OutlinedButton.styleFrom(
                 foregroundColor: AppColors.navyDark,
@@ -598,7 +598,7 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
             children: [
               Icon(Iconsax.edit_2, size: 14, color: AppColors.navyDark.withOpacity(0.6)),
               const SizedBox(width: 6),
-              Text('Edit mode — changes apply honge',
+              Text('Edit mode - your changes can be saved',
                   style: GoogleFonts.nunito(fontSize: 11, color: AppColors.navyDark.withOpacity(0.6))),
               const Spacer(),
               GestureDetector(
@@ -713,7 +713,7 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 elevation: 0,
               ),
-              child: Text('Changes Save Karein',
+              child: Text('Save Changes',
                   style: GoogleFonts.nunito(fontWeight: FontWeight.w800, color: Colors.white)),
             ),
           ),
