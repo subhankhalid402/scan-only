@@ -4,6 +4,7 @@ import 'package:path/path.dart';
 import 'package:sqflite/sqflite.dart';
 
 import '../models/document_model.dart';
+import 'app_local_storage.dart';
 
 class DatabaseService {
   static final DatabaseService instance = DatabaseService._init();
@@ -76,17 +77,21 @@ class DatabaseService {
 
   Future<int> insertDocument(DocumentModel doc) async {
     final db = await instance.database;
+    final cloudBackupEnabled = AppLocalStorage.getBool('cloudBackupEnabled');
+    final docToInsert = (cloudBackupEnabled && doc.syncStatus == 'local_only')
+        ? doc.copyWith(syncStatus: 'queued_for_upload')
+        : doc;
     final existing = await db.query(
       'documents',
       columns: ['id'],
       where: 'filePath = ?',
-      whereArgs: [doc.filePath],
+      whereArgs: [docToInsert.filePath],
       limit: 1,
     );
     if (existing.isNotEmpty) {
       return (existing.first['id'] as int?) ?? 0;
     }
-    return await db.insert('documents', doc.toMap());
+    return await db.insert('documents', docToInsert.toMap());
   }
 
   Future<List<DocumentModel>> getAllDocuments() async {
@@ -237,6 +242,20 @@ class DatabaseService {
       },
       where: 'id = ?',
       whereArgs: [id],
+    );
+  }
+
+  /// When cloud backup is enabled, queue local and previously failed items.
+  Future<int> queueLocalOnlyForUpload() async {
+    final db = await instance.database;
+    return await db.update(
+      'documents',
+      {
+        'syncStatus': 'queued_for_upload',
+        'modifiedAt': DateTime.now().toIso8601String(),
+      },
+      where: 'syncStatus IN (?, ?)',
+      whereArgs: ['local_only', 'upload_failed'],
     );
   }
 

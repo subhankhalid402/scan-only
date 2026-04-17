@@ -8,12 +8,17 @@ import os
 import sys
 from supabase import create_client, Client
 
-# Configuration
-SUPABASE_URL = "https://aowgmjiezwydhluigkuc.supabase.co"
-SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvd2dtamllend5ZGhsdWlna3VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMzcwNDYsImV4cCI6MjA5MTgxMzA0Nn0.Ek-gst2tcNLoppK6LHpx8SrVt4gqm1nm07o_mgOmSGw"
+# Configuration — set in environment (never commit keys)
+SUPABASE_URL = os.environ.get("SUPABASE_URL", "").strip()
+SUPABASE_KEY = os.environ.get("SUPABASE_ANON_KEY", "").strip()
 
 def create_supabase_client() -> Client:
     """Create and return Supabase client"""
+    if not SUPABASE_URL or not SUPABASE_KEY:
+        print("✗ Set SUPABASE_URL and SUPABASE_ANON_KEY in the environment, e.g.:")
+        print('    set SUPABASE_URL=https://YOUR_PROJECT.supabase.co')
+        print("    set SUPABASE_ANON_KEY=your_anon_key")
+        sys.exit(1)
     try:
         client = create_client(SUPABASE_URL, SUPABASE_KEY)
         print("✓ Connected to Supabase")
@@ -139,21 +144,21 @@ def create_storage_bucket(client: Client) -> bool:
         buckets = client.storage.list_buckets()
         bucket_names = [b.name for b in buckets]
         
-        if 'scan-olny' in bucket_names:
-            print("✓ scan-olny storage bucket already exists")
+        if 'scan-only' in bucket_names:
+            print("✓ scan-only storage bucket already exists")
             return True
         else:
-            print("⚠ scan-olny bucket doesn't exist. Creating...")
+            print("⚠ scan-only bucket doesn't exist. Creating...")
             try:
                 client.storage.create_bucket(
-                    'scan-olny',
+                    'scan-only',
                     options={
                         'public': False,
                         'allowed_mime_types': ['image/jpeg', 'image/png', 'application/pdf'],
                         'file_size_limit': 52428800  # 50MB
                     }
                 )
-                print("✓ scan-olny storage bucket created successfully")
+                print("✓ scan-only storage bucket created successfully")
                 return True
             except Exception as create_error:
                 print(f"✗ Failed to create storage bucket: {create_error}")
@@ -218,7 +223,7 @@ def main():
         print("📊 Database Summary:")
         print("  • cloud_documents: Stores document metadata")
         print("  • sync_logs: Tracks sync operations")
-        print("  • scan-olny bucket: Stores document files")
+        print("  • scan-only bucket: Stores document files")
         print()
         print("🔐 Security:")
         print("  • RLS (Row Level Security) enabled")

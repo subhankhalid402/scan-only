@@ -30,12 +30,38 @@ class AppColors {
   static const Color editorIconBorder = Color(0x26FFFFFF);
 }
 
+/// Shared layout for primary actions (Material 3 / common app patterns).
+class AppButtonSizes {
+  AppButtonSizes._();
+
+  /// Minimum tap height (48dp) — matches Material accessibility guidance.
+  static const double height = 48;
+
+  /// Horizontal padding for label + icon.
+  static const double paddingH = 20;
+
+  static const double paddingV = 12;
+
+  /// Corner radius for filled / outlined actions.
+  static const double radius = 12;
+
+  static const EdgeInsets padding = EdgeInsets.symmetric(
+    horizontal: paddingH,
+    vertical: paddingV,
+  );
+
+  static const BorderRadius borderRadius =
+      BorderRadius.all(Radius.circular(radius));
+
+  static const Size minimumSize = Size(64, height);
+}
+
 class AppTheme {
   static ThemeData get theme {
     return ThemeData(
       useMaterial3: true,
-      visualDensity: VisualDensity.compact,
-      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      visualDensity: VisualDensity.standard,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.navyMid,
         primary: AppColors.navyMid,
@@ -152,28 +178,65 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           backgroundColor: AppColors.gold,
           foregroundColor: AppColors.navyDark,
-          minimumSize: const Size(0, 40),
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+          elevation: 1,
+          shadowColor: AppColors.navyDark.withValues(alpha: 0.18),
+          minimumSize: AppButtonSizes.minimumSize,
+          padding: AppButtonSizes.padding,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppButtonSizes.borderRadius,
+          ),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.2,
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.navyMid,
+          foregroundColor: Colors.white,
+          minimumSize: AppButtonSizes.minimumSize,
+          padding: AppButtonSizes.padding,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppButtonSizes.borderRadius,
+          ),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
       outlinedButtonTheme: OutlinedButtonThemeData(
         style: OutlinedButton.styleFrom(
           foregroundColor: AppColors.navyDark,
-          side: BorderSide(color: AppColors.navyDark.withValues(alpha: 0.2)),
-          minimumSize: const Size(0, 38),
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 9),
-          shape:
-              RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-          textStyle: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+          side: BorderSide(
+            color: AppColors.navyDark.withValues(alpha: 0.28),
+            width: 1.2,
+          ),
+          minimumSize: AppButtonSizes.minimumSize,
+          padding: AppButtonSizes.padding,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppButtonSizes.borderRadius,
+          ),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
         ),
       ),
       textButtonTheme: TextButtonThemeData(
         style: TextButton.styleFrom(
           foregroundColor: AppColors.navyMid,
-          textStyle: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: AppButtonSizes.borderRadius,
+          ),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
@@ -183,6 +246,8 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       brightness: Brightness.dark,
+      visualDensity: VisualDensity.standard,
+      materialTapTargetSize: MaterialTapTargetSize.padded,
       colorScheme: ColorScheme.fromSeed(
         seedColor: AppColors.navyMid,
         brightness: Brightness.dark,
@@ -199,6 +264,66 @@ class AppTheme {
           fontSize: 20,
           fontWeight: FontWeight.w800,
           color: Colors.white,
+        ),
+      ),
+      elevatedButtonTheme: ElevatedButtonThemeData(
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.gold,
+          foregroundColor: AppColors.navyDark,
+          elevation: 1,
+          minimumSize: AppButtonSizes.minimumSize,
+          padding: AppButtonSizes.padding,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppButtonSizes.borderRadius,
+          ),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      filledButtonTheme: FilledButtonThemeData(
+        style: FilledButton.styleFrom(
+          backgroundColor: AppColors.gold,
+          foregroundColor: AppColors.navyDark,
+          minimumSize: AppButtonSizes.minimumSize,
+          padding: AppButtonSizes.padding,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppButtonSizes.borderRadius,
+          ),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
+        ),
+      ),
+      outlinedButtonTheme: OutlinedButtonThemeData(
+        style: OutlinedButton.styleFrom(
+          foregroundColor: Colors.white,
+          side: BorderSide(color: Colors.white.withValues(alpha: 0.35)),
+          minimumSize: AppButtonSizes.minimumSize,
+          padding: AppButtonSizes.padding,
+          shape: RoundedRectangleBorder(
+            borderRadius: AppButtonSizes.borderRadius,
+          ),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 15,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+      ),
+      textButtonTheme: TextButtonThemeData(
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.gold,
+          minimumSize: const Size(48, 48),
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          shape: RoundedRectangleBorder(
+            borderRadius: AppButtonSizes.borderRadius,
+          ),
+          textStyle: GoogleFonts.nunito(
+            fontSize: 15,
+            fontWeight: FontWeight.w800,
+          ),
         ),
       ),
     );
