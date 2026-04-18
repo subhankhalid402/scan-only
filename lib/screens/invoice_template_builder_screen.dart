@@ -323,7 +323,6 @@ class _InvoiceTemplateBuilderScreenState
         ? AppColors.navyDark
         : (_templateStyle == 1 ? AppColors.navyLight : AppColors.purple);
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         title: Text(
           'Invoice Templates',

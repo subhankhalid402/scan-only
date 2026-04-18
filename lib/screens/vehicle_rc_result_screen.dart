@@ -215,7 +215,6 @@ class _VehicleRcResultScreenState extends State<VehicleRcResultScreen> {
   Widget build(BuildContext context) {
     final d = _currentData();
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Vehicle Registration', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
@@ -290,20 +289,25 @@ class _VehicleRcResultScreenState extends State<VehicleRcResultScreen> {
 
   Widget _historyCard(VehicleRcData d) {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121A2B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Vehicle History Summary', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text('Format: ${d.documentFormat.isEmpty ? 'Unknown' : d.documentFormat}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Province/City: ${d.provinceCity.isEmpty ? 'N/A' : d.provinceCity}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Ownership: ${d.ownershipHistory.isEmpty ? 'Not detected' : d.ownershipHistory}', style: GoogleFonts.nunito(color: Colors.white70)),
+          Text('Vehicle History Summary', style: ScanResultFormStyle.cardTitle()),
+          const SizedBox(height: 8),
+          Text(
+            'Format: ${d.documentFormat.isEmpty ? 'Unknown' : d.documentFormat}',
+            style: ScanResultFormStyle.muted(),
+          ),
+          Text(
+            'Province/City: ${d.provinceCity.isEmpty ? 'N/A' : d.provinceCity}',
+            style: ScanResultFormStyle.muted(),
+          ),
+          Text(
+            'Ownership: ${d.ownershipHistory.isEmpty ? 'Not detected' : d.ownershipHistory}',
+            style: ScanResultFormStyle.muted(),
+          ),
         ],
       ),
     );
@@ -331,22 +335,18 @@ class _VehicleRcResultScreenState extends State<VehicleRcResultScreen> {
           padding: const EdgeInsets.only(bottom: 4),
           child: Row(
             children: [
-              SizedBox(width: 150, child: Text(l, style: GoogleFonts.nunito(color: Colors.white70))),
+              SizedBox(width: 150, child: Text(l, style: ScanResultFormStyle.muted())),
               Text(v, style: GoogleFonts.nunito(color: c, fontWeight: FontWeight.w800)),
             ],
           ),
         );
     return Container(
       padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121A2B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Validation', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800)),
+          Text('Validation', style: ScanResultFormStyle.cardTitle()),
           const SizedBox(height: 8),
           row('Reg number format', d.registrationNumberValid ? 'Valid' : 'Invalid', d.registrationNumberValid ? AppColors.green : Colors.redAccent),
           row('Token tax', d.tokenTaxValid ? 'Valid' : 'Expired/Unknown', d.tokenTaxValid ? AppColors.green : Colors.orange),
@@ -364,11 +364,11 @@ class _VehicleRcResultScreenState extends State<VehicleRcResultScreen> {
         children: [
           Row(
             children: [
-              Expanded(child: Text(label, style: GoogleFonts.nunito(color: Colors.white70, fontWeight: FontWeight.w700))),
+              Expanded(child: Text(label, style: ScanResultFormStyle.label())),
               IconButton(
                 onPressed: () => _copyField(label, c.text.trim()),
                 icon: const Icon(Icons.copy_rounded, size: 18),
-                color: Colors.white60,
+                color: AppColors.navyMid,
               ),
             ],
           ),
@@ -376,13 +376,10 @@ class _VehicleRcResultScreenState extends State<VehicleRcResultScreen> {
             controller: c,
             maxLines: maxLines,
             onChanged: (_) => setState(() {}),
-            style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700),
-            decoration: InputDecoration(
-              isDense: true,
-              filled: true,
-              fillColor: const Color(0xFF141E31),
+            style: ScanResultFormStyle.inputText(),
+            decoration: ScanResultFormStyle.textFieldDecoration(
+              radius: 10,
               errorText: isError ? 'Invalid value' : null,
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
             ),
           ),
         ],

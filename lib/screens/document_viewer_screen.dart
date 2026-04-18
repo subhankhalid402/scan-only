@@ -141,8 +141,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   // ── OCR ────────────────────────────────────────────────────────────────────
 
   Future<void> _extractOcr() async {
-    if (_doc.fileType != 'jpg' && _doc.fileType != 'png') {
-      _showInfo('OCR is available for image files (JPG/PNG) only.');
+    if (!_isRasterDoc(_doc)) {
+      _showInfo('OCR is available for image files (JPG, PNG, WebP) only.');
       return;
     }
 
@@ -206,7 +206,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   // ── Watermark ──────────────────────────────────────────────────────────────
 
   Future<void> _addWatermark() async {
-    if (_doc.fileType != 'jpg' && _doc.fileType != 'png') {
+    if (!_isRasterDoc(_doc)) {
       _showInfo('Watermark is available for image files only.');
       return;
     }
@@ -264,7 +264,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
   // ── Annotate ───────────────────────────────────────────────────────────────
 
   Future<void> _openAnnotation() async {
-    if (_doc.fileType != 'jpg' && _doc.fileType != 'png') {
+    if (!_isRasterDoc(_doc)) {
       _showInfo('Annotations are available for image files only.');
       return;
     }
@@ -330,7 +330,32 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
 
   bool _isRasterDoc(DocumentModel d) {
     final t = d.fileType.toLowerCase();
-    return t == 'jpg' || t == 'jpeg' || t == 'png';
+    return t == 'jpg' || t == 'jpeg' || t == 'png' || t == 'webp';
+  }
+
+  /// System print layout (PDF bytes).
+  bool _canPrint(DocumentModel d) => d.fileType.toLowerCase() == 'pdf';
+
+  /// In-app conversion screen can turn these into PDF (not useful when already PDF).
+  bool _canConvert(DocumentModel d) {
+    final t = d.fileType.toLowerCase();
+    return const {
+      'jpg',
+      'jpeg',
+      'png',
+      'webp',
+      'doc',
+      'docx',
+      'ppt',
+      'pptx',
+      'txt',
+      'csv',
+      'json',
+      'html',
+      'htm',
+      'xlsx',
+      'xls',
+    }.contains(t);
   }
 
   Color _fileTypeAccentColor() {
@@ -340,6 +365,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       case 'jpg':
       case 'jpeg':
       case 'png':
+      case 'webp':
         return AppColors.navyMid;
       case 'docx':
       case 'doc':
@@ -723,14 +749,16 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'rename', child: Text('Rename')),
               const PopupMenuItem(value: 'share', child: Text('Share')),
-              const PopupMenuItem(value: 'print', child: Text('Print')),
+              if (_canPrint(_doc))
+                const PopupMenuItem(value: 'print', child: Text('Print')),
               const PopupMenuItem(value: 'open', child: Text('Open with...')),
               if (_isRasterDoc(_doc))
                 const PopupMenuItem(
                   value: 'pdf',
                   child: Text('Generate PDF'),
                 ),
-              const PopupMenuItem(value: 'convert', child: Text('Convert')),
+              if (_canConvert(_doc))
+                const PopupMenuItem(value: 'convert', child: Text('Convert')),
               if (_isRasterDoc(_doc))
                 const PopupMenuItem(
                     value: 'add_wm', child: Text('Add Watermark')),
@@ -783,42 +811,43 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                 children: [
                   _actionBtn(Iconsax.share, 'Share', AppColors.navyMid,
                       _shareDocument),
-                  const SizedBox(width: 8),
-                  _actionBtn(
-                      Iconsax.printer, 'Print', AppColors.blue, _printDocument),
-                  const SizedBox(width: 8),
+                  if (_canPrint(_doc)) ...[
+                    const SizedBox(width: 8),
+                    _actionBtn(Iconsax.printer, 'Print', AppColors.blue,
+                        _printDocument),
+                  ],
                   if (_isRasterDoc(_doc)) ...[
+                    const SizedBox(width: 8),
                     _actionBtn(Iconsax.document_download, 'PDF',
                         AppColors.navyMid, _generatePdf),
-                    const SizedBox(width: 8),
                   ],
+                  const SizedBox(width: 8),
                   _actionBtn(Iconsax.export, 'Open', AppColors.navyMid,
                       _openWithExternal),
-                  const SizedBox(width: 8),
-                  _actionBtn(
-                      Iconsax.text, 'OCR', AppColors.navyMid, _extractOcr),
-                  const SizedBox(width: 8),
-                  _actionBtn(Iconsax.shield_tick, 'Watermark', AppColors.gold,
-                      _addWatermark),
-                  const SizedBox(width: 8),
-                  if (_doc.fileType == 'jpg' ||
-                      _doc.fileType == 'jpeg' ||
-                      _doc.fileType == 'png')
+                  if (_isRasterDoc(_doc)) ...[
+                    const SizedBox(width: 8),
+                    _actionBtn(
+                        Iconsax.text, 'OCR', AppColors.navyMid, _extractOcr),
+                    const SizedBox(width: 8),
+                    _actionBtn(Iconsax.shield_tick, 'Watermark',
+                        AppColors.gold, _addWatermark),
+                    const SizedBox(width: 8),
                     _actionBtn(Iconsax.eraser, 'Remove WM', AppColors.navyMid,
                         _removeWatermark),
-                  if (_doc.fileType == 'jpg' ||
-                      _doc.fileType == 'jpeg' ||
-                      _doc.fileType == 'png')
                     const SizedBox(width: 8),
-                  _actionBtn(Iconsax.pen_add, 'Annotate', AppColors.blue,
-                      _openAnnotation),
-                  const SizedBox(width: 8),
-                  _actionBtn(Iconsax.convert_3d_cube, 'Convert',
-                      AppColors.navyMid, _convertDocument),
-                  const SizedBox(width: 8),
-                  if (_doc.fileType.toLowerCase() == 'pdf')
+                    _actionBtn(Iconsax.pen_add, 'Annotate', AppColors.blue,
+                        _openAnnotation),
+                  ],
+                  if (_canConvert(_doc)) ...[
+                    const SizedBox(width: 8),
+                    _actionBtn(Iconsax.convert_3d_cube, 'Convert',
+                        AppColors.navyMid, _convertDocument),
+                  ],
+                  if (_doc.fileType.toLowerCase() == 'pdf') ...[
+                    const SizedBox(width: 8),
                     _actionBtn(Icons.compress_rounded, 'Compress',
                         AppColors.navyMid, _compressPdf),
+                  ],
                 ],
               ),
             ),
@@ -851,7 +880,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
 
     if (_doc.fileType == 'jpg' ||
         _doc.fileType == 'jpeg' ||
-        _doc.fileType == 'png') {
+        _doc.fileType == 'png' ||
+        _doc.fileType == 'webp') {
       return Container(
         color: Colors.black,
         child: InteractiveViewer(

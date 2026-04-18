@@ -288,6 +288,21 @@ class DatabaseService {
     return Sqflite.firstIntValue(result) ?? 0;
   }
 
+  /// Counts rows grouped by [DocumentModel.syncStatus] (`local_only`, `synced`, etc.).
+  Future<Map<String, int>> countDocumentsBySyncStatus() async {
+    final db = await instance.database;
+    final rows = await db.rawQuery(
+      'SELECT syncStatus, COUNT(*) AS n FROM documents GROUP BY syncStatus',
+    );
+    final out = <String, int>{};
+    for (final r in rows) {
+      final key = (r['syncStatus'] as String?) ?? 'unknown';
+      final n = r['n'];
+      out[key] = n is int ? n : (n as num?)?.toInt() ?? 0;
+    }
+    return out;
+  }
+
   Future<Map<String, int>> getDocumentCountByType() async {
     final db = await instance.database;
     final result = await db.rawQuery(

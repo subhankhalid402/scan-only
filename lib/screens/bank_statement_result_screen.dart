@@ -5,14 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../models/bank_statement_data.dart';
 import '../models/document_model.dart';
 import '../services/bank_statement_ocr_service.dart';
 import '../services/database_service.dart';
 import '../services/excel_export_service.dart';
 import '../services/pdf_service.dart';
+import '../services/share_file_service.dart';
 import '../theme.dart';
 
 class BankStatementResultScreen extends StatefulWidget {
@@ -161,8 +160,10 @@ class _BankStatementResultScreenState extends State<BankStatementResultScreen> {
         transactions: d.transactions.map((e) => e.toMap()).toList(),
       );
       if (!mounted) return;
-      await Share.shareXFiles([XFile(pdf), XFile(json), XFile(csv), XFile(xlsx)],
-          text: 'Bank statement summary');
+      await ShareFileService.sharePaths(
+        [pdf, json, csv, xlsx],
+        text: 'Bank statement summary',
+      );
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -183,7 +184,6 @@ class _BankStatementResultScreenState extends State<BankStatementResultScreen> {
     final d = _current();
     final recurring = _recurringCount(d.transactions);
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Bank Statement', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
@@ -252,21 +252,23 @@ class _BankStatementResultScreenState extends State<BankStatementResultScreen> {
     }
     final maxCat = cats.values.isEmpty ? 0.0 : cats.values.reduce((a, b) => a > b ? a : b);
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121A2B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Smart Analytics', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800)),
+          Text('Smart Analytics', style: ScanResultFormStyle.cardTitle()),
           const SizedBox(height: 8),
-          Text('Total Credits: ${d.totalCredits.toStringAsFixed(2)}', style: GoogleFonts.nunito(color: Colors.greenAccent)),
-          Text('Total Debits: ${d.totalDebits.toStringAsFixed(2)}', style: GoogleFonts.nunito(color: Colors.orangeAccent)),
-          Text('Avg Balance: ${d.averageMonthlyBalance.toStringAsFixed(2)}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Recurring payments detected: $recurring', style: GoogleFonts.nunito(color: Colors.white70)),
+          Text(
+            'Total Credits: ${d.totalCredits.toStringAsFixed(2)}',
+            style: GoogleFonts.nunito(color: AppColors.green, fontWeight: FontWeight.w700),
+          ),
+          Text(
+            'Total Debits: ${d.totalDebits.toStringAsFixed(2)}',
+            style: GoogleFonts.nunito(color: AppColors.orange, fontWeight: FontWeight.w700),
+          ),
+          Text('Avg Balance: ${d.averageMonthlyBalance.toStringAsFixed(2)}', style: ScanResultFormStyle.muted()),
+          Text('Recurring payments detected: $recurring', style: ScanResultFormStyle.muted()),
           const SizedBox(height: 6),
           ...cats.entries.take(6).map((e) {
             final ratio = maxCat <= 0 ? 0.0 : (e.value / maxCat).clamp(0.0, 1.0);
@@ -275,8 +277,16 @@ class _BankStatementResultScreenState extends State<BankStatementResultScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('${e.key}: ${e.value.toStringAsFixed(2)}', style: GoogleFonts.nunito(color: Colors.white70, fontSize: 12)),
-                  LinearProgressIndicator(value: ratio, minHeight: 6, backgroundColor: Colors.white12, color: AppColors.gold),
+                  Text(
+                    '${e.key}: ${e.value.toStringAsFixed(2)}',
+                    style: ScanResultFormStyle.muted(fontSize: 12),
+                  ),
+                  LinearProgressIndicator(
+                    value: ratio,
+                    minHeight: 6,
+                    backgroundColor: AppColors.navyDark.withValues(alpha: 0.08),
+                    color: AppColors.gold,
+                  ),
                 ],
               ),
             );
@@ -288,28 +298,32 @@ class _BankStatementResultScreenState extends State<BankStatementResultScreen> {
 
   Widget _txTable() {
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF101826),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         children: [
           Padding(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(12),
             child: Row(
               children: [
-                Expanded(child: Text('Transactions', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800))),
-                Text('${_txns.length}', style: GoogleFonts.nunito(color: Colors.white54)),
+                Expanded(child: Text('Transactions', style: ScanResultFormStyle.cardTitle(fontSize: 15))),
+                Text('${_txns.length}', style: ScanResultFormStyle.muted()),
               ],
             ),
           ),
-          const Divider(height: 1, color: Colors.white12),
+          Divider(height: 1, color: AppColors.navyDark.withValues(alpha: 0.1)),
           ..._txns.take(20).map((t) => ListTile(
                 dense: true,
-                title: Text('${t.date} • ${t.description}', maxLines: 1, overflow: TextOverflow.ellipsis, style: GoogleFonts.nunito(color: Colors.white70, fontSize: 12)),
-                subtitle: Text('Dr ${t.debit} | Cr ${t.credit} | Bal ${t.balance}', style: GoogleFonts.nunito(color: Colors.white38, fontSize: 11)),
-                trailing: Text(t.category, style: GoogleFonts.nunito(color: AppColors.gold, fontSize: 10)),
+                title: Text(
+                  '${t.date} • ${t.description}',
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: ScanResultFormStyle.bodyLine(fontSize: 12),
+                ),
+                subtitle: Text(
+                  'Dr ${t.debit} | Cr ${t.credit} | Bal ${t.balance}',
+                  style: ScanResultFormStyle.muted(fontSize: 11),
+                ),
+                trailing: Text(t.category, style: GoogleFonts.nunito(color: AppColors.navyMid, fontSize: 10, fontWeight: FontWeight.w800)),
               )),
         ],
       ),
@@ -324,20 +338,19 @@ class _BankStatementResultScreenState extends State<BankStatementResultScreen> {
         children: [
           Row(
             children: [
-              Expanded(child: Text(label, style: GoogleFonts.nunito(color: Colors.white70, fontWeight: FontWeight.w700))),
-              IconButton(onPressed: () => _copy(label, c.text.trim()), icon: const Icon(Icons.copy_rounded, size: 16), color: Colors.white60),
+              Expanded(child: Text(label, style: ScanResultFormStyle.label(fontSize: 13))),
+              IconButton(
+                onPressed: () => _copy(label, c.text.trim()),
+                icon: const Icon(Icons.copy_rounded, size: 16),
+                color: AppColors.navyMid,
+              ),
             ],
           ),
           TextField(
             controller: c,
             onChanged: (_) => setState(() {}),
-            style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-            decoration: InputDecoration(
-              isDense: true,
-              filled: true,
-              fillColor: const Color(0xFF141E31),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide.none),
-            ),
+            style: ScanResultFormStyle.inputText(fontSize: 13),
+            decoration: ScanResultFormStyle.textFieldDecoration(radius: 10),
           ),
         ],
       ),

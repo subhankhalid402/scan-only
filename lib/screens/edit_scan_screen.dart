@@ -24,8 +24,8 @@ import 'signature_pad_screen.dart';
 import 'annotation_screen.dart';
 import '../services/ocr_service.dart';
 import 'document_viewer_screen.dart';
-import 'advanced_sharing_screen.dart';
 import 'add_watermark_screen.dart';
+import '../services/share_file_service.dart';
 import 'remove_watermark_screen.dart';
 import 'document_scan_editor_screen.dart';
 
@@ -292,18 +292,29 @@ class _EditScanScreenState extends State<EditScanScreen> {
                 ),
                 const SizedBox(height: 10),
                 OutlinedButton.icon(
-                  onPressed: () {
+                  onPressed: () async {
                     handled[0] = true;
                     Navigator.pop(sheetCtx);
-                    nav.pop();
-                    nav.push(
-                      MaterialPageRoute(
-                        builder: (_) => AdvancedSharingScreen(
-                          filePath: saved.filePath,
-                          fileName: saved.name,
-                        ),
-                      ),
-                    );
+                    if (!mounted) return;
+                    try {
+                      await ShareFileService.sharePaths([saved.filePath]);
+                    } catch (e) {
+                      if (mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Share failed: $e',
+                              style: GoogleFonts.nunito(
+                                  fontWeight: FontWeight.w700),
+                            ),
+                            backgroundColor: AppColors.red,
+                            behavior: SnackBarBehavior.floating,
+                          ),
+                        );
+                      }
+                      return;
+                    }
+                    if (mounted) nav.pop();
                   },
                   icon: const Icon(Iconsax.share, color: Colors.white),
                   label: Text(

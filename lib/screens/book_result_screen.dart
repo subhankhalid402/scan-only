@@ -2,14 +2,13 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../models/book_scan_data.dart';
 import '../models/document_model.dart';
 import '../services/book_export_service.dart';
 import '../services/book_scan_service.dart';
 import '../services/database_service.dart';
 import '../services/pdf_service.dart';
+import '../services/share_file_service.dart';
 import '../services/translation_service.dart';
 import '../theme.dart';
 
@@ -106,8 +105,8 @@ class _BookResultScreenState extends State<BookResultScreen> {
       );
 
       if (!mounted) return;
-      await Share.shareXFiles(
-        [XFile(pdf), XFile(docx), XFile(txt), XFile(epub), XFile(json)],
+      await ShareFileService.sharePaths(
+        [pdf, docx, txt, epub, json],
         text: 'Book scan exports',
       );
       if (!mounted) return;
@@ -126,7 +125,6 @@ class _BookResultScreenState extends State<BookResultScreen> {
         ? pages
         : pages.where((p) => p.text.toLowerCase().contains(_search.toLowerCase())).toList();
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Book Scanner', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
@@ -185,33 +183,32 @@ class _BookResultScreenState extends State<BookResultScreen> {
 
   Widget _summaryCard() {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121A2B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
             _data.title.isEmpty ? 'Book scan summary' : _data.title,
-            style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800),
+            style: ScanResultFormStyle.cardTitle(),
           ),
-          const SizedBox(height: 6),
-          Text('Language: ${_data.languageHint}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Pages: ${_data.pages.length}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Curvature correction: ${_data.curvatureCorrected ? 'Applied' : 'No'}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Finger edge removal: ${_data.fingerRemovalApplied ? 'Applied' : 'No'}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Two-page spread: ${_data.twoPageSpreadDetected ? 'Detected' : 'Not detected'}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Auto page-turn: ${_data.autoPageTurnDetected ? 'Detected' : 'No'}', style: GoogleFonts.nunito(color: Colors.white70)),
+          const SizedBox(height: 8),
+          Text('Language: ${_data.languageHint}', style: ScanResultFormStyle.muted()),
+          Text('Pages: ${_data.pages.length}', style: ScanResultFormStyle.muted()),
+          Text('Curvature correction: ${_data.curvatureCorrected ? 'Applied' : 'No'}', style: ScanResultFormStyle.muted()),
+          Text('Finger edge removal: ${_data.fingerRemovalApplied ? 'Applied' : 'No'}', style: ScanResultFormStyle.muted()),
+          Text('Two-page spread: ${_data.twoPageSpreadDetected ? 'Detected' : 'Not detected'}', style: ScanResultFormStyle.muted()),
+          Text('Auto page-turn: ${_data.autoPageTurnDetected ? 'Detected' : 'No'}', style: ScanResultFormStyle.muted()),
           if (_data.tableOfContents.trim().isNotEmpty) ...[
-            const SizedBox(height: 6),
-            Text('TOC', style: GoogleFonts.nunito(color: AppColors.gold, fontWeight: FontWeight.w800)),
-            Text(_data.tableOfContents, style: GoogleFonts.nunito(color: Colors.white60)),
+            const SizedBox(height: 8),
+            Text('TOC', style: GoogleFonts.nunito(color: AppColors.navyMid, fontWeight: FontWeight.w800)),
+            Text(_data.tableOfContents, style: ScanResultFormStyle.muted(fontSize: 12)),
           ],
-          const SizedBox(height: 6),
-          Text('TTS: Ready for integration (platform speech engine)', style: GoogleFonts.nunito(color: Colors.white54, fontSize: 12)),
+          const SizedBox(height: 8),
+          Text(
+            'TTS: Ready for integration (platform speech engine)',
+            style: ScanResultFormStyle.muted(fontSize: 12),
+          ),
         ],
       ),
     );
@@ -220,33 +217,22 @@ class _BookResultScreenState extends State<BookResultScreen> {
   Widget _searchBox() {
     return TextField(
       onChanged: (v) => setState(() => _search = v),
-      style: GoogleFonts.nunito(color: Colors.white),
-      decoration: InputDecoration(
+      style: ScanResultFormStyle.inputText(),
+      decoration: ScanResultFormStyle.textFieldDecoration(radius: 10).copyWith(
         hintText: 'Search within scanned book',
-        hintStyle: GoogleFonts.nunito(color: Colors.white38),
-        prefixIcon: const Icon(Icons.search_rounded, color: Colors.white54),
-        isDense: true,
-        filled: true,
-        fillColor: const Color(0xFF141E31),
-        border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(10),
-          borderSide: BorderSide.none,
-        ),
+        hintStyle: ScanResultFormStyle.muted(),
+        prefixIcon: const Icon(Icons.search_rounded, color: AppColors.navyMid),
       ),
     );
   }
 
   Widget _translatedCard() {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF17233A),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Text(
         _translated.length > 1200 ? '${_translated.substring(0, 1200)}...' : _translated,
-        style: GoogleFonts.nunito(color: Colors.white70),
+        style: ScanResultFormStyle.bodyLine(),
       ),
     );
   }
@@ -255,11 +241,7 @@ class _BookResultScreenState extends State<BookResultScreen> {
     final bookmarked = _bookmarks.contains(p.pageIndex);
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101826),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: ListTile(
         leading: SizedBox(
           width: 52,
@@ -267,13 +249,13 @@ class _BookResultScreenState extends State<BookResultScreen> {
         ),
         title: Text(
           'Page ${p.pageIndex + 1} ${p.pageNumber.isNotEmpty ? "(#${p.pageNumber})" : ""}',
-          style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800),
+          style: ScanResultFormStyle.cardTitle(fontSize: 15),
         ),
         subtitle: Text(
           '${p.heading.isEmpty ? 'No heading' : p.heading}\nLayout: ${p.columnLayout} | Eq:${p.hasEquation ? "Y" : "N"} | Tbl:${p.hasTable ? "Y" : "N"}',
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
-          style: GoogleFonts.nunito(color: Colors.white60, fontSize: 12),
+          style: ScanResultFormStyle.muted(fontSize: 12),
         ),
         trailing: IconButton(
           onPressed: () {
@@ -287,7 +269,7 @@ class _BookResultScreenState extends State<BookResultScreen> {
           },
           icon: Icon(
             bookmarked ? Icons.bookmark_rounded : Icons.bookmark_border_rounded,
-            color: bookmarked ? AppColors.gold : Colors.white54,
+            color: bookmarked ? AppColors.gold : AppColors.navyMid.withValues(alpha: 0.45),
           ),
         ),
         onTap: () => _showPageDetails(p),
@@ -299,15 +281,15 @@ class _BookResultScreenState extends State<BookResultScreen> {
     await showModalBottomSheet<void>(
       context: context,
       isScrollControlled: true,
-      backgroundColor: const Color(0xFF0D1422),
+      backgroundColor: AppColors.cardWhite,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (ctx) => SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: SingleChildScrollView(
-            child: Text(
-              p.text,
-              style: GoogleFonts.nunito(color: Colors.white70),
-            ),
+            child: Text(p.text, style: ScanResultFormStyle.bodyLine()),
           ),
         ),
       ),

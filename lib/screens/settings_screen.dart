@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:iconsax/iconsax.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
+import '../services/share_file_service.dart';
 import '../app_theme_controller.dart';
 import '../services/app_local_storage.dart';
 import '../services/biometric_service.dart';
@@ -19,7 +19,10 @@ import 'onboarding_screen.dart';
 // Scanner-focused settings; toggles are wired to prefs / theme / DB where applicable.
 
 class SettingsScreen extends StatefulWidget {
-  const SettingsScreen({super.key});
+  /// When true (home tab), add bottom padding so the list does not sit under the shell [BottomAppBar].
+  final bool padsForBottomTabShell;
+
+  const SettingsScreen({super.key, this.padsForBottomTabShell = true});
 
   @override
   State<SettingsScreen> createState() => _SettingsScreenState();
@@ -29,6 +32,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   // ── Prefs state ───────────────────────────────────────────────
   bool _autoEnhance = true;
   bool _darkMode = false;
+  bool _followSystemTheme = false;
   bool _gridView = false;
   String _defaultQuality = 'High';
 
@@ -60,6 +64,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
     setState(() {
       _autoEnhance = AppLocalStorage.getBool('autoEnhance', defaultValue: true);
       _darkMode = AppLocalStorage.getBool('darkMode');
+      _followSystemTheme =
+          AppLocalStorage.getBool(AppThemeController.themeFollowSystemKey);
       _gridView = AppLocalStorage.getBool('gridView');
       _defaultQuality =
           AppLocalStorage.getString('defaultQuality', defaultValue: 'High');
@@ -81,8 +87,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         _showInfo('Nothing to export', 'Add scans first, then try again.');
         return;
       }
-      await Share.shareXFiles(
-        [XFile(path)],
+      await ShareFileService.sharePaths(
+        [path],
         subject: 'ScanOnly backup',
         text:
             'Local backup of your ScanOnly library (ZIP is not encrypted—store safely).',
@@ -267,29 +273,53 @@ class _SettingsScreenState extends State<SettingsScreen> {
   //  BUILD
   // ══════════════════════════════════════════════════════════════
 
+  /// Must match [HomeScreen] `_buildBottomNav` child height (62) + breathing room above the bar.
+  double _homeTabShellBottomInset(BuildContext context) {
+    const double bottomAppBarHeight = 62;
+    const double gapAboveBar = 20;
+    return bottomAppBarHeight +
+        MediaQuery.of(context).viewPadding.bottom +
+        gapAboveBar;
+  }
+
+  double _listBottomPadding(BuildContext context) {
+    final safe = MediaQuery.of(context).viewPadding.bottom;
+    if (!widget.padsForBottomTabShell) {
+      return 22 + safe;
+    }
+    return _homeTabShellBottomInset(context);
+  }
+
   @override
   Widget build(BuildContext context) {
     // Show shimmer/loading until prefs are ready
     if (!_prefsLoaded) {
       return Scaffold(
-        backgroundColor: const Color(0xFFF0F2F8),
         body: Column(
           children: [
             _buildHeader(),
             const Expanded(child: Center(child: CircularProgressIndicator())),
+            SizedBox(
+                height: widget.padsForBottomTabShell
+                    ? _homeTabShellBottomInset(context)
+                    : 0),
           ],
         ),
       );
     }
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F8),
       body: Column(
         children: [
           _buildHeader(),
           Expanded(
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(12, 10, 12, 22),
+              padding: EdgeInsets.fromLTRB(
+                12,
+                10,
+                12,
+                _listBottomPadding(context),
+              ),
               children: [
                 _sectionLabel('Scanning', Iconsax.camera, AppColors.gold),
                 _navTile(
@@ -346,21 +376,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   title: 'Cloud backup',
                   subtitle: SupabaseService.isAvailable
                       ? 'Upload after each local save (Supabase)'
-                      : 'Supabase keys missing in launch args',
+                      : 'Supabase unavailable (check internet or project)',
                   value: _cloudBackupEnabled && SupabaseService.isAvailable,
                   onChanged: SupabaseService.isAvailable
                       ? (v) {
                           setState(() => _cloudBackupEnabled = v);
-                          AppLocalStorage.setBool('cloudBackupEnabled', v);
-                          if (v) {
-                            CloudBackupService.instance.syncPendingUploads();
-                          }
+                          Future(() async {
+                            await AppLocalStorage.setBool(
+                                'cloudBackupEnabled', v);
+                            if (v) {
+                              await CloudBackupService.instance
+                                  .syncPendingUploads();
+                            }
+                          });
                         }
                       : (_) {
                           _showInfo(
-                            'Supabase not configured',
-                            'Run with --dart-define-from-file=dart_defines.json '
-                                'or use launch profile "scan_only (Supabase from dart_defines.json)".',
+                            'Supabase unavailable',
+                            'The app could not reach Supabase at startup. '
+                                'Check your connection, then restart the app. '
+                                'If you changed projects, update lib/config/supabase_app_config.dart.',
                           );
                         },
                 ),
@@ -458,17 +493,32 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 const SizedBox(height: 14),
                 _sectionLabel('App', Iconsax.brush_2, AppColors.navyMid),
                 _toggleTile(
+                  icon: Iconsax.mobile,
+                  color: AppColors.navyMid,
+                  title: 'Use device theme',
+                  subtitle: _followSystemTheme
+                      ? 'Matches Android light / dark setting'
+                      : 'Turn off to choose light or dark manually',
+                  value: _followSystemTheme,
+                  onChanged: (v) {
+                    setState(() => _followSystemTheme = v);
+                    AppThemeController.setFollowSystemTheme(v);
+                  },
+                ),
+                _toggleTile(
                   icon: _darkMode ? Iconsax.moon : Iconsax.sun_1,
                   color: AppColors.navyDark,
                   title: 'Dark mode',
-                  subtitle:
-                      _darkMode ? 'Dark theme on' : 'Light theme on',
+                  subtitle: _followSystemTheme
+                      ? 'Saved for when device theme is off'
+                      : (_darkMode ? 'Dark theme on' : 'Light theme on'),
                   value: _darkMode,
-                  onChanged: (v) {
-                    setState(() => _darkMode = v);
-                    AppLocalStorage.setBool('darkMode', v);
-                    AppThemeController.setDarkMode(v);
-                  },
+                  onChanged: _followSystemTheme
+                      ? null
+                      : (v) {
+                          setState(() => _darkMode = v);
+                          AppThemeController.setDarkMode(v);
+                        },
                 ),
                 _navTile(
                   icon: Iconsax.book,
@@ -588,7 +638,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     required String title,
     required String subtitle,
     required bool value,
-    required void Function(bool) onChanged,
+    ValueChanged<bool>? onChanged,
   }) =>
       _tile(
         icon: icon,
@@ -866,16 +916,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   Future<void> _syncNow() async {
     if (_syncingNow) return;
-    if (!SupabaseService.isAvailable) {
-      _showInfo(
-        'Supabase not configured',
-        'Copy dart_defines.example.json to dart_defines.json, add your URL and '
-            'anon key, then run with --dart-define-from-file=dart_defines.json '
-            '(VS Code: launch "scan_only (Supabase from dart_defines.json)"). '
-            'Or pass --dart-define=SUPABASE_URL=... and SUPABASE_ANON_KEY=...',
-      );
-      return;
-    }
     if (!_cloudBackupEnabled) {
       _showInfo(
         'Cloud backup is off',
@@ -887,17 +927,60 @@ class _SettingsScreenState extends State<SettingsScreen> {
     try {
       final result = await CloudBackupService.instance.syncPendingUploads();
       if (!mounted) return;
-      if (result.uploaded == 0 && result.failed == 0) {
-        _showInfo(
-          'Nothing to sync yet',
-          'No queued documents found. Save one new scan/PDF while Cloud backup '
-              'is ON, then tap Sync now again.',
-        );
-      } else {
+      if (result.uploaded > 0 || result.failed > 0) {
         _showSuccess(
           'Sync done: ${result.uploaded} uploaded, ${result.failed} failed.',
         );
+        return;
       }
+      if (result.pendingUploadCount > 0) {
+        final detail = result.diagnostic?.trim();
+        _showInfo(
+          'Upload not finished',
+          '${result.pendingUploadCount} document(s) are queued but the app did not upload them in this run.\n\n'
+              '${detail != null && detail.isNotEmpty ? '$detail\n\n' : ''}'
+              'Also confirm in Supabase:\n'
+              '• Storage → bucket name exactly: scan-only (not scan-onlu)\n'
+              '• Authentication → Providers → Anonymous → enabled\n'
+              '• Storage policies allow insert for that bucket\n\n'
+              'Then tap Sync now again.',
+        );
+        return;
+      }
+      if (result.newlyQueuedCount > 0) {
+        _showInfo(
+          'Documents queued',
+          '${result.newlyQueuedCount} older document(s) were marked for upload. '
+              'Tap Sync now again after the connection is stable.',
+        );
+        return;
+      }
+      final by = await DatabaseService.instance.countDocumentsBySyncStatus();
+      final total = by.values.fold<int>(0, (s, n) => s + n);
+      final synced = by['synced'] ?? 0;
+      final local = by['local_only'] ?? 0;
+      final queued = by['queued_for_upload'] ?? 0;
+      final uploadFailed = by['upload_failed'] ?? 0;
+      final breakdown = by.entries.map((e) => '${e.key}: ${e.value}').join(', ');
+
+      String body;
+      if (total == 0) {
+        body =
+            'There are no saved documents in this app yet. Scan or import from the Home tab first.';
+      } else if (queued == 0 &&
+          local == 0 &&
+          uploadFailed == 0 &&
+          synced == total) {
+        body =
+            'All $synced saved item(s) are already marked synced — the app is not holding anything back to upload. '
+            'Check Supabase → Storage (bucket scan-only) and Table Editor → cloud_documents if you still do not see them online.';
+      } else {
+        body =
+            'Nothing was queued this sync (saved documents: $total — $breakdown). '
+            'If a scan shows here but never uploads, the original file may have been deleted from the phone; '
+            'try opening it on the Docs tab — if it errors, re-scan or re-import.';
+      }
+      _showInfo('Nothing to sync', body);
     } finally {
       if (mounted) setState(() => _syncingNow = false);
     }

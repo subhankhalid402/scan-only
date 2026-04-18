@@ -2,12 +2,11 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../models/document_model.dart';
 import '../services/database_service.dart';
 import '../services/pdf_service.dart';
 import '../services/photo_enhancement_service.dart';
+import '../services/share_file_service.dart';
 import '../theme.dart';
 
 class PhotoEnhancementScreen extends StatefulWidget {
@@ -97,15 +96,13 @@ class _PhotoEnhancementScreenState extends State<PhotoEnhancementScreen> {
   Future<void> _exportAndShare() async {
     setState(() => _busy = true);
     try {
-      final files = <XFile>[];
+      final paths = <String>[];
       for (final p in _pages) {
-        files.add(
-          XFile(
-            await PhotoEnhancementService.instance.exportImage(
-              p,
-              format: PhotoExportFormat.jpg,
-              quality: _quality,
-            ),
+        paths.add(
+          await PhotoEnhancementService.instance.exportImage(
+            p,
+            format: PhotoExportFormat.jpg,
+            quality: _quality,
           ),
         );
       }
@@ -119,10 +116,10 @@ class _PhotoEnhancementScreenState extends State<PhotoEnhancementScreen> {
         format: PhotoExportFormat.webp,
         quality: _quality,
       );
-      files.add(XFile(png));
-      files.add(XFile(webp));
+      paths.add(png);
+      paths.add(webp);
       final pdf = await PdfService.instance.createPdfFromImages(_pages, 'Enhanced_Photos');
-      files.add(XFile(pdf));
+      paths.add(pdf);
 
       final thumb = await PdfService.instance.generateThumbnail(_pages.first);
       final size = await PdfService.instance.getFileSizeMB(pdf);
@@ -140,7 +137,7 @@ class _PhotoEnhancementScreenState extends State<PhotoEnhancementScreen> {
         ),
       );
       if (!mounted) return;
-      await Share.shareXFiles(files, text: 'Enhanced photos');
+      await ShareFileService.sharePaths(paths, text: 'Enhanced photos');
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -149,7 +146,6 @@ class _PhotoEnhancementScreenState extends State<PhotoEnhancementScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Photo Enhancement', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),

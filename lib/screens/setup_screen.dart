@@ -127,6 +127,8 @@ class _SetupScreenState extends State<SetupScreen> {
       _addLog('✓ Sync completed');
       _addLog('  Uploaded: ${result.uploaded}');
       _addLog('  Failed: ${result.failed}');
+      _addLog('  Newly queued (local→queued): ${result.newlyQueuedCount}');
+      _addLog('  Still queued after run: ${result.pendingUploadCount}');
 
       if (result.uploaded > 0) {
         _addLog('\n✅ Documents synced successfully!');
@@ -134,6 +136,9 @@ class _SetupScreenState extends State<SetupScreen> {
       } else if (result.failed > 0) {
         _addLog('\n⚠️  Some documents failed to sync');
         setState(() => _status = 'Sync had errors');
+      } else if (result.pendingUploadCount > 0) {
+        _addLog('\n⚠️  Documents are queued but not uploaded (check Supabase / network)');
+        setState(() => _status = 'Upload pending');
       } else {
         _addLog('\nℹ️  No documents to sync');
         setState(() => _status = 'No pending uploads');

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'app_theme_controller.dart';
+import 'config/supabase_app_config.dart';
 import 'services/app_local_storage.dart';
 import 'services/supabase_service.dart';
 import 'theme.dart';
@@ -22,10 +23,9 @@ void main() async {
 
   await AppLocalStorage.init();
   await AppThemeController.init();
-  // Direct Supabase connection (no JSON file needed)
   await SupabaseService.init(
-    url: 'https://aowgmjiezwydhluigkuc.supabase.co',
-    anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFvd2dtamllend5ZGhsdWlna3VjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzYyMzcwNDYsImV4cCI6MjA5MTgxMzA0Nn0.Ek-gst2tcNLoppK6LHpx8SrVt4gqm1nm07o_mgOmSGw',
+    url: SupabaseAppConfig.url,
+    anonKey: SupabaseAppConfig.anonKey,
   );
 
   const channel = MethodChannel('scanonly/openwith');
@@ -54,9 +54,16 @@ class ScanOnlyApp extends StatelessWidget {
           themeMode: mode,
           home: SplashScreen(initialSharedFile: initialSharedFile),
           builder: (context, child) {
-            return AppLifecycleLock(
+            final mq = MediaQuery.of(context);
+            final textScaler = mq.textScaler.clamp(
+              minScaleFactor: 0.85,
+              maxScaleFactor: 1.25,
+            );
+            final scaledChild = MediaQuery(
+              data: mq.copyWith(textScaler: textScaler),
               child: child ?? const SizedBox.shrink(),
             );
+            return AppLifecycleLock(child: scaledChild);
           },
         );
       },

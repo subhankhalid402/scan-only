@@ -202,7 +202,6 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       appBar: _buildAppBar(),
       body: Column(
         children: [
@@ -307,7 +306,7 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
   // ── Pen toolbar ───────────────────────────────────────────────
 
   Widget _buildToolbar() => Container(
-        color: Colors.white,
+        color: Theme.of(context).colorScheme.surface,
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
@@ -364,7 +363,9 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
                     decoration: BoxDecoration(
                       color: _strokeWidth == s.width
                           ? AppColors.navyDark
-                          : const Color(0xFFF0F2F8),
+                          : Theme.of(context)
+                              .colorScheme
+                              .surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(8),
                     ),
                     child: Text(s.label,

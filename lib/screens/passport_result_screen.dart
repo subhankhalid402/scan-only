@@ -243,7 +243,6 @@ class _PassportResultScreenState extends State<PassportResultScreen> {
   Widget build(BuildContext context) {
     final d = _currentData();
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Passport Details',

@@ -88,16 +88,18 @@ class _HomeScreenState extends State<HomeScreen> {
           ),
           ElevatedButton(
             style: ElevatedButton.styleFrom(backgroundColor: AppColors.gold),
-            onPressed: () {
-              AppLocalStorage.setBool('cloudBackupEnabled', true);
-              CloudBackupService.instance.syncPendingUploads();
+            onPressed: () async {
               Navigator.pop(ctx);
+              await AppLocalStorage.setBool('cloudBackupEnabled', true);
+              await CloudBackupService.instance.syncPendingUploads();
+              if (!mounted) return;
               _openTab(3); // open settings tab
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text(
-                      'Cloud backup enabled. Configure Supabase keys in launch args.',
+                      'Cloud backup enabled. Existing documents will upload in the background; '
+                      'use Settings → Sync now if you want to check progress.',
                     ),
                   ),
                 );
@@ -285,7 +287,7 @@ class _HomeScreenState extends State<HomeScreen> {
             refreshToken: _docsRefreshToken,
           ),
           const SearchScreen(),
-          const SettingsScreen(),
+          const SettingsScreen(padsForBottomTabShell: true),
         ],
       ),
       bottomNavigationBar: _buildBottomNav(),
@@ -308,9 +310,10 @@ class _HomeScreenState extends State<HomeScreen> {
         _buildHeroSection(),
         Expanded(
           child: Container(
-            decoration: const BoxDecoration(
-              color: AppColors.background,
-              borderRadius: BorderRadius.vertical(top: Radius.circular(28)),
+            decoration: BoxDecoration(
+              color: Theme.of(context).scaffoldBackgroundColor,
+              borderRadius:
+                  const BorderRadius.vertical(top: Radius.circular(28)),
             ),
             child: _buildRecentDocuments(),
           ),
@@ -562,6 +565,8 @@ class _HomeScreenState extends State<HomeScreen> {
   // ─── Recent Documents ─────────────────────────────────────────────────────
 
   Widget _buildRecentDocuments() {
+    final onSurface = Theme.of(context).colorScheme.onSurface;
+    final muted = Theme.of(context).colorScheme.onSurfaceVariant;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
       child: Column(
@@ -575,7 +580,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 style: GoogleFonts.nunito(
                   fontSize: 17,
                   fontWeight: FontWeight.w800,
-                  color: AppColors.textDark,
+                  color: onSurface,
                 ),
               ),
               GestureDetector(
@@ -598,14 +603,14 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Icon(Iconsax.document, size: 64, color: Colors.grey[300]),
+                    Icon(Iconsax.document, size: 64, color: muted.withValues(alpha: 0.35)),
                     const SizedBox(height: 14),
                     Text(
                       'No documents yet',
                       textAlign: TextAlign.center,
                       style: GoogleFonts.nunito(
                         fontSize: 14,
-                        color: AppColors.textMuted,
+                        color: muted,
                         height: 1.5,
                       ),
                     ),
@@ -720,6 +725,13 @@ class _DocCard extends StatelessWidget {
     required this.onDelete,
   });
 
+  Color _chipBg(ColorScheme scheme) {
+    return Color.alphaBlend(
+      scheme.onSurface.withValues(alpha: 0.06),
+      scheme.surface,
+    );
+  }
+
   Color _accentColor() {
     final t = doc.fileType.toLowerCase();
     switch (t) {
@@ -763,16 +775,24 @@ class _DocCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final color = _accentColor();
+    final scheme = Theme.of(context).colorScheme;
+    final titleColor = scheme.onSurface;
+    final subtitleColor = scheme.onSurfaceVariant;
     // Whole row is one surface — tap anywhere (except ⋮) opens
     // the document with a ripple. [PopupMenuButton] handles its own tap only.
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: Material(
-        color: Colors.white,
-        elevation: 1.5,
+        color: scheme.surface,
+        elevation: Theme.of(context).brightness == Brightness.dark ? 0 : 1.5,
         shadowColor: Colors.black.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(16),
         clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(16),
+          side: Theme.of(context).brightness == Brightness.dark
+              ? BorderSide(color: scheme.outline.withValues(alpha: 0.22))
+              : BorderSide.none,
+        ),
         child: InkWell(
           onTap: onTap,
           borderRadius: BorderRadius.circular(16),
@@ -808,7 +828,7 @@ class _DocCard extends StatelessWidget {
                         style: GoogleFonts.nunito(
                           fontSize: 13,
                           fontWeight: FontWeight.w700,
-                          color: AppColors.textDark,
+                          color: titleColor,
                         ),
                         maxLines: 1,
                         overflow: TextOverflow.ellipsis,
@@ -820,7 +840,7 @@ class _DocCard extends StatelessWidget {
                             '${_formatDate(doc.createdAt)} · ${doc.pageCount} page${doc.pageCount > 1 ? 's' : ''}',
                             style: GoogleFonts.nunito(
                               fontSize: 11,
-                              color: AppColors.textMuted,
+                              color: subtitleColor,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -830,7 +850,7 @@ class _DocCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: const Color(0xFFF0F0F0),
+                              color: _chipBg(scheme),
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
@@ -838,7 +858,7 @@ class _DocCard extends StatelessWidget {
                               style: GoogleFonts.nunito(
                                 fontSize: 10,
                                 fontWeight: FontWeight.w600,
-                                color: AppColors.textMuted,
+                                color: subtitleColor,
                               ),
                             ),
                           ),
@@ -848,8 +868,8 @@ class _DocCard extends StatelessWidget {
                   ),
                 ),
                 PopupMenuButton<String>(
-                  icon:
-                      const Icon(Icons.more_vert, color: Colors.grey, size: 20),
+                  icon: Icon(Icons.more_vert,
+                      color: subtitleColor, size: 20),
                   onSelected: (val) {
                     switch (val) {
                       case 'share':

@@ -291,7 +291,6 @@ class _DocumentTemplateBuilderScreenState
   Widget build(BuildContext context) {
     final accent = _accentColorForTemplate();
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text(

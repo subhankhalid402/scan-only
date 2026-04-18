@@ -20,6 +20,7 @@ import 'documents_screen.dart';
 import 'edit_scan_screen.dart';
 import 'settings_screen.dart';
 import 'office_export_hub_screen.dart';
+import 'photo_enhancement_screen.dart';
 
 class ComprehensiveFeaturesScreen extends StatefulWidget {
   const ComprehensiveFeaturesScreen({super.key});
@@ -344,7 +345,6 @@ class _ComprehensiveFeaturesScreenState
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
         title: Text('All Features',
             style: GoogleFonts.nunito(
@@ -443,7 +443,7 @@ class _ComprehensiveFeaturesScreenState
   Future<void> _autoEnhance() async {
     final path = await _pickSingleImage();
     if (path == null || !mounted) return;
-    _go(AdvancedFiltersScreen(imagePath: path));
+    _go(PhotoEnhancementScreen(imagePaths: [path]));
   }
 
   Future<void> _advancedFilters() async {
@@ -512,11 +512,11 @@ class _ComprehensiveFeaturesScreenState
   }
 
   void _biometric() {
-    _go(const SettingsScreen());
+    _go(const SettingsScreen(padsForBottomTabShell: false));
   }
 
   void _notifications() {
-    _go(const SettingsScreen());
+    _go(const SettingsScreen(padsForBottomTabShell: false));
   }
 
   // ── Pickers ────────────────────────────────────────────────────────────────

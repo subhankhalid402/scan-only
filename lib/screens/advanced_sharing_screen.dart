@@ -8,6 +8,7 @@ import 'package:qr_flutter/qr_flutter.dart';
 import 'package:share_plus/share_plus.dart';
 import '../theme.dart';
 import '../services/email_service.dart';
+import '../services/share_file_service.dart';
 
 class AdvancedSharingScreen extends StatefulWidget {
   final String filePath;
@@ -35,10 +36,9 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
         _showError('File not found. It may have been moved or deleted.');
         return;
       }
-      await Share.shareXFiles(
-        [XFile(widget.filePath, name: widget.fileName)],
-        text: 'Check out this document: ${widget.fileName}',
-      );
+      // Do not pass `text`: many apps (e.g. WhatsApp) then send only the caption
+      // and omit the file attachment. File name comes from the path / XFile.name.
+      await ShareFileService.sharePaths([widget.filePath]);
     } catch (e) {
       if (!mounted) return;
       _showError('Could not share: $e');
@@ -98,11 +98,11 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
       final uri = Uri.file(widget.filePath).toString();
       await Clipboard.setData(ClipboardData(text: uri));
       await Share.share(
-        'Document link:\n$uri',
+        'Local file path (same device only):\n$uri',
         subject: widget.fileName,
       );
       if (!mounted) return;
-      _showSuccess('Link copied and shared.');
+      _showSuccess('Path copied; share sheet opened with text only.');
     } catch (e) {
       if (!mounted) return;
       _showError('Could not share link: $e');
@@ -248,7 +248,7 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
                 Expanded(
                   child: _shareOption(
                     Iconsax.link,
-                    'Share Link',
+                    'Path as text',
                     _shareViaLink,
                     AppColors.green,
                   ),

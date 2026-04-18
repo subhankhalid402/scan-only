@@ -5,14 +5,13 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../models/document_model.dart';
 import '../models/medical_prescription_data.dart';
 import '../services/database_service.dart';
 import '../services/medical_prescription_ocr_service.dart';
 import '../services/notification_service.dart';
 import '../services/pdf_service.dart';
+import '../services/share_file_service.dart';
 import '../theme.dart';
 
 class MedicalPrescriptionResultScreen extends StatefulWidget {
@@ -179,8 +178,8 @@ class _MedicalPrescriptionResultScreenState
       final json = await _saveJson(d);
       await _setupReminders(d);
       if (!mounted) return;
-      await Share.shareXFiles(
-        [XFile(pdf), XFile(json)],
+      await ShareFileService.sharePaths(
+        [pdf, json],
         text: 'Prescription for ${d.patientName}',
       );
       if (!mounted) return;
@@ -200,7 +199,6 @@ class _MedicalPrescriptionResultScreenState
   Widget build(BuildContext context) {
     final d = _currentData();
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Medical Prescription',
@@ -288,24 +286,28 @@ class _MedicalPrescriptionResultScreenState
 
   Widget _validationCard(MedicalPrescriptionData d) {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121A2B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Smart Checks', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text('PMDC: ${d.pmdcValid ? 'Valid format' : 'Needs review'}',
-              style: GoogleFonts.nunito(
-                  color: d.pmdcValid ? AppColors.green : Colors.orange)),
-          Text('Urdu support: ${d.urduText.isEmpty ? 'No Urdu detected' : 'Detected'}',
-              style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Signature: ${d.signatureDetected ? 'Detected' : 'Not clear'}',
-              style: GoogleFonts.nunito(color: Colors.white70)),
+          Text('Smart Checks', style: ScanResultFormStyle.cardTitle()),
+          const SizedBox(height: 8),
+          Text(
+            'PMDC: ${d.pmdcValid ? 'Valid format' : 'Needs review'}',
+            style: GoogleFonts.nunito(
+              color: d.pmdcValid ? AppColors.green : AppColors.orange,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            'Urdu support: ${d.urduText.isEmpty ? 'No Urdu detected' : 'Detected'}',
+            style: ScanResultFormStyle.muted(),
+          ),
+          Text(
+            'Signature: ${d.signatureDetected ? 'Detected' : 'Not clear'}',
+            style: ScanResultFormStyle.muted(),
+          ),
         ],
       ),
     );
@@ -329,7 +331,7 @@ class _MedicalPrescriptionResultScreenState
               const Spacer(),
               IconButton(
                 onPressed: () => setState(() => _meds.add(const MedicineEntry())),
-                icon: const Icon(Icons.add_circle_outline_rounded, color: Colors.white70),
+                icon: const Icon(Icons.add_circle_outline_rounded, color: AppColors.gold),
               )
             ],
           ),
@@ -377,18 +379,13 @@ class _MedicalPrescriptionResultScreenState
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          SizedBox(width: 70, child: Text(label, style: GoogleFonts.nunito(color: Colors.white54, fontSize: 12))),
+          SizedBox(width: 70, child: Text(label, style: ScanResultFormStyle.labelOnDarkPanel())),
           Expanded(
             child: TextField(
               controller: c,
               onChanged: (v) => setState(() => onChanged(v)),
-              style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-              ),
+              style: ScanResultFormStyle.inputText(fontSize: 13),
+              decoration: ScanResultFormStyle.textFieldOnDarkPanel(),
             ),
           ),
         ],
@@ -405,15 +402,11 @@ class _MedicalPrescriptionResultScreenState
         children: [
           Row(
             children: [
-              Expanded(
-                child: Text(label,
-                    style: GoogleFonts.nunito(
-                        color: Colors.white70, fontWeight: FontWeight.w700)),
-              ),
+              Expanded(child: Text(label, style: ScanResultFormStyle.label())),
               IconButton(
                 onPressed: () => _copy(label, c.text.trim()),
                 icon: const Icon(Icons.copy_rounded, size: 18),
-                color: Colors.white60,
+                color: AppColors.navyMid,
               ),
             ],
           ),
@@ -421,16 +414,10 @@ class _MedicalPrescriptionResultScreenState
             controller: c,
             maxLines: maxLines,
             onChanged: (_) => setState(() {}),
-            style:
-                GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700),
-            decoration: InputDecoration(
-              isDense: true,
-              filled: true,
-              fillColor: const Color(0xFF141E31),
+            style: ScanResultFormStyle.inputText(),
+            decoration: ScanResultFormStyle.textFieldDecoration(
+              radius: 10,
               errorText: isError ? 'Invalid value' : null,
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none),
             ),
           ),
         ],

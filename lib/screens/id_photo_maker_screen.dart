@@ -203,7 +203,6 @@ class _IdPhotoMakerScreenState extends State<IdPhotoMakerScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text(

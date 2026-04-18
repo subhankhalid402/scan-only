@@ -340,7 +340,6 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F6FA),
       appBar: _buildAppBar(),
       body: Stack(
         children: [

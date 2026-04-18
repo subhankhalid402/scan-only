@@ -6,8 +6,6 @@ import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../models/document_model.dart';
 import '../models/receipt_data.dart';
 import '../services/database_service.dart';
@@ -15,6 +13,7 @@ import '../services/excel_export_service.dart';
 import '../services/pdf_service.dart';
 import '../services/receipt_expense_service.dart';
 import '../services/receipt_ocr_service.dart';
+import '../services/share_file_service.dart';
 import '../theme.dart';
 
 class ReceiptResultScreen extends StatefulWidget {
@@ -224,8 +223,8 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
           backgroundColor: AppColors.green,
         ),
       );
-      await Share.shareXFiles(
-        [XFile(pdfPath), XFile(jsonPath), XFile(excelPath), XFile(csvPath)],
+      await ShareFileService.sharePaths(
+        [pdfPath, jsonPath, excelPath, csvPath],
         text: 'Receipt export (${d.storeName})',
       );
     } finally {
@@ -259,7 +258,6 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
   Widget build(BuildContext context) {
     final d = _currentData();
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: const Color(0xFF111824),
         title: Text('Receipt Intelligence', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
@@ -518,18 +516,13 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
       padding: const EdgeInsets.only(bottom: 6),
       child: Row(
         children: [
-          SizedBox(width: 50, child: Text(label, style: GoogleFonts.nunito(color: Colors.white54, fontSize: 12))),
+          SizedBox(width: 50, child: Text(label, style: ScanResultFormStyle.labelOnDarkPanel())),
           Expanded(
             child: TextField(
               controller: ctrl,
               onChanged: (v) => setState(() => onChanged(v)),
-              style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-              decoration: InputDecoration(
-                isDense: true,
-                filled: true,
-                fillColor: Colors.white.withValues(alpha: 0.05),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-              ),
+              style: ScanResultFormStyle.inputText(fontSize: 13),
+              decoration: ScanResultFormStyle.textFieldOnDarkPanel(),
             ),
           ),
         ],
@@ -545,11 +538,11 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
         children: [
           Row(
             children: [
-              Expanded(child: Text(label, style: GoogleFonts.nunito(color: Colors.white70, fontWeight: FontWeight.w700, fontSize: 12))),
+              Expanded(child: Text(label, style: ScanResultFormStyle.labelOnDarkPanel(fontSize: 12))),
               IconButton(
                 onPressed: () => _copy(label, ctrl.text.trim()),
                 icon: const Icon(Icons.copy_rounded, size: 16),
-                color: Colors.white60,
+                color: AppColors.gold,
               ),
             ],
           ),
@@ -557,13 +550,8 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
             controller: ctrl,
             maxLines: maxLines,
             onChanged: (_) => setState(() {}),
-            style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13),
-            decoration: InputDecoration(
-              isDense: true,
-              filled: true,
-              fillColor: Colors.white.withValues(alpha: 0.05),
-              border: OutlineInputBorder(borderRadius: BorderRadius.circular(8), borderSide: BorderSide.none),
-            ),
+            style: ScanResultFormStyle.inputText(fontSize: 13),
+            decoration: ScanResultFormStyle.textFieldOnDarkPanel(),
           ),
         ],
       ),

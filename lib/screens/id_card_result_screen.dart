@@ -197,7 +197,6 @@ class _IdCardResultScreenState extends State<IdCardResultScreen> {
   Widget build(BuildContext context) {
     final card = _currentData();
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text(

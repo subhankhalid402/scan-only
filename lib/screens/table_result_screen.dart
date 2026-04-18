@@ -5,13 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../models/document_model.dart';
 import '../models/table_scan_data.dart';
 import '../services/database_service.dart';
 import '../services/excel_export_service.dart';
 import '../services/pdf_service.dart';
+import '../services/share_file_service.dart';
 import '../services/table_scan_service.dart';
 import '../theme.dart';
 
@@ -136,8 +135,8 @@ class _TableResultScreenState extends State<TableResultScreen> {
       );
 
       if (!mounted) return;
-      await Share.shareXFiles(
-        [XFile(xlsx), XFile(csv), XFile(pdf), XFile(json), XFile(html)],
+      await ShareFileService.sharePaths(
+        [xlsx, csv, pdf, json, html],
         text: 'Table exports (Google Sheets ready)',
       );
       if (!mounted) return;
@@ -152,7 +151,6 @@ class _TableResultScreenState extends State<TableResultScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Table Scanner', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
@@ -206,23 +204,19 @@ class _TableResultScreenState extends State<TableResultScreen> {
 
   Widget _stats() {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121A2B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Structure Detection', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text('Rows: ${_data.rowCount} | Columns: ${_data.columnCount}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Header row: ${_data.headerDetected ? 'Detected' : 'Not sure'}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Borderless: ${_data.borderlessDetected ? 'Likely' : 'No'}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Nested table: ${_data.nestedTableHint ? 'Possible' : 'No'}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Urdu: ${_data.urduDetected ? 'Yes' : 'No'} | PKR: ${_data.pkrDetected ? 'Yes' : 'No'}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Multi-page: ${_data.multiPage ? 'Yes' : 'No'}', style: GoogleFonts.nunito(color: Colors.white70)),
+          Text('Structure Detection', style: ScanResultFormStyle.cardTitle()),
+          const SizedBox(height: 8),
+          Text('Rows: ${_data.rowCount} | Columns: ${_data.columnCount}', style: ScanResultFormStyle.muted()),
+          Text('Header row: ${_data.headerDetected ? 'Detected' : 'Not sure'}', style: ScanResultFormStyle.muted()),
+          Text('Borderless: ${_data.borderlessDetected ? 'Likely' : 'No'}', style: ScanResultFormStyle.muted()),
+          Text('Nested table: ${_data.nestedTableHint ? 'Possible' : 'No'}', style: ScanResultFormStyle.muted()),
+          Text('Urdu: ${_data.urduDetected ? 'Yes' : 'No'} | PKR: ${_data.pkrDetected ? 'Yes' : 'No'}', style: ScanResultFormStyle.muted()),
+          Text('Multi-page: ${_data.multiPage ? 'Yes' : 'No'}', style: ScanResultFormStyle.muted()),
         ],
       ),
     );
@@ -234,12 +228,8 @@ class _TableResultScreenState extends State<TableResultScreen> {
     if (headers.isEmpty && rows.isEmpty) {
       return Container(
         padding: const EdgeInsets.all(14),
-        decoration: BoxDecoration(
-          color: const Color(0xFF101826),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.white12),
-        ),
-        child: Text('No table cells detected', style: GoogleFonts.nunito(color: Colors.white60)),
+        decoration: ScanResultFormStyle.insightCardDecoration(),
+        child: Text('No table cells detected', style: ScanResultFormStyle.muted()),
       );
     }
     final all = <List<String>>[
@@ -247,21 +237,24 @@ class _TableResultScreenState extends State<TableResultScreen> {
       ...rows,
     ];
     return Container(
-      decoration: BoxDecoration(
-        color: const Color(0xFF101826),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
+      clipBehavior: Clip.antiAlias,
       child: SingleChildScrollView(
         scrollDirection: Axis.horizontal,
         child: DataTable(
-          headingRowColor: WidgetStatePropertyAll(Colors.white.withValues(alpha: 0.08)),
+          headingRowColor: WidgetStatePropertyAll(AppColors.navyMid),
+          dataRowMinHeight: 40,
+          horizontalMargin: 12,
+          dividerThickness: 0.6,
+          border: TableBorder(
+            horizontalInside: BorderSide(color: AppColors.navyDark.withValues(alpha: 0.08)),
+          ),
           columns: List.generate(
             _data.columnCount,
             (i) => DataColumn(
               label: Text(
                 headers.isNotEmpty && i < headers.length ? headers[i] : 'C${i + 1}',
-                style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800),
+                style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800, fontSize: 12),
               ),
             ),
           ),
@@ -273,7 +266,7 @@ class _TableResultScreenState extends State<TableResultScreen> {
                     DataCell(
                       Text(
                         c < all[r].length ? all[r][c] : '',
-                        style: GoogleFonts.nunito(color: Colors.white70, fontSize: 12),
+                        style: ScanResultFormStyle.muted(fontSize: 12),
                       ),
                     ),
                 ],

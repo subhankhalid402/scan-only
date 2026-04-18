@@ -5,13 +5,12 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../models/academic_certificate_data.dart';
 import '../models/document_model.dart';
 import '../services/academic_certificate_ocr_service.dart';
 import '../services/database_service.dart';
 import '../services/pdf_service.dart';
+import '../services/share_file_service.dart';
 import '../theme.dart';
 
 class AcademicCertificateResultScreen extends StatefulWidget {
@@ -153,7 +152,7 @@ class _AcademicCertificateResultScreenState
       );
       final json = await _saveJson(d);
       if (!mounted) return;
-      await Share.shareXFiles([XFile(pdf), XFile(json)], text: 'Academic portfolio');
+      await ShareFileService.sharePaths([pdf, json], text: 'Academic portfolio');
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -170,7 +169,6 @@ class _AcademicCertificateResultScreenState
   Widget build(BuildContext context) {
     final d = _current();
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Degree & Certificate', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
@@ -233,21 +231,32 @@ class _AcademicCertificateResultScreenState
 
   Widget _verificationCard(AcademicCertificateData d) {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121A2B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Verification', style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text('HEC QR: ${d.hecQrDetected ? 'Detected' : 'Not found'}', style: GoogleFonts.nunito(color: d.hecQrDetected ? AppColors.green : Colors.orange)),
-          Text('HEC Status: ${d.hecVerified ? 'Likely verified' : 'Needs manual check'}', style: GoogleFonts.nunito(color: d.hecVerified ? AppColors.green : Colors.orange)),
-          Text('Watermark/Security: ${d.watermarkDetected ? 'Detected' : 'Not clear'}', style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Orientation: ${d.orientation}', style: GoogleFonts.nunito(color: Colors.white70)),
+          Text('Verification', style: ScanResultFormStyle.cardTitle()),
+          const SizedBox(height: 8),
+          Text(
+            'HEC QR: ${d.hecQrDetected ? 'Detected' : 'Not found'}',
+            style: GoogleFonts.nunito(
+              color: d.hecQrDetected ? AppColors.green : AppColors.orange,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            'HEC Status: ${d.hecVerified ? 'Likely verified' : 'Needs manual check'}',
+            style: GoogleFonts.nunito(
+              color: d.hecVerified ? AppColors.green : AppColors.orange,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          Text(
+            'Watermark/Security: ${d.watermarkDetected ? 'Detected' : 'Not clear'}',
+            style: ScanResultFormStyle.muted(),
+          ),
+          Text('Orientation: ${d.orientation}', style: ScanResultFormStyle.muted()),
         ],
       ),
     );
@@ -265,21 +274,32 @@ class _AcademicCertificateResultScreenState
 
   Widget _fakeFlagCard(List<String> flags) {
     return Container(
-      padding: const EdgeInsets.all(10),
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
-        color: const Color(0xFF221617),
+        color: const Color(0xFFFFF8F8),
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.redAccent.withValues(alpha: 0.5)),
+        border: Border.all(color: AppColors.red.withValues(alpha: 0.35)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Fake Degree Detection Flags', style: GoogleFonts.nunito(color: Colors.redAccent, fontWeight: FontWeight.w900)),
-          const SizedBox(height: 6),
+          Text(
+            'Fake Degree Detection Flags',
+            style: GoogleFonts.nunito(
+              color: AppColors.red,
+              fontWeight: FontWeight.w900,
+            ),
+          ),
+          const SizedBox(height: 8),
           if (flags.isEmpty)
-            Text('No obvious flags', style: GoogleFonts.nunito(color: Colors.white70))
+            Text('No obvious flags', style: ScanResultFormStyle.muted())
           else
-            ...flags.map((f) => Text('• $f', style: GoogleFonts.nunito(color: Colors.white70))),
+            ...flags.map(
+              (f) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Text('• $f', style: ScanResultFormStyle.bodyLine()),
+              ),
+            ),
         ],
       ),
     );
@@ -293,26 +313,19 @@ class _AcademicCertificateResultScreenState
         children: [
           Row(
             children: [
-              Expanded(child: Text(label, style: GoogleFonts.nunito(color: Colors.white70, fontWeight: FontWeight.w700))),
+              Expanded(child: Text(label, style: ScanResultFormStyle.label())),
               IconButton(
                 onPressed: () => _copy(label, c.text.trim()),
                 icon: const Icon(Icons.copy_rounded, size: 18),
-                color: Colors.white60,
+                color: AppColors.navyMid,
               ),
             ],
           ),
           TextField(
             controller: c,
             onChanged: (_) => setState(() {}),
-            style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w700),
-            decoration: InputDecoration(
-              isDense: true,
-              filled: true,
-              fillColor: const Color(0xFF141E31),
-              border: OutlineInputBorder(
-                  borderRadius: BorderRadius.circular(10),
-                  borderSide: BorderSide.none),
-            ),
+            style: ScanResultFormStyle.inputText(),
+            decoration: ScanResultFormStyle.textFieldDecoration(radius: 10),
           ),
         ],
       ),

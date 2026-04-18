@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+
+import '../config/supabase_app_config.dart';
 import 'supabase_service.dart';
 
 /// Service to generate public URLs for documents
@@ -6,7 +8,7 @@ class PublicUrlService {
   PublicUrlService._();
 
   static const String bucketName = 'scan-only';
-  static const String baseUrl = 'https://aowgmjiezwydhluigkuc.supabase.co/storage/v1/object/public';
+  static String get baseUrl => SupabaseAppConfig.storagePublicObjectBase;
 
   /// Generate public URL for a document
   static String getPublicUrl(String filePath) {

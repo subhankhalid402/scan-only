@@ -6,12 +6,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-
 import '../models/document_model.dart';
 import '../models/whiteboard_scan_data.dart';
 import '../services/database_service.dart';
 import '../services/pdf_service.dart';
+import '../services/share_file_service.dart';
 import '../services/whiteboard_scan_service.dart';
 import '../theme.dart';
 
@@ -133,8 +132,8 @@ class _WhiteboardResultScreenState extends State<WhiteboardResultScreen> {
       );
 
       if (!mounted) return;
-      await Share.shareXFiles(
-        [XFile(pdf), XFile(jpgOut), XFile(pngOut), XFile(docx), XFile(json)],
+      await ShareFileService.sharePaths(
+        [pdf, jpgOut, pngOut, docx, json],
         text: 'Whiteboard scan export',
       );
       if (!mounted) return;
@@ -159,7 +158,6 @@ class _WhiteboardResultScreenState extends State<WhiteboardResultScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Whiteboard Scan', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
@@ -190,43 +188,39 @@ class _WhiteboardResultScreenState extends State<WhiteboardResultScreen> {
                   TextField(
                     controller: _textCtrl,
                     maxLines: 10,
-                    style: GoogleFonts.nunito(color: Colors.white),
-                    decoration: InputDecoration(
+                    style: ScanResultFormStyle.inputText(),
+                    decoration: ScanResultFormStyle.textFieldDecoration(radius: 10).copyWith(
                       labelText: 'Extracted content',
-                      labelStyle: GoogleFonts.nunito(color: Colors.white60),
-                      filled: true,
-                      fillColor: const Color(0xFF141E31),
-                      border: OutlineInputBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        borderSide: BorderSide.none,
-                      ),
+                      labelStyle: ScanResultFormStyle.label(),
+                      alignLabelWithHint: true,
                     ),
                   ),
                   const SizedBox(height: 8),
                   if (_data.latexEquations.isNotEmpty)
                     Container(
-                      padding: const EdgeInsets.all(10),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF101826),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.white12),
-                      ),
+                      padding: const EdgeInsets.all(12),
+                      decoration: ScanResultFormStyle.insightCardDecoration(),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Row(
                             children: [
                               Expanded(
-                                child: Text('LaTeX Equations',
-                                    style: GoogleFonts.nunito(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.w800)),
+                                child: Text(
+                                  'LaTeX Equations',
+                                  style: ScanResultFormStyle.cardTitle(fontSize: 15),
+                                ),
                               ),
-                              TextButton(onPressed: _copyLatex, child: const Text('Copy')),
+                              TextButton(
+                                onPressed: _copyLatex,
+                                child: Text('Copy', style: GoogleFonts.nunito(color: AppColors.navyMid, fontWeight: FontWeight.w800)),
+                              ),
                             ],
                           ),
-                          Text(_data.latexEquations.join('\n'),
-                              style: GoogleFonts.nunito(color: Colors.white70, fontSize: 12)),
+                          Text(
+                            _data.latexEquations.join('\n'),
+                            style: ScanResultFormStyle.muted(fontSize: 12),
+                          ),
                         ],
                       ),
                     ),
@@ -248,32 +242,29 @@ class _WhiteboardResultScreenState extends State<WhiteboardResultScreen> {
 
   Widget _summaryCard() {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF121A2B),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Smart Whiteboard Processing',
-              style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
-          Text('Glare removed: ${_data.glareReduced ? 'Yes' : 'No'}',
-              style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Background whitened: ${_data.backgroundWhitened ? 'Yes' : 'No'}',
-              style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Perspective corrected: ${_data.perspectiveCorrected ? 'Yes' : 'No'}',
-              style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Multi-shot stitched: ${_data.stitchedMultiShot ? 'Yes' : 'No'}',
-              style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Flowchart: ${_data.hasFlowchart ? 'Detected' : 'No'} | Table: ${_data.hasDrawnTable ? 'Detected' : 'No'}',
-              style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('Equation: ${_data.hasEquation ? 'Detected' : 'No'} | Arrows: ${_data.hasArrows ? 'Detected' : 'No'}',
-              style: GoogleFonts.nunito(color: Colors.white70)),
-          Text('RTL: ${_data.rtlDetected ? 'Yes' : 'No'} | Mixed Urdu+English: ${_data.mixedLanguage ? 'Yes' : 'No'}',
-              style: GoogleFonts.nunito(color: Colors.white70)),
+          Text('Smart Whiteboard Processing', style: ScanResultFormStyle.cardTitle()),
+          const SizedBox(height: 8),
+          Text('Glare removed: ${_data.glareReduced ? 'Yes' : 'No'}', style: ScanResultFormStyle.muted()),
+          Text('Background whitened: ${_data.backgroundWhitened ? 'Yes' : 'No'}', style: ScanResultFormStyle.muted()),
+          Text('Perspective corrected: ${_data.perspectiveCorrected ? 'Yes' : 'No'}', style: ScanResultFormStyle.muted()),
+          Text('Multi-shot stitched: ${_data.stitchedMultiShot ? 'Yes' : 'No'}', style: ScanResultFormStyle.muted()),
+          Text(
+            'Flowchart: ${_data.hasFlowchart ? 'Detected' : 'No'} | Table: ${_data.hasDrawnTable ? 'Detected' : 'No'}',
+            style: ScanResultFormStyle.muted(),
+          ),
+          Text(
+            'Equation: ${_data.hasEquation ? 'Detected' : 'No'} | Arrows: ${_data.hasArrows ? 'Detected' : 'No'}',
+            style: ScanResultFormStyle.muted(),
+          ),
+          Text(
+            'RTL: ${_data.rtlDetected ? 'Yes' : 'No'} | Mixed Urdu+English: ${_data.mixedLanguage ? 'Yes' : 'No'}',
+            style: ScanResultFormStyle.muted(),
+          ),
         ],
       ),
     );
@@ -291,22 +282,17 @@ class _WhiteboardResultScreenState extends State<WhiteboardResultScreen> {
 
   Widget _zonesCard() {
     return Container(
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFF101826),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.white12),
-      ),
+      padding: const EdgeInsets.all(12),
+      decoration: ScanResultFormStyle.insightCardDecoration(),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text('Content Zones',
-              style: GoogleFonts.nunito(color: Colors.white, fontWeight: FontWeight.w800)),
-          const SizedBox(height: 6),
+          Text('Content Zones', style: ScanResultFormStyle.cardTitle(fontSize: 15)),
+          const SizedBox(height: 8),
           ..._data.zones.take(10).map(
                 (z) => Text(
                   '• ${z.type}: ${z.snippet}',
-                  style: GoogleFonts.nunito(color: Colors.white60, fontSize: 12),
+                  style: ScanResultFormStyle.muted(fontSize: 12),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
                 ),

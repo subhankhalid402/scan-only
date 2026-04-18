@@ -94,7 +94,6 @@ class _MergePdfsScreenState extends State<MergePdfsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F2F8),
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         foregroundColor: Colors.white,

@@ -180,7 +180,6 @@ class _AddWatermarkScreenState extends State<AddWatermarkScreen> {
   Widget build(BuildContext context) {
     final previewPath = widget.imagePaths.first;
     return Scaffold(
-      backgroundColor: AppColors.background,
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
         title: Text('Watermark',
