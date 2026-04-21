@@ -960,6 +960,54 @@ class _ScanScreenState extends State<ScanScreen>
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
+  /// Standalone "Gallery" scan tab uses document-style processing (CamScanner-like).
+  String get _pipelineModeId =>
+      _selectedMode == 'gallery' ? 'document' : _selectedMode;
+
+  double? _targetAspectRatioForPipeline() {
+    final m = _pipelineModeId;
+    if (m == 'id_card' || m == 'driving_license') return 85.6 / 54.0;
+    if (m == 'passport') return 125.0 / 88.0;
+    return null;
+  }
+
+  /// Auto-enhance / polish, then optional manual align sheet — same as after camera capture.
+  Future<String> _polishDeskewStillPath(String rawPath) async {
+    final mode = _pipelineModeId;
+    var outPath = rawPath;
+    final targetAspectRatio = _targetAspectRatioForPipeline();
+    if (_prefAutoEnhance) {
+      final processed = await ImageProcessingService.instance.processCapture(
+        imagePath: outPath,
+        modeId: mode,
+        enhanceMode: _enhanceModeFromFilter(_selectedFilter),
+        targetAspectRatio: targetAspectRatio,
+      );
+      outPath = processed.imagePath;
+    } else {
+      outPath =
+          await ImageEnhancementService.instance.polishCaptureForScanMode(
+        outPath,
+        mode,
+        filter: _selectedFilter,
+      );
+    }
+    if (_useDeskewAfterCapture(mode) && mounted) {
+      final deskewed = await Navigator.push<String?>(
+        context,
+        MaterialPageRoute<String?>(
+          fullscreenDialog: true,
+          builder: (_) => DocumentScanEditorScreen(
+            imagePath: outPath,
+            targetAspectRatio: targetAspectRatio,
+          ),
+        ),
+      );
+      if (deskewed != null) outPath = deskewed;
+    }
+    return outPath;
+  }
+
   void _startTimerCapture() {
     if (_timerCountdown > 0) return;
     setState(() => _timerCountdown = 3);
@@ -998,43 +1046,7 @@ class _ScanScreenState extends State<ScanScreen>
     final sw = Stopwatch()..start();
     try {
       final image = await _cameraController!.takePicture();
-      var outPath = image.path;
-      final targetAspectRatio =
-          _selectedMode == 'id_card' || _selectedMode == 'driving_license'
-              ? (85.6 / 54.0)
-              : (_selectedMode == 'passport' ? (125.0 / 88.0) : null);
-      if (_prefAutoEnhance) {
-        final processed = await ImageProcessingService.instance.processCapture(
-          imagePath: outPath,
-          modeId: _selectedMode,
-          enhanceMode: _enhanceModeFromFilter(_selectedFilter),
-          targetAspectRatio: targetAspectRatio,
-        );
-        outPath = processed.imagePath;
-      } else {
-        outPath =
-            await ImageEnhancementService.instance.polishCaptureForScanMode(
-          outPath,
-          _selectedMode,
-          filter: _selectedFilter,
-        );
-      }
-
-      if (_useDeskewAfterCapture(_selectedMode) && mounted) {
-        final deskewed = await Navigator.push<String?>(
-          context,
-          MaterialPageRoute<String?>(
-            fullscreenDialog: true,
-            builder: (_) => DocumentScanEditorScreen(
-              imagePath: outPath,
-              targetAspectRatio: targetAspectRatio,
-            ),
-          ),
-        );
-        if (deskewed != null) {
-          outPath = deskewed;
-        }
-      }
+      var outPath = await _polishDeskewStillPath(image.path);
       if (!mounted) return;
       var captured = <String>[outPath];
       if (_pendingFeatureAction == 'dual_page_split' ||
@@ -1427,10 +1439,27 @@ class _ScanScreenState extends State<ScanScreen>
   Future<void> _pickFromGallery() async {
     final picker = ImagePicker();
     final images = await picker.pickMultiImage();
-    if (images.isNotEmpty) {
-      setState(() {
-        _capturedPages.addAll(images.map((img) => img.path));
-      });
+    if (images.isEmpty || !mounted) return;
+    setState(() => _isCapturing = true);
+    try {
+      final paths = <String>[];
+      for (final xfile in images) {
+        if (!mounted) break;
+        var one = await _polishDeskewStillPath(xfile.path);
+        if (_pendingFeatureAction == 'dual_page_split' ||
+            _selectedMode == 'book') {
+          paths.addAll(await _splitDualPages(one));
+        } else {
+          paths.add(one);
+        }
+      }
+      if (mounted && paths.isNotEmpty) {
+        setState(() => _capturedPages.addAll(paths));
+        PaintingBinding.instance.imageCache.clearLiveImages();
+        _afterPagesAddedSnack(paths.length);
+      }
+    } finally {
+      if (mounted) setState(() => _isCapturing = false);
     }
   }
 
@@ -1506,9 +1535,24 @@ class _ScanScreenState extends State<ScanScreen>
   Future<void> _pickSingleWithCamera() async {
     final picker = ImagePicker();
     final image = await picker.pickImage(source: ImageSource.camera);
-    if (image != null && mounted) {
-      setState(() => _capturedPages.add(image.path));
-      _afterPagesAddedSnack(1);
+    if (image == null || !mounted) return;
+    setState(() => _isCapturing = true);
+    try {
+      var path = await _polishDeskewStillPath(image.path);
+      final added = <String>[];
+      if (_pendingFeatureAction == 'dual_page_split' ||
+          _selectedMode == 'book') {
+        added.addAll(await _splitDualPages(path));
+      } else {
+        added.add(path);
+      }
+      if (mounted && added.isNotEmpty) {
+        setState(() => _capturedPages.addAll(added));
+        PaintingBinding.instance.imageCache.clearLiveImages();
+        _afterPagesAddedSnack(added.length);
+      }
+    } finally {
+      if (mounted) setState(() => _isCapturing = false);
     }
   }
 

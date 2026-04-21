@@ -30,16 +30,25 @@ void main() async {
 
   const channel = MethodChannel('scanonly/openwith');
   String? initialSharedFile;
+  List<String>? initialSharedFiles;
   try {
     initialSharedFile = await channel.invokeMethod<String>('getInitialSharedFile');
+    final multiFiles = await channel.invokeMethod<List<dynamic>>('getInitialSharedFiles');
+    if (multiFiles != null && multiFiles.isNotEmpty) {
+      initialSharedFiles = multiFiles.cast<String>();
+    }
   } catch (_) {}
 
-  runApp(ScanOnlyApp(initialSharedFile: initialSharedFile));
+  runApp(ScanOnlyApp(
+    initialSharedFile: initialSharedFile,
+    initialSharedFiles: initialSharedFiles,
+  ));
 }
 
 class ScanOnlyApp extends StatelessWidget {
   final String? initialSharedFile;
-  const ScanOnlyApp({super.key, this.initialSharedFile});
+  final List<String>? initialSharedFiles;
+  const ScanOnlyApp({super.key, this.initialSharedFile, this.initialSharedFiles});
 
   @override
   Widget build(BuildContext context) {
@@ -52,7 +61,10 @@ class ScanOnlyApp extends StatelessWidget {
           theme: AppTheme.theme,
           darkTheme: AppTheme.darkTheme,
           themeMode: mode,
-          home: SplashScreen(initialSharedFile: initialSharedFile),
+          home: SplashScreen(
+            initialSharedFile: initialSharedFile,
+            initialSharedFiles: initialSharedFiles,
+          ),
           builder: (context, child) {
             final mq = MediaQuery.of(context);
             final textScaler = mq.textScaler.clamp(

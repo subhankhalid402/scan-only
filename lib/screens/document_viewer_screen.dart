@@ -878,10 +878,10 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       );
     }
 
-    if (_doc.fileType == 'jpg' ||
-        _doc.fileType == 'jpeg' ||
-        _doc.fileType == 'png' ||
-        _doc.fileType == 'webp') {
+    final ext = _doc.fileType.toLowerCase();
+
+    // ── Images ──────────────────────────────────────────────────────────────
+    if (ext == 'jpg' || ext == 'jpeg' || ext == 'png' || ext == 'webp') {
       return Container(
         color: Colors.black,
         child: InteractiveViewer(
@@ -908,7 +908,8 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       );
     }
 
-    if (_doc.fileType == 'pdf') {
+    // ── PDF ──────────────────────────────────────────────────────────────────
+    if (ext == 'pdf') {
       _ensurePdfController(file.path);
       if (_pdfController == null) {
         return const Center(
@@ -921,24 +922,18 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       );
     }
 
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(Iconsax.document, size: 80, color: Colors.grey[300]),
-          const SizedBox(height: 16),
-          Text(_doc.name,
-              style: GoogleFonts.nunito(
-                  fontSize: 16, fontWeight: FontWeight.w700)),
-          const SizedBox(height: 8),
-          ElevatedButton.icon(
-            onPressed: _openWithExternal,
-            icon: const Icon(Iconsax.export),
-            label: const Text('Open with app'),
-            style: ElevatedButton.styleFrom(backgroundColor: AppColors.navyMid),
-          ),
-        ],
-      ),
+    // ── Plain text / CSV / JSON / HTML ───────────────────────────────────────
+    if (ext == 'txt' || ext == 'csv' || ext == 'json' ||
+        ext == 'html' || ext == 'htm' || ext == 'xml' ||
+        ext == 'log' || ext == 'md') {
+      return _TextFileViewer(file: file);
+    }
+
+    // ── All other formats (docx, xlsx, ppt, etc.) ────────────────────────────
+    // Show file info + open with external app button
+    return _UnsupportedFileView(
+      doc: _doc,
+      onOpenExternal: _openWithExternal,
     );
   }
 
@@ -972,6 +967,210 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
             Text(label,
                 style: GoogleFonts.nunito(
                     fontSize: 11, fontWeight: FontWeight.w700, color: color)),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// ── Plain-text viewer ────────────────────────────────────────────────────────
+
+class _TextFileViewer extends StatefulWidget {
+  final File file;
+  const _TextFileViewer({required this.file});
+
+  @override
+  State<_TextFileViewer> createState() => _TextFileViewerState();
+}
+
+class _TextFileViewerState extends State<_TextFileViewer> {
+  String? _content;
+  bool _loading = true;
+  String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _load();
+  }
+
+  Future<void> _load() async {
+    try {
+      final raw = await widget.file.readAsString();
+      setState(() {
+        _content = raw;
+        _loading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_loading) {
+      return const Center(child: CircularProgressIndicator(color: AppColors.gold));
+    }
+    if (_error != null) {
+      return Center(
+        child: Text('Could not read file: $_error',
+            style: GoogleFonts.nunito(color: AppColors.textMuted)),
+      );
+    }
+    return Container(
+      color: Colors.white,
+      child: Scrollbar(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.all(16),
+          child: SelectableText(
+            _content ?? '',
+            style: const TextStyle(
+              fontFamily: 'monospace',
+              fontSize: 13,
+              height: 1.5,
+              color: Color(0xFF1A1A2E),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+// ── Unsupported file view (docx, xlsx, ppt, etc.) ────────────────────────────
+
+class _UnsupportedFileView extends StatelessWidget {
+  final DocumentModel doc;
+  final VoidCallback onOpenExternal;
+
+  const _UnsupportedFileView({
+    required this.doc,
+    required this.onOpenExternal,
+  });
+
+  IconData _iconForType(String ext) {
+    switch (ext) {
+      case 'doc':
+      case 'docx':
+        return Icons.description_rounded;
+      case 'xls':
+      case 'xlsx':
+        return Icons.table_chart_rounded;
+      case 'ppt':
+      case 'pptx':
+        return Icons.slideshow_rounded;
+      case 'zip':
+      case 'rar':
+        return Icons.folder_zip_rounded;
+      case 'mp4':
+      case 'mov':
+      case 'avi':
+        return Icons.video_file_rounded;
+      case 'mp3':
+      case 'wav':
+        return Icons.audio_file_rounded;
+      default:
+        return Icons.insert_drive_file_rounded;
+    }
+  }
+
+  Color _colorForType(String ext) {
+    switch (ext) {
+      case 'doc':
+      case 'docx':
+        return const Color(0xFF2B579A); // Word blue
+      case 'xls':
+      case 'xlsx':
+        return const Color(0xFF217346); // Excel green
+      case 'ppt':
+      case 'pptx':
+        return const Color(0xFFD24726); // PowerPoint orange
+      case 'zip':
+      case 'rar':
+        return const Color(0xFFF59E0B);
+      default:
+        return AppColors.navyMid;
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final ext = doc.fileType.toLowerCase();
+    final color = _colorForType(ext);
+
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(32),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 100,
+              height: 100,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: color.withOpacity(0.3), width: 2),
+              ),
+              child: Icon(_iconForType(ext), size: 52, color: color),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              doc.name,
+              style: GoogleFonts.nunito(
+                fontSize: 17,
+                fontWeight: FontWeight.w700,
+                color: AppColors.textDark,
+              ),
+              textAlign: TextAlign.center,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '${ext.toUpperCase()} • ${doc.fileSizeMB.toStringAsFixed(1)} MB',
+              style: GoogleFonts.nunito(
+                fontSize: 13,
+                color: AppColors.textMuted,
+              ),
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: onOpenExternal,
+                icon: const Icon(Icons.open_in_new_rounded),
+                label: Text(
+                  'Open with another app',
+                  style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w700,
+                    fontSize: 15,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: color,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(14),
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 12),
+            Text(
+              'This file type cannot be previewed in-app.\nTap above to open with Word, Excel, or another app.',
+              style: GoogleFonts.nunito(
+                fontSize: 12,
+                color: AppColors.textMuted,
+                height: 1.5,
+              ),
+              textAlign: TextAlign.center,
+            ),
           ],
         ),
       ),

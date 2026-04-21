@@ -9,6 +9,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../models/document_model.dart';
+import '../services/database_service.dart';
+import '../services/template_export_service.dart';
 import '../theme.dart';
 
 class DocumentTemplateBuilderScreen extends StatefulWidget {
@@ -249,17 +252,137 @@ class _DocumentTemplateBuilderScreenState
     final dir = await getApplicationDocumentsDirectory();
     final outDir = Directory('${dir.path}/ScanOnly/Templates');
     await outDir.create(recursive: true);
-    final outPath = p.join(
-      outDir.path,
-      '${widget.templateName.replaceAll(' ', '_').toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}.pdf',
-    );
+    final fileName =
+        '${widget.templateName.replaceAll(' ', '_').toLowerCase()}_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final outPath = p.join(outDir.path, fileName);
     await File(outPath).writeAsBytes(bytes);
+
+    // Register in library so it appears in Documents tab
+    final doc = DocumentModel(
+      name: fileName,
+      filePath: outPath,
+      fileType: 'pdf',
+      scanType: 'document',
+      pageCount: 1,
+      fileSizeMB: bytes.length / (1024 * 1024),
+      createdAt: DateTime.now(),
+      tags: const [],
+    );
+    await DatabaseService.instance.insertDocument(doc);
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Saved: ${p.basename(outPath)}'),
+        content: Text('Saved to library: ${p.basename(outPath)}'),
         backgroundColor: AppColors.green,
       ),
+    );
+  }
+
+  Future<void> _exportAs(String format) async {
+    final fields = _fields.map((k, v) => MapEntry(k, v.text));
+    final rows = _listRows.map((r) => [r.a.text, r.b.text, r.c.text]).toList();
+    final stem = widget.templateName.replaceAll(' ', '_').toLowerCase();
+
+    try {
+      String outPath;
+      switch (format) {
+        case 'excel':
+          outPath = await TemplateExportService.instance
+              .exportExcel(stem: stem, fields: fields, tableRows: rows);
+          break;
+        case 'word':
+          outPath = await TemplateExportService.instance
+              .exportWord(stem: stem, fields: fields, tableRows: rows);
+          break;
+        case 'ppt':
+          outPath = await TemplateExportService.instance
+              .exportPpt(stem: stem, fields: fields, tableRows: rows);
+          break;
+        default:
+          return;
+      }
+
+      // Register in library
+      final ext = outPath.split('.').last.toLowerCase();
+      final doc = DocumentModel(
+        name: p.basename(outPath),
+        filePath: outPath,
+        fileType: ext,
+        scanType: 'document',
+        pageCount: 1,
+        fileSizeMB: File(outPath).lengthSync() / (1024 * 1024),
+        createdAt: DateTime.now(),
+        tags: const [],
+      );
+      await DatabaseService.instance.insertDocument(doc);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Exported as ${format.toUpperCase()}: ${p.basename(outPath)}'),
+          backgroundColor: AppColors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.red),
+      );
+    }
+  }
+
+  void _showExportSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Export As',
+                  style: GoogleFonts.nunito(
+                      fontWeight: FontWeight.w800, fontSize: 16)),
+              const SizedBox(height: 12),
+              _exportTile(Icons.picture_as_pdf, 'PDF', 'pdf',
+                  AppColors.navyDark, _savePdf),
+              _exportTile(Icons.table_chart_rounded, 'Excel (.xlsx)', 'excel',
+                  const Color(0xFF217346), () => _exportAs('excel')),
+              _exportTile(Icons.description_rounded, 'Word (.docx)', 'word',
+                  const Color(0xFF2B579A), () => _exportAs('word')),
+              _exportTile(Icons.slideshow_rounded, 'PowerPoint (.pptx)', 'ppt',
+                  const Color(0xFFD24726), () => _exportAs('ppt')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _exportTile(
+      IconData icon, String label, String format, Color color, VoidCallback onTap) {
+    return ListTile(
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: color, size: 20),
+      ),
+      title: Text(label,
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+      onTap: () {
+        Navigator.pop(context);
+        onTap();
+      },
     );
   }
 
@@ -461,9 +584,9 @@ class _DocumentTemplateBuilderScreenState
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: _savePdf,
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text('Save PDF'),
+                  onPressed: _showExportSheet,
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Export'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.gold,
                     foregroundColor: AppColors.navyDark,

@@ -124,16 +124,36 @@ class BatchProcessingService {
     final file = File(imagePath);
     final bytes = await file.readAsBytes();
     var image = img.decodeImage(bytes);
-
     if (image == null) throw Exception('Could not decode image');
 
-    // Draw watermark text on image
-    // Note: This is a simple implementation
-    // For production, use a proper text rendering library
-    
-    final watermarkedPath = imagePath.replaceAll('.jpg', '_watermarked.jpg');
+    // Draw semi-transparent diagonal watermark across the image
+    final color = img.ColorRgba8(180, 180, 180, 100); // light gray, semi-transparent
+
+    // Draw watermark text multiple times diagonally
+    final stepX = (image.width / 3).round();
+    final stepY = (image.height / 3).round();
+
+    for (int row = 0; row < 3; row++) {
+      for (int col = 0; col < 3; col++) {
+        final x = col * stepX + 20;
+        final y = row * stepY + 20;
+        img.drawString(
+          image,
+          text,
+          font: img.arial14,
+          x: x,
+          y: y,
+          color: color,
+        );
+      }
+    }
+
+    final ext = imagePath.toLowerCase().endsWith('.png') ? 'png' : 'jpg';
+    final watermarkedPath = imagePath.replaceAll(RegExp(r'\.(jpg|jpeg|png)$'), '_watermarked.$ext');
     final watermarkedFile = File(watermarkedPath);
-    await watermarkedFile.writeAsBytes(img.encodeJpg(image));
+    await watermarkedFile.writeAsBytes(
+      ext == 'png' ? img.encodePng(image) : img.encodeJpg(image),
+    );
 
     return watermarkedPath;
   }

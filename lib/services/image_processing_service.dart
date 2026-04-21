@@ -160,12 +160,12 @@ Uint8List _autoEnhanceIsolate(Map<String, dynamic> payload) {
   if (src == null) return Uint8List.fromList(bytes);
 
   var out = _whiteBalance(src);
+  out = _shadowNormalize(out);
   out = _modeBrightness(out, mode);
   out = _modeContrast(out, mode);
-  out = _shadowNormalize(out);
-  out = _unsharp(out, amount: 0.85);
-  out = img.gaussianBlur(out, radius: 1);
-  return Uint8List.fromList(img.encodeJpg(out, quality: 92));
+  out = _unsharp(out, amount: 0.6);
+  // Removed second gaussianBlur - it was softening text after sharpening
+  return Uint8List.fromList(img.encodeJpg(out, quality: 95));
 }
 
 img.Image _whiteBalance(img.Image src) {
@@ -219,27 +219,37 @@ img.Image _modeBrightness(img.Image image, String mode) {
 img.Image _modeContrast(img.Image image, String mode) {
   switch (mode) {
     case 'document':
-      return img.contrast(image, contrast: 160);
+      return img.contrast(image, contrast: 148);
     case 'receipt':
-      return img.contrast(image, contrast: 180);
+      return img.contrast(image, contrast: 170);
     case 'id_card':
     case 'driving_license':
     case 'passport':
-      return img.contrast(image, contrast: 130);
+      return img.contrast(image, contrast: 125);
     case 'whiteboard':
-      return img.contrast(image, contrast: 190);
+      return img.contrast(image, contrast: 185);
+    case 'book':
+      return img.contrast(image, contrast: 135);
+    case 'medical_prescription':
+      return img.contrast(image, contrast: 155);
+    case 'bank_statement':
+      return img.contrast(image, contrast: 160);
     default:
-      return img.contrast(image, contrast: 145);
+      return img.contrast(image, contrast: 140);
   }
 }
 
 img.Image _shadowNormalize(img.Image image) {
+  // Adaptive shadow lifting - preserves highlights, lifts shadows
   final out = img.Image(width: image.width, height: image.height);
   for (var y = 0; y < image.height; y++) {
     for (var x = 0; x < image.width; x++) {
       final p = image.getPixel(x, y);
       final luma = 0.299 * p.r + 0.587 * p.g + 0.114 * p.b;
-      final lift = luma < 90 ? 1.18 : 1.0;
+      
+      // Adaptive lift: more lift for darker pixels, less for brighter
+      final lift = luma < 60 ? 1.35 : (luma < 120 ? 1.15 : 1.0);
+      
       out.setPixelRgb(
         x,
         y,

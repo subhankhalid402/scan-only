@@ -56,16 +56,45 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
     }
   }
 
+  bool _isValidEmail(String email) {
+    final emailRegex = RegExp(r'^[a-zA-Z0-9._%+\-]+@[a-zA-Z0-9.\-]+\.[a-zA-Z]{2,}$');
+    if (!emailRegex.hasMatch(email)) return false;
+
+    // Block common dummy/disposable domains
+    const blockedDomains = [
+      'test.com', 'example.com', 'dummy.com', 'fake.com',
+      'abc.com', 'xyz.com', 'aaa.com', 'bbb.com', 'ccc.com',
+      'mailinator.com', 'guerrillamail.com', 'tempmail.com',
+      'throwaway.email', 'yopmail.com', 'sharklasers.com',
+      'trashmail.com', 'dispostable.com', 'maildrop.cc',
+    ];
+
+    final domain = email.split('@').last.toLowerCase();
+    if (blockedDomains.contains(domain)) return false;
+
+    // Block obviously fake local parts
+    final localPart = email.split('@').first.toLowerCase();
+    const blockedLocalParts = ['test', 'dummy', 'fake', 'asdf', 'qwerty', 'aaaa', 'bbbb'];
+    if (blockedLocalParts.contains(localPart)) return false;
+
+    return true;
+  }
+
   void _shareViaEmail() async {
-    if (_emailController.text.isEmpty) {
+    final email = _emailController.text.trim();
+    if (email.isEmpty) {
       _showError('Please enter email address');
+      return;
+    }
+    if (!_isValidEmail(email)) {
+      _showError('Please enter a valid email address');
       return;
     }
 
     setState(() => _isSharing = true);
     try {
       final success = await EmailService.instance.sendDocumentEmail(
-        recipientEmail: _emailController.text,
+        recipientEmail: email,
         filePath: widget.filePath,
         fileName: widget.fileName,
       );

@@ -125,9 +125,9 @@ class ImageEnhancementService {
   }
 
   img.Image _applyWhitening(img.Image image) {
-    var out = img.adjustColor(image, brightness: 1.15, saturation: 0.88);
-    out = img.contrast(out, contrast: 138);
-    out = img.contrast(out, contrast: 145);
+    // Paper whitening: lift background, keep text dark
+    var out = img.adjustColor(image, brightness: 1.12, saturation: 0.85);
+    out = img.contrast(out, contrast: 140);
     return out;
   }
 
@@ -139,10 +139,8 @@ class ImageEnhancementService {
   }
 
   img.Image _applyFlattenNormalize(img.Image image) {
-    // Perspective warp requires corner points; normalize exposure/contrast here.
-    var out = img.adjustColor(image, brightness: 1.10, saturation: 0.95);
-    out = img.contrast(out, contrast: 132);
-    out = img.contrast(out, contrast: 140);
+    var out = img.adjustColor(image, brightness: 1.08, saturation: 0.92);
+    out = img.contrast(out, contrast: 135);
     return out;
   }
 
@@ -553,10 +551,10 @@ class ImageEnhancementService {
   }) async {
     final dir = await getTemporaryDirectory();
     final baseName = path.basenameWithoutExtension(originalPath);
-    // Timestamp makes every saved file unique → no Flutter image cache collisions
     final ts = DateTime.now().millisecondsSinceEpoch;
     final outPath = path.join(dir.path, '$baseName${suffix}_$ts.jpg');
-    await File(outPath).writeAsBytes(img.encodeJpg(image, quality: 92));
+    // Quality 95 for better text clarity (was 92)
+    await File(outPath).writeAsBytes(img.encodeJpg(image, quality: 95));
     return outPath;
   }
 }

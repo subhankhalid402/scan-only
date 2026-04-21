@@ -1,16 +1,15 @@
 import 'dart:io';
+import 'package:share_plus/share_plus.dart';
 
+/// Email service - uses device's native share sheet to send documents via email.
+/// This is the correct approach for mobile apps (no SMTP credentials needed).
 class EmailService {
   static final EmailService _instance = EmailService._internal();
-
-  factory EmailService() {
-    return _instance;
-  }
-
+  factory EmailService() => _instance;
   EmailService._internal();
-
   static EmailService get instance => _instance;
 
+  /// Sends a document via the device's native share sheet (email client, WhatsApp, etc.)
   Future<bool> sendDocumentEmail({
     required String recipientEmail,
     required String filePath,
@@ -19,31 +18,43 @@ class EmailService {
     String? body,
   }) async {
     try {
-      // Check if file exists
       final file = File(filePath);
-      if (!file.existsSync()) {
-        return false;
-      }
+      if (!file.existsSync()) return false;
 
-      // In a real app, you would use a package like 'mailer' to send emails
-      // For now, this is a placeholder that returns success
-      // To implement actual email sending, add the 'mailer' package to pubspec.yaml
-      // and configure SMTP settings
+      final emailSubject = subject ?? 'Document: $fileName';
+      final emailBody = body ?? 'Please find the attached document: $fileName';
 
-      return true;
+      // Use native share sheet - user picks their email app
+      final result = await Share.shareXFiles(
+        [XFile(filePath)],
+        subject: emailSubject,
+        text: 'To: $recipientEmail\n\n$emailBody',
+      );
+
+      return result.status == ShareResultStatus.success ||
+          result.status == ShareResultStatus.dismissed;
     } catch (e) {
       return false;
     }
   }
 
+  /// Share document via link using native share sheet
   Future<bool> sendDocumentViaLink({
     required String filePath,
     required String fileName,
   }) async {
     try {
-      // Placeholder for cloud storage link generation
-      // In a real app, upload to cloud storage and get shareable link
-      return true;
+      final file = File(filePath);
+      if (!file.existsSync()) return false;
+
+      final result = await Share.shareXFiles(
+        [XFile(filePath)],
+        subject: fileName,
+        text: 'Sharing document: $fileName',
+      );
+
+      return result.status == ShareResultStatus.success ||
+          result.status == ShareResultStatus.dismissed;
     } catch (e) {
       return false;
     }

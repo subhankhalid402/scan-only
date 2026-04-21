@@ -9,6 +9,9 @@ import 'package:pdf/pdf.dart';
 import 'package:pdf/widgets.dart' as pw;
 import 'package:printing/printing.dart';
 
+import '../models/document_model.dart';
+import '../services/database_service.dart';
+import '../services/template_export_service.dart';
 import '../theme.dart';
 
 class InvoiceTemplateBuilderScreen extends StatefulWidget {
@@ -279,17 +282,141 @@ class _InvoiceTemplateBuilderScreenState
     final dir = await getApplicationDocumentsDirectory();
     final outDir = Directory('${dir.path}/ScanOnly/Invoices');
     await outDir.create(recursive: true);
-    final outPath = p.join(
-      outDir.path,
-      'invoice_${DateTime.now().millisecondsSinceEpoch}.pdf',
-    );
+    final fileName = 'invoice_${DateTime.now().millisecondsSinceEpoch}.pdf';
+    final outPath = p.join(outDir.path, fileName);
     await File(outPath).writeAsBytes(bytes);
+
+    // Register in library
+    final doc = DocumentModel(
+      name: fileName,
+      filePath: outPath,
+      fileType: 'pdf',
+      scanType: 'document',
+      pageCount: 1,
+      fileSizeMB: bytes.length / (1024 * 1024),
+      createdAt: DateTime.now(),
+      tags: const [],
+    );
+    await DatabaseService.instance.insertDocument(doc);
+
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Invoice saved: ${p.basename(outPath)}'),
+        content: Text('Invoice saved to library: ${p.basename(outPath)}'),
         backgroundColor: AppColors.green,
       ),
+    );
+  }
+
+  Future<void> _exportAs(String format) async {
+    final fields = {
+      'Company': _company.text,
+      'Client': _client.text,
+      'Invoice #': _invoiceNo.text,
+      'Date': _date.text,
+      'Due Date': _dueDate.text,
+      'Notes': _notes.text,
+      'Total': _total.toStringAsFixed(0),
+    };
+    final rows = _items
+        .map((i) => [i.name.text, i.qty.text, i.rate.text, i.total.toStringAsFixed(0)])
+        .toList();
+
+    try {
+      String outPath;
+      switch (format) {
+        case 'excel':
+          outPath = await TemplateExportService.instance
+              .exportExcel(stem: 'invoice', fields: fields, tableRows: rows);
+          break;
+        case 'word':
+          outPath = await TemplateExportService.instance
+              .exportWord(stem: 'invoice', fields: fields, tableRows: rows);
+          break;
+        case 'ppt':
+          outPath = await TemplateExportService.instance
+              .exportPpt(stem: 'invoice', fields: fields, tableRows: rows);
+          break;
+        default:
+          return;
+      }
+
+      final ext = outPath.split('.').last.toLowerCase();
+      final doc = DocumentModel(
+        name: p.basename(outPath),
+        filePath: outPath,
+        fileType: ext,
+        scanType: 'document',
+        pageCount: 1,
+        fileSizeMB: File(outPath).lengthSync() / (1024 * 1024),
+        createdAt: DateTime.now(),
+        tags: const [],
+      );
+      await DatabaseService.instance.insertDocument(doc);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Exported as ${format.toUpperCase()}: ${p.basename(outPath)}'),
+          backgroundColor: AppColors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.red),
+      );
+    }
+  }
+
+  void _showExportSheet() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.white,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (_) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('Export Invoice As',
+                  style: GoogleFonts.nunito(
+                      fontWeight: FontWeight.w800, fontSize: 16)),
+              const SizedBox(height: 12),
+              _exportTile(Icons.picture_as_pdf, 'PDF', AppColors.navyDark, _generatePdf),
+              _exportTile(Icons.table_chart_rounded, 'Excel (.xlsx)',
+                  const Color(0xFF217346), () => _exportAs('excel')),
+              _exportTile(Icons.description_rounded, 'Word (.docx)',
+                  const Color(0xFF2B579A), () => _exportAs('word')),
+              _exportTile(Icons.slideshow_rounded, 'PowerPoint (.pptx)',
+                  const Color(0xFFD24726), () => _exportAs('ppt')),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _exportTile(IconData icon, String label, Color color, VoidCallback onTap) {
+    return ListTile(
+      leading: Container(
+        width: 36,
+        height: 36,
+        decoration: BoxDecoration(
+          color: color.withOpacity(0.12),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: Icon(icon, color: color, size: 20),
+      ),
+      title: Text(label, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+      onTap: () {
+        Navigator.pop(context);
+        onTap();
+      },
     );
   }
 
@@ -502,9 +629,9 @@ class _InvoiceTemplateBuilderScreenState
               const SizedBox(width: 10),
               Expanded(
                 child: ElevatedButton.icon(
-                  onPressed: _generatePdf,
-                  icon: const Icon(Icons.picture_as_pdf),
-                  label: const Text('Save PDF'),
+                  onPressed: _showExportSheet,
+                  icon: const Icon(Icons.download_rounded),
+                  label: const Text('Export'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.gold,
                     foregroundColor: AppColors.navyDark,
