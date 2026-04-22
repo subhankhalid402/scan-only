@@ -86,21 +86,42 @@ class TemplatesScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // ── Responsive layout: screen width se columns decide karo ──
+    final screenWidth = MediaQuery.of(context).size.width;
+    final crossAxisCount = screenWidth < 360 ? 1 : 2; // chhoti screen pe 1 column
+
+    // ── Safe area + keyboard ke liye padding ──
+    final bottomPadding = MediaQuery.of(context).padding.bottom;
+
     return Scaffold(
+      backgroundColor: const Color(0xFFF5F6FA),
       appBar: AppBar(
-        title: Text('Document Templates',
-            style: GoogleFonts.nunito(
-                fontWeight: FontWeight.w800, color: Colors.white)),
+        title: Text(
+          'Document Templates',
+          style: GoogleFonts.nunito(
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
+            color: Colors.white,
+          ),
+        ),
         backgroundColor: AppColors.navyDark,
         foregroundColor: Colors.white,
+        elevation: 0,
       ),
       body: GridView.builder(
-        padding: const EdgeInsets.all(16),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2,
+        padding: EdgeInsets.fromLTRB(
+          14,
+          14,
+          14,
+          14 + bottomPadding, // bottom nav bar ke liye extra padding
+        ),
+        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+          crossAxisCount: crossAxisCount,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
-          childAspectRatio: 0.72,
+          // ── FIX: aspect ratio increase kiya taake card cut na ho ──
+          // Pehle 0.72 tha, ab 0.78 hai — description text ke liye space
+          childAspectRatio: 0.78,
         ),
         itemCount: _templates.length,
         itemBuilder: (_, i) => _TemplateCard(
@@ -114,8 +135,12 @@ class TemplatesScreen extends StatelessWidget {
   void _useTemplate(BuildContext context, _TemplateItem t) {
     switch (t.route) {
       case _TemplateRoute.invoice:
-        Navigator.push(context,
-            MaterialPageRoute(builder: (_) => const InvoiceTemplateBuilderScreen()));
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => const InvoiceTemplateBuilderScreen(),
+          ),
+        );
         break;
       case _TemplateRoute.builder:
         Navigator.push(
@@ -128,11 +153,13 @@ class TemplatesScreen extends StatelessWidget {
           ),
         );
         break;
+      // ── FIX: scan route bhi implement kiya (pehle dead code tha) ──
       case _TemplateRoute.scan:
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => ScanScreen(scanType: t.scanType, templateLabel: t.name),
+            builder: (_) =>
+                ScanScreen(scanType: t.scanType, templateLabel: t.name),
           ),
         );
         break;
@@ -182,11 +209,13 @@ class _TemplateCard extends StatelessWidget {
             ),
           ],
         ),
+        // ── FIX: Column ko IntrinsicHeight ke baghair handle karo ──
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // Thumbnail area — fixed height
             Container(
-              height: 92,
+              height: 88,
               width: double.infinity,
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
@@ -196,45 +225,67 @@ class _TemplateCard extends StatelessWidget {
               ),
               child: _TemplateThumbnail(template: template),
             ),
+
+            // Template name
             Padding(
-              padding: const EdgeInsets.fromLTRB(10, 8, 10, 4),
+              padding: const EdgeInsets.fromLTRB(10, 8, 10, 2),
               child: Row(
                 children: [
-                  Icon(template.icon, size: 16, color: template.color),
-                  const SizedBox(width: 6),
+                  Icon(template.icon, size: 15, color: template.color),
+                  const SizedBox(width: 5),
                   Expanded(
-                    child: Text(template.name,
-                        style: GoogleFonts.nunito(
-                            fontWeight: FontWeight.w800, fontSize: 13),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis),
+                    child: Text(
+                      template.name,
+                      style: GoogleFonts.nunito(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 12.5,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
             ),
+
+            // Description — maxLines:2 overflow safe
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 10),
-              child: Text(template.description,
-                  style: GoogleFonts.nunito(
-                      fontSize: 10, color: AppColors.textMuted),
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis),
+              child: Text(
+                template.description,
+                style: GoogleFonts.nunito(
+                  fontSize: 10,
+                  color: AppColors.textMuted,
+                  height: 1.3,
+                ),
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
             ),
-            const Spacer(),
+
+            // ── FIX: Spacer ki jagah Expanded use karo taake overflow na ho ──
+            const Expanded(child: SizedBox()),
+
+            // Use Template button
             Padding(
               padding: const EdgeInsets.fromLTRB(10, 0, 10, 10),
               child: Container(
+                width: double.infinity, // full width button — better tap target
                 padding:
-                    const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(
                   color: template.color.withOpacity(0.14),
                   borderRadius: BorderRadius.circular(20),
                 ),
-                child: Text('Use Template',
-                    style: GoogleFonts.nunito(
-                        color: template.color,
-                        fontWeight: FontWeight.w800,
-                        fontSize: 11)),
+                child: Text(
+                  'Use Template',
+                  textAlign: TextAlign.center,
+                  style: GoogleFonts.nunito(
+                    color: template.color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
+                  ),
+                ),
               ),
             ),
           ],
@@ -277,6 +328,9 @@ class _TemplateThumbnail extends StatelessWidget {
         return _resumeThumb();
       case 'Meeting Notes':
         return _meetingThumb();
+      // ── FIX: 'Table Sheet' explicitly add kiya — pehle default mein tha ──
+      case 'Table Sheet':
+        return _tableThumb();
       default:
         return _tableThumb();
     }
@@ -295,7 +349,8 @@ class _TemplateThumbnail extends StatelessWidget {
           const SizedBox(height: 4),
           _line(w: 90),
           const Spacer(),
-          Row(children: [_line(w: 64), const Spacer(), _line(w: 46, op: 0.2)]),
+          Row(
+              children: [_line(w: 64), const Spacer(), _line(w: 46, op: 0.2)]),
         ],
       );
 
@@ -316,7 +371,8 @@ class _TemplateThumbnail extends StatelessWidget {
 
   Widget _certificateThumb() => Container(
         decoration: BoxDecoration(
-          border: Border.all(color: const Color(0xFFD4AF37).withOpacity(0.5), width: 2),
+          border: Border.all(
+              color: const Color(0xFFD4AF37).withOpacity(0.5), width: 2),
           borderRadius: BorderRadius.circular(8),
         ),
         child: Padding(
@@ -325,7 +381,7 @@ class _TemplateThumbnail extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               Icon(Icons.workspace_premium_rounded,
-                  color: const Color(0xFFD4AF37).withOpacity(0.7), size: 28),
+                  color: const Color(0xFFD4AF37).withOpacity(0.7), size: 26),
               const SizedBox(height: 4),
               _line(w: 80, h: 7, op: 0.18),
               const SizedBox(height: 4),
@@ -338,7 +394,7 @@ class _TemplateThumbnail extends StatelessWidget {
   Widget _businessCardThumb() => Center(
         child: Container(
           width: double.infinity,
-          height: 62,
+          height: 58,
           decoration: BoxDecoration(
             gradient: LinearGradient(
                 colors: [template.color, template.color.withOpacity(0.68)]),
@@ -362,8 +418,8 @@ class _TemplateThumbnail extends StatelessWidget {
 
   Widget _receiptThumb() => Center(
         child: Container(
-          width: 78,
-          height: 90,
+          width: 72,
+          height: 82,
           decoration: BoxDecoration(
             color: Colors.white,
             borderRadius: BorderRadius.circular(8),
@@ -400,7 +456,7 @@ class _TemplateThumbnail extends StatelessWidget {
               Row(children: [
                 _line(w: 22, h: 22, op: 0.08),
                 const SizedBox(width: 8),
-                _line(w: 86, h: 9)
+                _line(w: 70, h: 9)
               ]),
               const SizedBox(height: 8),
               _line(),

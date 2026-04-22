@@ -30,7 +30,7 @@ class _SmartGalleryScreenState extends State<SmartGalleryScreen> {
   bool _grid = true;
   bool _bulk = false;
   final Set<int> _selected = {};
-  String _category = 'All';
+  String _category = '';  // empty = show all
   String _sort = 'date';
   String _fileType = 'all';
   DateTimeRange? _range;
@@ -75,7 +75,7 @@ class _SmartGalleryScreenState extends State<SmartGalleryScreen> {
         return combined.contains(q);
       }).toList();
     }
-    if (_category != 'All') {
+    if (_category.isNotEmpty) {
       out = out
           .where(
               (d) => SmartGalleryService.instance.categoryFor(d) == _category)
@@ -105,9 +105,11 @@ class _SmartGalleryScreenState extends State<SmartGalleryScreen> {
   }
 
   List<String> _categories() {
-    final set = <String>{'All'};
+    final set = <String>{};
     for (final d in _all) {
-      set.add(SmartGalleryService.instance.categoryFor(d));
+      final cat = SmartGalleryService.instance.categoryFor(d);
+      // Skip 'Documents' - it's the default/generic category
+      if (cat != 'Documents') set.add(cat);
     }
     return set.toList();
   }
@@ -490,7 +492,8 @@ class _SmartGalleryScreenState extends State<SmartGalleryScreen> {
                       label: c,
                       selected: _category == c,
                       onTap: () => setState(() {
-                        _category = c;
+                        // Toggle: tap again to deselect (show all)
+                        _category = _category == c ? '' : c;
                         _applyFilters();
                       }),
                     );
