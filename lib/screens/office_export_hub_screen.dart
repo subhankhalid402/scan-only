@@ -14,80 +14,78 @@ class OfficeExportHubScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
-        title: Text(
-          'Office Export Tools',
-          style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
-        ),
+        title: Text('Office Export Tools',
+            style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
       ),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
-          _tile(
-            context,
-            icon: Iconsax.receipt,
-            title: 'Invoice Export',
-            subtitle: 'PDF, Excel, Word, PPT, Slides',
-            color: AppColors.gold,
-            onTap: () => _go(context, const InvoiceTemplateBuilderScreen()),
-          ),
-          _tile(
-            context,
-            icon: Iconsax.document_text,
-            title: 'Contract Export',
-            subtitle: 'PDF + Office formats',
-            color: AppColors.navyMid,
-            onTap: () => _go(
-              context,
-              const DocumentTemplateBuilderScreen(templateName: 'Contract'),
-            ),
-          ),
-          _tile(
-            context,
-            icon: Iconsax.card,
-            title: 'Business Card Export',
-            subtitle: 'PDF + Office formats',
-            color: AppColors.purple,
-            onTap: () => _go(
-              context,
-              const DocumentTemplateBuilderScreen(
-                  templateName: 'Business Card'),
-            ),
-          ),
-          _tile(
-            context,
-            icon: Iconsax.receipt,
-            title: 'Receipt Export',
-            subtitle: 'PDF + Office formats',
-            color: AppColors.green,
-            onTap: () => _go(
-              context,
-              const DocumentTemplateBuilderScreen(templateName: 'Receipt'),
-            ),
-          ),
-          _tile(
-            context,
-            icon: Iconsax.text_block,
-            title: 'Whiteboard Notes Export',
-            subtitle: 'PDF + Office formats',
-            color: AppColors.blue,
-            onTap: () => _go(
-              context,
-              const DocumentTemplateBuilderScreen(
-                templateName: 'Whiteboard Notes',
-              ),
-            ),
-          ),
-          _tile(
-            context,
-            icon: Iconsax.element_3,
-            title: 'Table Sheet Export',
-            subtitle: 'PDF + Office formats',
-            color: AppColors.orange,
-            onTap: () => _go(
-              context,
-              const DocumentTemplateBuilderScreen(templateName: 'Table Sheet'),
-            ),
-          ),
+          _tile(context,
+              icon: Iconsax.receipt,
+              title: 'Invoice',
+              subtitle: 'PDF, Excel, Word, PPT',
+              color: AppColors.gold,
+              onTap: () => _go(context, const InvoiceTemplateBuilderScreen())),
+          _tile(context,
+              icon: Iconsax.document_text,
+              title: 'Contract',
+              subtitle: 'PDF + Office formats',
+              color: AppColors.navyMid,
+              onTap: () => _go(context,
+                  DocumentTemplateBuilderScreen(templateName: 'Contract'))),
+          _tile(context,
+              icon: Icons.workspace_premium_rounded,
+              title: 'Certificate',
+              subtitle: 'PDF + Office formats',
+              color: const Color(0xFFD4AF37),
+              onTap: () => _go(context,
+                  DocumentTemplateBuilderScreen(templateName: 'Certificate'))),
+          _tile(context,
+              icon: Iconsax.card,
+              title: 'Business Card',
+              subtitle: 'PDF + Office formats',
+              color: AppColors.purple,
+              onTap: () => _go(
+                  context,
+                  DocumentTemplateBuilderScreen(
+                      templateName: 'Business Card'))),
+          _tile(context,
+              icon: Iconsax.receipt_2,
+              title: 'Receipt',
+              subtitle: 'PDF + Office formats',
+              color: AppColors.green,
+              onTap: () => _go(context,
+                  DocumentTemplateBuilderScreen(templateName: 'Receipt'))),
+          _tile(context,
+              icon: Iconsax.text_block,
+              title: 'Whiteboard Notes',
+              subtitle: 'PDF + Office formats',
+              color: AppColors.blue,
+              onTap: () => _go(
+                  context,
+                  DocumentTemplateBuilderScreen(
+                      templateName: 'Whiteboard Notes'))),
+          _tile(context,
+              icon: Iconsax.element_3,
+              title: 'Table Sheet',
+              subtitle: 'PDF + Office formats',
+              color: AppColors.orange,
+              onTap: () => _go(context,
+                  DocumentTemplateBuilderScreen(templateName: 'Table Sheet'))),
+          _tile(context,
+              icon: Iconsax.note_text,
+              title: 'Meeting Notes',
+              subtitle: 'PDF + Office formats',
+              color: AppColors.navyMid,
+              onTap: () => _go(context,
+                  DocumentTemplateBuilderScreen(templateName: 'Meeting Notes'))),
+          _tile(context,
+              icon: Iconsax.personalcard,
+              title: 'Resume / CV',
+              subtitle: 'PDF + Office formats',
+              color: AppColors.purple,
+              onTap: () => _go(context,
+                  DocumentTemplateBuilderScreen(templateName: 'Resume / CV'))),
         ],
       ),
     );
@@ -109,10 +107,10 @@ class OfficeExportHubScreen extends StatelessWidget {
         decoration: BoxDecoration(
           color: Colors.white,
           borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.28)),
+          border: Border.all(color: color.withOpacity(0.28)),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.06),
+              color: Colors.black.withOpacity(0.06),
               blurRadius: 10,
               offset: const Offset(0, 3),
             ),
@@ -124,7 +122,7 @@ class OfficeExportHubScreen extends StatelessWidget {
               width: 42,
               height: 42,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.14),
+                color: color.withOpacity(0.14),
                 borderRadius: BorderRadius.circular(11),
               ),
               child: Icon(icon, color: color),
@@ -134,20 +132,13 @@ class OfficeExportHubScreen extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(
-                    title,
-                    style: GoogleFonts.nunito(
-                      fontWeight: FontWeight.w800,
-                      color: AppColors.navyDark,
-                    ),
-                  ),
-                  Text(
-                    subtitle,
-                    style: GoogleFonts.nunito(
-                      fontSize: 12,
-                      color: AppColors.textMuted,
-                    ),
-                  ),
+                  Text(title,
+                      style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w800,
+                          color: AppColors.navyDark)),
+                  Text(subtitle,
+                      style: GoogleFonts.nunito(
+                          fontSize: 12, color: AppColors.textMuted)),
                 ],
               ),
             ),
@@ -158,7 +149,6 @@ class OfficeExportHubScreen extends StatelessWidget {
     );
   }
 
-  void _go(BuildContext context, Widget screen) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
-  }
+  void _go(BuildContext context, Widget screen) =>
+      Navigator.push(context, MaterialPageRoute(builder: (_) => screen));
 }

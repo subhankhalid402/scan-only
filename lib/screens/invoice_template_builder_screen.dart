@@ -27,10 +27,12 @@ class _InvoiceTemplateBuilderScreenState
   final _company = TextEditingController(text: 'ScanOnly Pvt Ltd');
   final _client = TextEditingController(text: 'Client Name');
   final _invoiceNo = TextEditingController(text: 'INV-1001');
-  final _date = TextEditingController(text: '2026-04-14');
-  final _dueDate = TextEditingController(text: '2026-04-21');
   final _notes = TextEditingController(text: 'Thank you for your business.');
   int _templateStyle = 0;
+
+  // ✅ FIXED: hardcoded strings ki jagah _today se initialize
+  late final TextEditingController _date;
+  late final TextEditingController _dueDate;
 
   final List<_InvoiceItem> _items = [
     _InvoiceItem(
@@ -39,6 +41,20 @@ class _InvoiceTemplateBuilderScreenState
       rate: TextEditingController(text: '15000'),
     ),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // ✅ FIXED: auto-date on first open
+    final now = DateTime.now();
+    final due = now.add(const Duration(days: 7));
+    _date = TextEditingController(
+      text: now.toIso8601String().split('T').first,
+    );
+    _dueDate = TextEditingController(
+      text: due.toIso8601String().split('T').first,
+    );
+  }
 
   @override
   void dispose() {
@@ -54,30 +70,46 @@ class _InvoiceTemplateBuilderScreenState
     super.dispose();
   }
 
-  double get _total => _items.fold(0, (sum, i) => sum + i.total);
-  String get _styleName => _templateStyle == 0
-      ? 'Classic'
-      : (_templateStyle == 1 ? 'Modern' : 'Bold');
+  double get _subtotal => _items.fold(0, (sum, i) => sum + i.total);
+
+  // ✅ Style name consistent — "Classic/Modern/Bold" (document builder se match)
+  String get _styleName =>
+      _templateStyle == 0 ? 'Classic' : (_templateStyle == 1 ? 'Modern' : 'Bold');
+
   String get _today => DateTime.now().toIso8601String().split('T').first;
 
+  Color get _accentColor => _templateStyle == 0
+      ? AppColors.navyDark
+      : (_templateStyle == 1 ? AppColors.navyLight : AppColors.purple);
+
+  // ✅ FIXED: .value.toRadixString() — safe across all Flutter versions
+  String _colorToHex(Color color) {
+    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+  }
+
   Future<Uint8List> _buildPdfBytes() async {
+    // ✅ FIXED: items empty guard — crash prevention
+    if (_items.isEmpty) {
+      throw Exception('Invoice must have at least one item.');
+    }
+
     final pdf = pw.Document();
-    final headerColorHex = _templateStyle == 0
-        ? '#0B1740'
-        : (_templateStyle == 1 ? '#1E3A8A' : '#4A148C');
-    final headerColor = PdfColor.fromHex(headerColorHex);
+    final headerColor = PdfColor.fromHex(_colorToHex(_accentColor)); // ✅ FIXED
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
-        build: (context) {
+        build: (_) {
           return pw.Column(
             crossAxisAlignment: pw.CrossAxisAlignment.start,
             children: [
-              // Professional letterhead
+              // Letterhead band
               pw.Container(
                 width: double.infinity,
-                padding:
-                    const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 10,
+                ),
                 decoration: pw.BoxDecoration(
                   color: headerColor.shade(0.14),
                   borderRadius: pw.BorderRadius.circular(8),
@@ -116,6 +148,7 @@ class _InvoiceTemplateBuilderScreenState
                 ),
               ),
               pw.SizedBox(height: 10),
+              // Title row
               pw.Row(
                 children: [
                   if (_templateStyle == 2)
@@ -140,7 +173,9 @@ class _InvoiceTemplateBuilderScreenState
                   ),
                   pw.Container(
                     padding: const pw.EdgeInsets.symmetric(
-                        horizontal: 10, vertical: 4),
+                      horizontal: 10,
+                      vertical: 4,
+                    ),
                     decoration: pw.BoxDecoration(
                       color: headerColor.shade(0.15),
                       borderRadius: pw.BorderRadius.circular(10),
@@ -157,6 +192,7 @@ class _InvoiceTemplateBuilderScreenState
                 ],
               ),
               pw.SizedBox(height: 8),
+              // Info block
               pw.Container(
                 width: double.infinity,
                 padding: const pw.EdgeInsets.all(10),
@@ -167,14 +203,30 @@ class _InvoiceTemplateBuilderScreenState
                 child: pw.Column(
                   crossAxisAlignment: pw.CrossAxisAlignment.start,
                   children: [
-                    pw.Text('Company: ${_company.text}'),
-                    pw.Text('Client: ${_client.text}'),
-                    pw.Text('Invoice #: ${_invoiceNo.text}'),
-                    pw.Text('Date: ${_date.text}   Due: ${_dueDate.text}'),
+                    pw.Text(
+                      'Company: ${_company.text}',
+                      style: const pw.TextStyle(fontSize: 11),
+                    ),
+                    pw.SizedBox(height: 3),
+                    pw.Text(
+                      'Client: ${_client.text}',
+                      style: const pw.TextStyle(fontSize: 11),
+                    ),
+                    pw.SizedBox(height: 3),
+                    pw.Text(
+                      'Invoice #: ${_invoiceNo.text}',
+                      style: const pw.TextStyle(fontSize: 11),
+                    ),
+                    pw.SizedBox(height: 3),
+                    pw.Text(
+                      'Date: ${_date.text}   Due: ${_dueDate.text}',
+                      style: const pw.TextStyle(fontSize: 11),
+                    ),
                   ],
                 ),
               ),
               pw.SizedBox(height: 14),
+              // Items table — 4 columns with proper headers
               pw.TableHelper.fromTextArray(
                 headers: const ['Item', 'Qty', 'Rate', 'Amount'],
                 data: _items
@@ -188,18 +240,23 @@ class _InvoiceTemplateBuilderScreenState
                 headerStyle: pw.TextStyle(
                   color: headerColor,
                   fontWeight: pw.FontWeight.bold,
+                  fontSize: 10,
                 ),
                 headerDecoration: pw.BoxDecoration(
                   color: headerColor.shade(0.15),
                 ),
                 cellStyle: const pw.TextStyle(fontSize: 10),
+                cellHeight: 28,
                 cellAlignment: pw.Alignment.centerLeft,
               ),
               pw.SizedBox(height: 10),
+              // Subtotal row
               pw.Container(
                 width: double.infinity,
-                padding:
-                    const pw.EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                padding: const pw.EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 8,
+                ),
                 decoration: pw.BoxDecoration(
                   border: pw.Border.all(color: headerColor.shade(0.35)),
                   borderRadius: pw.BorderRadius.circular(6),
@@ -216,7 +273,7 @@ class _InvoiceTemplateBuilderScreenState
                     ),
                     pw.Spacer(),
                     pw.Text(
-                      _total.toStringAsFixed(0),
+                      _subtotal.toStringAsFixed(0),
                       style: pw.TextStyle(
                         fontSize: 11,
                         color: headerColor,
@@ -227,17 +284,20 @@ class _InvoiceTemplateBuilderScreenState
                 ),
               ),
               pw.SizedBox(height: 6),
+              // Total block
               pw.Align(
                 alignment: pw.Alignment.centerRight,
                 child: pw.Container(
                   padding: const pw.EdgeInsets.symmetric(
-                      horizontal: 12, vertical: 7),
+                    horizontal: 12,
+                    vertical: 7,
+                  ),
                   decoration: pw.BoxDecoration(
                     color: headerColor.shade(0.12),
                     borderRadius: pw.BorderRadius.circular(6),
                   ),
                   child: pw.Text(
-                    'Total: ${_total.toStringAsFixed(0)}',
+                    'Total: ${_subtotal.toStringAsFixed(0)}',
                     style: pw.TextStyle(
                       fontSize: 15,
                       fontWeight: pw.FontWeight.bold,
@@ -247,15 +307,20 @@ class _InvoiceTemplateBuilderScreenState
                 ),
               ),
               pw.SizedBox(height: 12),
-              pw.Container(
-                width: double.infinity,
-                padding: const pw.EdgeInsets.all(8),
-                decoration: pw.BoxDecoration(
-                  color: headerColor.shade(0.07),
-                  borderRadius: pw.BorderRadius.circular(6),
+              // Notes
+              if (_notes.text.trim().isNotEmpty)
+                pw.Container(
+                  width: double.infinity,
+                  padding: const pw.EdgeInsets.all(8),
+                  decoration: pw.BoxDecoration(
+                    color: headerColor.shade(0.07),
+                    borderRadius: pw.BorderRadius.circular(6),
+                  ),
+                  child: pw.Text(
+                    'Notes ($_styleName): ${_notes.text}',
+                    style: const pw.TextStyle(fontSize: 10),
+                  ),
                 ),
-                child: pw.Text('Notes ($_styleName): ${_notes.text}'),
-              ),
               pw.Spacer(),
               pw.Divider(color: headerColor.shade(0.35)),
               pw.Align(
@@ -278,37 +343,71 @@ class _InvoiceTemplateBuilderScreenState
   }
 
   Future<void> _generatePdf() async {
-    final bytes = await _buildPdfBytes();
-    final dir = await getApplicationDocumentsDirectory();
-    final outDir = Directory('${dir.path}/ScanOnly/Invoices');
-    await outDir.create(recursive: true);
-    final fileName = 'invoice_${DateTime.now().millisecondsSinceEpoch}.pdf';
-    final outPath = p.join(outDir.path, fileName);
-    await File(outPath).writeAsBytes(bytes);
+    // ✅ FIXED: empty items guard with user-friendly message
+    if (_items.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one item before saving.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
 
-    // Register in library
-    final doc = DocumentModel(
-      name: fileName,
-      filePath: outPath,
-      fileType: 'pdf',
-      scanType: 'document',
-      pageCount: 1,
-      fileSizeMB: bytes.length / (1024 * 1024),
-      createdAt: DateTime.now(),
-      tags: const [],
-    );
-    await DatabaseService.instance.insertDocument(doc);
+    try {
+      final bytes = await _buildPdfBytes();
+      final dir = await getApplicationDocumentsDirectory();
+      final outDir = Directory('${dir.path}/ScanOnly/Invoices');
+      await outDir.create(recursive: true);
+      final fileName =
+          'invoice_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      final outPath = p.join(outDir.path, fileName);
+      await File(outPath).writeAsBytes(bytes);
 
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('Invoice saved to library: ${p.basename(outPath)}'),
-        backgroundColor: AppColors.green,
-      ),
-    );
+      final doc = DocumentModel(
+        name: fileName,
+        filePath: outPath,
+        fileType: 'pdf',
+        scanType: 'document',
+        pageCount: 1,
+        fileSizeMB: bytes.length / (1024 * 1024),
+        createdAt: DateTime.now(),
+        tags: const [],
+      );
+      await DatabaseService.instance.insertDocument(doc);
+
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Invoice saved: ${p.basename(outPath)}'),
+          backgroundColor: AppColors.green,
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Save failed: $e'),
+          backgroundColor: AppColors.red,
+        ),
+      );
+    }
   }
 
   Future<void> _exportAs(String format) async {
+    // ✅ FIXED: empty items guard
+    if (_items.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one item before exporting.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     final fields = {
       'Company': _company.text,
       'Client': _client.text,
@@ -316,26 +415,42 @@ class _InvoiceTemplateBuilderScreenState
       'Date': _date.text,
       'Due Date': _dueDate.text,
       'Notes': _notes.text,
-      'Total': _total.toStringAsFixed(0),
+      'Total': _subtotal.toStringAsFixed(0),
     };
+
+    // ✅ FIXED: 4-column rows — Item, Qty, Rate, Amount (consistent with PDF table)
     final rows = _items
-        .map((i) => [i.name.text, i.qty.text, i.rate.text, i.total.toStringAsFixed(0)])
+        .map((i) => [
+              i.name.text,
+              i.qty.text,
+              i.rate.text,
+              i.total.toStringAsFixed(0),
+            ])
         .toList();
 
     try {
       String outPath;
       switch (format) {
         case 'excel':
-          outPath = await TemplateExportService.instance
-              .exportExcel(stem: 'invoice', fields: fields, tableRows: rows);
+          outPath = await TemplateExportService.instance.exportExcel(
+            stem: 'invoice',
+            fields: fields,
+            tableRows: rows,
+          );
           break;
         case 'word':
-          outPath = await TemplateExportService.instance
-              .exportWord(stem: 'invoice', fields: fields, tableRows: rows);
+          outPath = await TemplateExportService.instance.exportWord(
+            stem: 'invoice',
+            fields: fields,
+            tableRows: rows,
+          );
           break;
         case 'ppt':
-          outPath = await TemplateExportService.instance
-              .exportPpt(stem: 'invoice', fields: fields, tableRows: rows);
+          outPath = await TemplateExportService.instance.exportPpt(
+            stem: 'invoice',
+            fields: fields,
+            tableRows: rows,
+          );
           break;
         default:
           return;
@@ -357,14 +472,19 @@ class _InvoiceTemplateBuilderScreenState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Exported as ${format.toUpperCase()}: ${p.basename(outPath)}'),
+          content: Text(
+            'Exported as ${format.toUpperCase()}: ${p.basename(outPath)}',
+          ),
           backgroundColor: AppColors.green,
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.red),
+        SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: AppColors.red,
+        ),
       );
     }
   }
@@ -383,17 +503,38 @@ class _InvoiceTemplateBuilderScreenState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Export Invoice As',
-                  style: GoogleFonts.nunito(
-                      fontWeight: FontWeight.w800, fontSize: 16)),
+              Text(
+                'Export Invoice As',
+                style: GoogleFonts.nunito(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
               const SizedBox(height: 12),
-              _exportTile(Icons.picture_as_pdf, 'PDF', AppColors.navyDark, _generatePdf),
-              _exportTile(Icons.table_chart_rounded, 'Excel (.xlsx)',
-                  const Color(0xFF217346), () => _exportAs('excel')),
-              _exportTile(Icons.description_rounded, 'Word (.docx)',
-                  const Color(0xFF2B579A), () => _exportAs('word')),
-              _exportTile(Icons.slideshow_rounded, 'PowerPoint (.pptx)',
-                  const Color(0xFFD24726), () => _exportAs('ppt')),
+              _exportTile(
+                Icons.picture_as_pdf,
+                'PDF',
+                AppColors.navyDark,
+                _generatePdf,
+              ),
+              _exportTile(
+                Icons.table_chart_rounded,
+                'Excel (.xlsx)',
+                const Color(0xFF217346),
+                () => _exportAs('excel'),
+              ),
+              _exportTile(
+                Icons.description_rounded,
+                'Word (.docx)',
+                const Color(0xFF2B579A),
+                () => _exportAs('word'),
+              ),
+              _exportTile(
+                Icons.slideshow_rounded,
+                'PowerPoint (.pptx)',
+                const Color(0xFFD24726),
+                () => _exportAs('ppt'),
+              ),
             ],
           ),
         ),
@@ -401,18 +542,26 @@ class _InvoiceTemplateBuilderScreenState
     );
   }
 
-  Widget _exportTile(IconData icon, String label, Color color, VoidCallback onTap) {
+  Widget _exportTile(
+    IconData icon,
+    String label,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return ListTile(
       leading: Container(
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withOpacity(0.12), // ✅ FIXED
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: color, size: 20),
       ),
-      title: Text(label, style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+      title: Text(
+        label,
+        style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+      ),
       onTap: () {
         Navigator.pop(context);
         onTap();
@@ -421,6 +570,18 @@ class _InvoiceTemplateBuilderScreenState
   }
 
   Future<void> _previewPdf() async {
+    // ✅ FIXED: empty items guard before preview
+    if (_items.isEmpty) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Please add at least one item to preview.'),
+          backgroundColor: Colors.orange,
+        ),
+      );
+      return;
+    }
+
     if (!mounted) return;
     await Navigator.push(
       context,
@@ -428,9 +589,13 @@ class _InvoiceTemplateBuilderScreenState
         builder: (_) => Scaffold(
           appBar: AppBar(
             backgroundColor: AppColors.navyDark,
+            foregroundColor: Colors.white, // ✅ FIXED: back button visible
             title: Text(
               'Invoice PDF Preview',
-              style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+              style: GoogleFonts.nunito(
+                fontWeight: FontWeight.w800,
+                color: Colors.white,
+              ),
             ),
           ),
           body: PdfPreview(
@@ -446,25 +611,29 @@ class _InvoiceTemplateBuilderScreenState
 
   @override
   Widget build(BuildContext context) {
-    final accent = _templateStyle == 0
-        ? AppColors.navyDark
-        : (_templateStyle == 1 ? AppColors.navyLight : AppColors.purple);
+    final accent = _accentColor;
     return Scaffold(
       appBar: AppBar(
         title: Text(
-          'Invoice Templates',
-          style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+          'Invoice Template',
+          style: GoogleFonts.nunito(
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
         ),
         backgroundColor: AppColors.navyDark,
+        foregroundColor: Colors.white, // ✅ FIXED: back button white
       ),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
+          // Style selector
           Text(
-            'Canva-style real templates',
+            'Choose Style',
             style: GoogleFonts.nunito(
               fontWeight: FontWeight.w800,
               color: AppColors.navyDark,
+              fontSize: 15,
             ),
           ),
           const SizedBox(height: 8),
@@ -474,12 +643,16 @@ class _InvoiceTemplateBuilderScreenState
               final color = i == 0
                   ? AppColors.navyDark
                   : (i == 1 ? AppColors.navyLight : AppColors.purple);
+              // ✅ FIXED: "Classic/Modern/Bold" — document builder se consistent
+              final styleName =
+                  i == 0 ? 'Classic' : (i == 1 ? 'Modern' : 'Bold');
               return Expanded(
                 child: Padding(
                   padding: EdgeInsets.only(right: i == 2 ? 0 : 8),
                   child: GestureDetector(
                     onTap: () => setState(() => _templateStyle = i),
-                    child: Container(
+                    child: AnimatedContainer( // ✅ smooth selection
+                      duration: const Duration(milliseconds: 200),
                       height: 106,
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -491,12 +664,12 @@ class _InvoiceTemplateBuilderScreenState
                         boxShadow: selected
                             ? [
                                 BoxShadow(
-                                  color: AppColors.gold.withValues(alpha: 0.25),
+                                  color: AppColors.gold.withOpacity(0.25), // ✅ FIXED
                                   blurRadius: 12,
                                   offset: const Offset(0, 4),
                                 ),
                               ]
-                            : null,
+                            : [],
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(8),
@@ -505,7 +678,7 @@ class _InvoiceTemplateBuilderScreenState
                             Container(
                               height: 16,
                               decoration: BoxDecoration(
-                                color: color.withValues(alpha: 0.16),
+                                color: color.withOpacity(0.16), // ✅ FIXED
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
@@ -514,7 +687,7 @@ class _InvoiceTemplateBuilderScreenState
                               height: 8,
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.08),
+                                color: Colors.black.withOpacity(0.08), // ✅ FIXED
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
@@ -523,13 +696,13 @@ class _InvoiceTemplateBuilderScreenState
                               height: 8,
                               width: double.infinity,
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.08),
+                                color: Colors.black.withOpacity(0.08), // ✅ FIXED
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
                             const Spacer(),
                             Text(
-                              'Template ${i + 1}',
+                              styleName, // ✅ FIXED: "Classic/Modern/Bold"
                               style: GoogleFonts.nunito(
                                 color: color,
                                 fontWeight: FontWeight.w800,
@@ -546,15 +719,16 @@ class _InvoiceTemplateBuilderScreenState
             }),
           ),
           const SizedBox(height: 14),
+          // Fields card
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: accent.withValues(alpha: 0.24)),
+              border: Border.all(color: accent.withOpacity(0.24)), // ✅ FIXED
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05), // ✅ FIXED
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -583,21 +757,50 @@ class _InvoiceTemplateBuilderScreenState
                     ),
                   ],
                 ),
-                _field('Due Date', _dueDate, icon: Icons.event_available),
+                _field(
+                  'Due Date',
+                  _dueDate,
+                  icon: Icons.event_available,
+                ),
               ],
             ),
           ),
-          const SizedBox(height: 8),
-          Text(
-            'Items',
-            style: GoogleFonts.nunito(
-              color: AppColors.navyDark,
-              fontWeight: FontWeight.w800,
-            ),
+          const SizedBox(height: 12),
+          // Items section
+          Row(
+            children: [
+              Text(
+                'Items',
+                style: GoogleFonts.nunito(
+                  color: AppColors.navyDark,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 15,
+                ),
+              ),
+              const Spacer(),
+              // ✅ item count badge
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.12),
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  '${_items.length} item${_items.length == 1 ? '' : 's'}',
+                  style: GoogleFonts.nunito(
+                    color: accent,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 12,
+                  ),
+                ),
+              ),
+            ],
           ),
           const SizedBox(height: 8),
           ..._items.map(_itemEditor),
-          const SizedBox(height: 8),
           OutlinedButton.icon(
             onPressed: () {
               setState(() {
@@ -612,11 +815,18 @@ class _InvoiceTemplateBuilderScreenState
             },
             icon: const Icon(Icons.add),
             label: const Text('Add Item'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: accent,
+              side: BorderSide(color: accent.withOpacity(0.5)),
+            ),
           ),
+          const SizedBox(height: 12),
           _field('Notes', _notes, maxLines: 2, icon: Icons.notes_rounded),
           const SizedBox(height: 10),
+          // Live preview
           _previewCard(),
           const SizedBox(height: 14),
+          // Action buttons
           Row(
             children: [
               Expanded(
@@ -624,6 +834,10 @@ class _InvoiceTemplateBuilderScreenState
                   onPressed: _previewPdf,
                   icon: const Icon(Icons.preview_outlined),
                   label: const Text('Preview PDF'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navyDark,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -641,6 +855,7 @@ class _InvoiceTemplateBuilderScreenState
               ),
             ],
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );
@@ -652,6 +867,7 @@ class _InvoiceTemplateBuilderScreenState
     int maxLines = 1,
     IconData? icon,
   }) {
+    final accent = _accentColor;
     return Padding(
       padding: const EdgeInsets.only(bottom: 10),
       child: TextField(
@@ -659,7 +875,20 @@ class _InvoiceTemplateBuilderScreenState
         maxLines: maxLines,
         decoration: InputDecoration(
           labelText: label,
-          prefixIcon: icon != null ? Icon(icon) : null,
+          prefixIcon: icon != null ? Icon(icon, color: accent) : null,
+          // ✅ FIXED: styled borders — document builder se consistent
+          border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: accent.withOpacity(0.3)),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: accent, width: 1.5),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(10),
+            borderSide: BorderSide(color: accent.withOpacity(0.25)),
+          ),
         ),
         onChanged: (_) => setState(() {}),
       ),
@@ -667,6 +896,7 @@ class _InvoiceTemplateBuilderScreenState
   }
 
   Widget _itemEditor(_InvoiceItem item) {
+    final accent = _accentColor;
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
@@ -674,10 +904,61 @@ class _InvoiceTemplateBuilderScreenState
         color: Colors.white,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(color: Colors.black12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 6,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
       child: Column(
         children: [
-          _field('Item name', item.name, icon: Icons.inventory_2_outlined),
+          // ✅ FIXED: delete button moved to top-right corner — less cramped
+          Row(
+            children: [
+              Expanded(
+                child: Text(
+                  item.name.text.isNotEmpty ? item.name.text : 'New Item',
+                  style: GoogleFonts.nunito(
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.navyDark,
+                  ),
+                ),
+              ),
+              InkWell(
+                onTap: () {
+                  // ✅ prevent deleting last item
+                  if (_items.length == 1) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('At least one item is required.'),
+                        backgroundColor: Colors.orange,
+                      ),
+                    );
+                    return;
+                  }
+                  setState(() {
+                    item.dispose();
+                    _items.remove(item);
+                  });
+                },
+                borderRadius: BorderRadius.circular(20),
+                child: Padding(
+                  padding: const EdgeInsets.all(4),
+                  child: Icon(
+                    Icons.delete_outline,
+                    color: _items.length == 1
+                        ? Colors.grey.shade300
+                        : Colors.redAccent,
+                    size: 20,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          _field('Item Name', item.name, icon: Icons.inventory_2_outlined),
           Row(
             children: [
               Expanded(
@@ -691,14 +972,25 @@ class _InvoiceTemplateBuilderScreenState
               Expanded(
                 child: _field('Rate', item.rate, icon: Icons.currency_rupee),
               ),
-              IconButton(
-                onPressed: () {
-                  setState(() {
-                    item.dispose();
-                    _items.remove(item);
-                  });
-                },
-                icon: const Icon(Icons.delete_outline),
+              const SizedBox(width: 8),
+              // ✅ live amount preview per item
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 8,
+                ),
+                decoration: BoxDecoration(
+                  color: accent.withOpacity(0.08),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  item.total.toStringAsFixed(0),
+                  style: GoogleFonts.nunito(
+                    color: accent,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 13,
+                  ),
+                ),
               ),
             ],
           ),
@@ -708,24 +1000,20 @@ class _InvoiceTemplateBuilderScreenState
   }
 
   Widget _previewCard() {
-    final color = _templateStyle == 0
-        ? AppColors.navyDark
-        : (_templateStyle == 1 ? AppColors.navyLight : AppColors.purple);
+    final color = _accentColor;
     final previewBg = _templateStyle == 1
         ? const Color(0xFFF7FAFF)
         : (_templateStyle == 2 ? const Color(0xFFF9F4FF) : Colors.white);
+
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: previewBg,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: (_templateStyle == 2 ? AppColors.purple : AppColors.navyDark)
-              .withValues(alpha: 0.26),
-        ),
+        border: Border.all(color: color.withOpacity(0.26)), // ✅ FIXED
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.08),
+            color: Colors.black.withOpacity(0.08), // ✅ FIXED
             blurRadius: 14,
             offset: const Offset(0, 6),
           ),
@@ -734,11 +1022,12 @@ class _InvoiceTemplateBuilderScreenState
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // Header band
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.14),
+              color: color.withOpacity(0.14), // ✅ FIXED
               borderRadius: BorderRadius.circular(10),
             ),
             child: Row(
@@ -765,7 +1054,7 @@ class _InvoiceTemplateBuilderScreenState
                 Text(
                   _today,
                   style: GoogleFonts.nunito(
-                    color: color.withValues(alpha: 0.85),
+                    color: color.withOpacity(0.85), // ✅ FIXED
                     fontSize: 11,
                     fontWeight: FontWeight.w700,
                   ),
@@ -774,6 +1063,7 @@ class _InvoiceTemplateBuilderScreenState
             ),
           ),
           const SizedBox(height: 10),
+          // INVOICE title
           Row(
             children: [
               if (_templateStyle == 2)
@@ -788,89 +1078,137 @@ class _InvoiceTemplateBuilderScreenState
                 ),
               Expanded(
                 child: Text(
-                  'INVOICE',
-                  textAlign:
-                      _templateStyle == 1 ? TextAlign.center : TextAlign.start,
+                  '$_styleName INVOICE',
+                  textAlign: _templateStyle == 1
+                      ? TextAlign.center
+                      : TextAlign.start,
                   style: GoogleFonts.nunito(
-                    fontSize: 24,
+                    fontSize: 22,
                     color: color,
                     fontWeight: FontWeight.w900,
                     letterSpacing: 0.8,
                   ),
                 ),
               ),
-              if (_templateStyle != 1)
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.12),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Text(
-                    _invoiceNo.text,
-                    style: GoogleFonts.nunito(
-                      color: color,
-                      fontWeight: FontWeight.w800,
-                      fontSize: 11,
-                    ),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
+                decoration: BoxDecoration(
+                  color: color.withOpacity(0.12), // ✅ FIXED
+                  borderRadius: BorderRadius.circular(20),
+                ),
+                child: Text(
+                  _invoiceNo.text,
+                  style: GoogleFonts.nunito(
+                    color: color,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 11,
                   ),
                 ),
+              ),
             ],
           ),
           const SizedBox(height: 6),
+          // Info block
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(10),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: _templateStyle == 2 ? 0.12 : 0.06),
+              color: color.withOpacity(_templateStyle == 2 ? 0.12 : 0.06), // ✅ FIXED
               borderRadius: BorderRadius.circular(10),
             ),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(_company.text,
-                    style: GoogleFonts.nunito(fontWeight: FontWeight.w900)),
+                Text(
+                  _company.text,
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w900),
+                ),
                 Text('Bill to: ${_client.text}'),
                 Text('Date: ${_date.text}   Due: ${_dueDate.text}'),
               ],
             ),
           ),
           const SizedBox(height: 10),
+          // Table header
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: color.withValues(alpha: _templateStyle == 1 ? 0.2 : 0.12),
+              color: color.withOpacity( // ✅ FIXED
+                  _templateStyle == 1 ? 0.2 : 0.12),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
               children: [
                 Expanded(
-                    child: Text('Item',
-                        style:
-                            GoogleFonts.nunito(fontWeight: FontWeight.w800))),
-                Text('Amount',
-                    style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
+                  flex: 3,
+                  child: Text(
+                    'Item',
+                    style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                  ),
+                ),
+                Text(
+                  'Qty',
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(width: 10),
+                Text(
+                  'Rate',
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(width: 10),
+                // ✅ FIXED: Amount column bhi dikhta hai preview mein
+                Text(
+                  'Amount',
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                ),
               ],
             ),
           ),
           const SizedBox(height: 6),
-          ..._items.map((e) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  children: [
-                    Expanded(child: Text(e.name.text)),
-                    Text(
-                        '${e.qty.text} x ${e.rate.text} = ${e.total.toStringAsFixed(0)}'),
-                  ],
-                ),
-              )),
+          // Item rows
+          ..._items.map(
+            (e) => Padding(
+              padding: const EdgeInsets.only(bottom: 4),
+              child: Row(
+                children: [
+                  Expanded(
+                    flex: 3,
+                    child: Text(
+                      e.name.text,
+                      style: GoogleFonts.nunito(fontSize: 12),
+                    ),
+                  ),
+                  Text(
+                    e.qty.text,
+                    style: GoogleFonts.nunito(fontSize: 12),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    e.rate.text,
+                    style: GoogleFonts.nunito(fontSize: 12),
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    e.total.toStringAsFixed(0),
+                    style: GoogleFonts.nunito(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
           const Divider(height: 18, thickness: 1.1),
+          // Subtotal
           Container(
             width: double.infinity,
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              border: Border.all(color: color.withValues(alpha: 0.35)),
+              border: Border.all(color: color.withOpacity(0.35)), // ✅ FIXED
               borderRadius: BorderRadius.circular(6),
             ),
             child: Row(
@@ -884,7 +1222,7 @@ class _InvoiceTemplateBuilderScreenState
                 ),
                 const Spacer(),
                 Text(
-                  _total.toStringAsFixed(0),
+                  _subtotal.toStringAsFixed(0),
                   style: GoogleFonts.nunito(
                     color: color,
                     fontWeight: FontWeight.w800,
@@ -894,14 +1232,19 @@ class _InvoiceTemplateBuilderScreenState
             ),
           ),
           const SizedBox(height: 6),
+          // Total
           Align(
             alignment: Alignment.centerRight,
             child: Text(
-              'Total: ${_total.toStringAsFixed(0)}',
-              style:
-                  GoogleFonts.nunito(fontWeight: FontWeight.w900, fontSize: 16),
+              'Total: ${_subtotal.toStringAsFixed(0)}',
+              style: GoogleFonts.nunito(
+                fontWeight: FontWeight.w900,
+                fontSize: 16,
+                color: color,
+              ),
             ),
           ),
+          // Notes
           if (_notes.text.trim().isNotEmpty) ...[
             const SizedBox(height: 8),
             Text(
@@ -909,11 +1252,12 @@ class _InvoiceTemplateBuilderScreenState
               style: GoogleFonts.nunito(
                 color: AppColors.textMuted,
                 fontStyle: FontStyle.italic,
+                fontSize: 12,
               ),
             ),
           ],
           const SizedBox(height: 8),
-          Divider(color: color.withValues(alpha: 0.25)),
+          Divider(color: color.withOpacity(0.25)), // ✅ FIXED
           Align(
             alignment: Alignment.centerRight,
             child: Text(
@@ -935,7 +1279,9 @@ class _InvoiceItem {
   final TextEditingController name;
   final TextEditingController qty;
   final TextEditingController rate;
+
   _InvoiceItem({required this.name, required this.qty, required this.rate});
+
   double get total {
     final q = double.tryParse(qty.text.trim()) ?? 0;
     final r = double.tryParse(rate.text.trim()) ?? 0;

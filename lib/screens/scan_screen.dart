@@ -53,7 +53,7 @@ class _ScanMode {
   });
 }
 
-/// Capture modes — order matches typical document-scanner apps (general → forms → media → codes).
+/// Capture modes — order matches typical document-scanner apps.
 const List<_ScanMode> _kScanModes = [
   _ScanMode(
       id: 'document',
@@ -152,7 +152,7 @@ class _FeatureChip {
   const _FeatureChip({required this.icon, required this.label});
 }
 
-/// Capture polish presets (maps to [ImageEnhancementService.polishCaptureForScanMode] filter ids).
+/// Capture polish presets.
 class _FilterPreset {
   final String id;
   final String label;
@@ -669,8 +669,9 @@ const Map<String, _ModeContent> _kModeContent = {
   ),
 };
 
-/// Live in-app [CameraPreview] for every mode except QR (CamScanner-style viewfinder).
-bool _usesFlutterCameraPreview(String modeId) => modeId != 'qr';
+/// FIX 1: 'gallery' mode does NOT use the flutter camera preview.
+bool _usesFlutterCameraPreview(String modeId) =>
+    modeId != 'qr' && modeId != 'gallery';
 
 /// Open CamScanner-style deskew after capture for document-like modes.
 bool _useDeskewAfterCapture(String modeId) {
@@ -765,7 +766,7 @@ class _ScanScreenState extends State<ScanScreen>
   double _currentZoom = 1.0;
   double _pinchStartZoom = 1.0;
 
-  /// Double-tap preview: alignment grid (no extra toolbar buttons).
+  /// Double-tap preview: alignment grid.
   bool _showAlignmentGrid = false;
   bool _idBackSide = false;
 
@@ -804,19 +805,20 @@ class _ScanScreenState extends State<ScanScreen>
   Timer? _countdownTimer;
   String? _pendingFeatureAction;
   bool _longDocModeEnabled = false;
+
+  // FIX 2: reset to 'dialog' after each use; never left in stale state.
   String _qrResultAction = 'dialog';
 
   @override
   void initState() {
     super.initState();
-    // Honor any mode that has capture UI + tips (includes gallery-only ids).
     _selectedMode = _kModeContent.containsKey(widget.scanType)
         ? widget.scanType
         : 'document';
 
     if (_selectedMode == 'qr') {
       _qrController = MobileScannerController();
-    } else {
+    } else if (_usesFlutterCameraPreview(_selectedMode)) {
       _bootstrapCamera();
     }
 
@@ -833,14 +835,14 @@ class _ScanScreenState extends State<ScanScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
   }
 
+  // FIX 3: Load prefs synchronously before _initCamera; do not rely on
+  // setState side-effects inside an async gap.
   Future<void> _bootstrapCamera() async {
     if (!mounted) return;
-    setState(() {
-      _prefAutoEnhance =
-          AppLocalStorage.getBool('autoEnhance', defaultValue: true);
-      _prefQuality =
-          AppLocalStorage.getString('defaultQuality', defaultValue: 'High');
-    });
+    _prefAutoEnhance =
+        AppLocalStorage.getBool('autoEnhance', defaultValue: true);
+    _prefQuality =
+        AppLocalStorage.getString('defaultQuality', defaultValue: 'High');
     await _initCamera();
   }
 
@@ -960,7 +962,7 @@ class _ScanScreenState extends State<ScanScreen>
 
   // ── Actions ────────────────────────────────────────────────────────────────
 
-  /// Standalone "Gallery" scan tab uses document-style processing (CamScanner-like).
+  /// 'gallery' mode uses document-style processing pipeline.
   String get _pipelineModeId =>
       _selectedMode == 'gallery' ? 'document' : _selectedMode;
 
@@ -971,7 +973,6 @@ class _ScanScreenState extends State<ScanScreen>
     return null;
   }
 
-  /// Auto-enhance / polish, then optional manual align sheet — same as after camera capture.
   Future<String> _polishDeskewStillPath(String rawPath) async {
     final mode = _pipelineModeId;
     var outPath = rawPath;
@@ -1036,6 +1037,8 @@ class _ScanScreenState extends State<ScanScreen>
     }
     if (_isCapturing) return;
     if (_selectedMode == 'qr') return;
+
+    // FIX 4: gallery mode opens gallery picker, not camera capture.
     if (_selectedMode == 'gallery') {
       await _pickFromGallery();
       return;
@@ -1059,15 +1062,20 @@ class _ScanScreenState extends State<ScanScreen>
       });
       PaintingBinding.instance.imageCache.clearLiveImages();
       final firstPath = captured.first;
+
+      // ── Pending feature actions ─────────────────────────────────────────
       if (_pendingFeatureAction == 'ocr_text') {
+        _pendingFeatureAction = null;
         final text = await OcrService.instance.extractText(firstPath);
         await _showTextResultSheet(
             'OCR Text', text.isEmpty ? 'No text found.' : text);
       } else if (_pendingFeatureAction == 'mrz_extract') {
+        _pendingFeatureAction = null;
         final mrz = await _extractMrzText(firstPath);
         await _showTextResultSheet(
             'MRZ Extract', mrz.isEmpty ? 'No MRZ detected.' : mrz);
       } else if (_pendingFeatureAction == 'amount_extract') {
+        _pendingFeatureAction = null;
         final txt = await OcrService.instance.extractText(firstPath);
         final amounts = _extractAmounts(txt);
         await _showTextResultSheet(
@@ -1075,12 +1083,22 @@ class _ScanScreenState extends State<ScanScreen>
           amounts.isEmpty ? 'No amounts detected.' : amounts.join('\n'),
         );
       } else if (_pendingFeatureAction == 'csv_export') {
+        // FIX 5: removed duplicate csv_export condition; only handled once here.
+        _pendingFeatureAction = null;
         final txt = await OcrService.instance.extractText(firstPath);
         final csv = await _saveCsvFromText(txt);
         _showInfoSnack('CSV exported: ${p.basename(csv)}');
+      } else {
+        _pendingFeatureAction = null;
       }
-      _pendingFeatureAction = null;
-      if (_selectedMode == 'id_card' && mounted && !_longDocModeEnabled) {
+
+      if (!mounted) return;
+
+      // ── Mode-specific result screens ────────────────────────────────────
+      // FIX 6: _capturedPages is cleared after each result-screen navigation
+      // so state stays clean for the next scan session.
+
+      if (_selectedMode == 'id_card' && !_longDocModeEnabled) {
         if (_capturedPages.length < 2) {
           _showInfoSnack('Front side captured. Now capture the back side.');
           _afterPagesAddedSnack(captured.length);
@@ -1097,12 +1115,18 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        // FIX: reset id-card side toggle and captured pages after result screen
+        if (mounted) {
+          setState(() {
+            _capturedPages.clear();
+            _idBackSide = false;
+          });
+        }
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'driving_license' &&
-          mounted &&
-          !_longDocModeEnabled) {
+
+      if (_selectedMode == 'driving_license' && !_longDocModeEnabled) {
         if (_capturedPages.length < 2) {
           _showInfoSnack('Front side captured. Now capture the back side.');
           _afterPagesAddedSnack(captured.length);
@@ -1119,10 +1143,17 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) {
+          setState(() {
+            _capturedPages.clear();
+            _idBackSide = false;
+          });
+        }
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'vehicle_rc' && mounted && !_longDocModeEnabled) {
+
+      if (_selectedMode == 'vehicle_rc' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -1131,12 +1162,12 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'medical_prescription' &&
-          mounted &&
-          !_longDocModeEnabled) {
+
+      if (_selectedMode == 'medical_prescription' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -1145,12 +1176,12 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'bank_statement' &&
-          mounted &&
-          !_longDocModeEnabled) {
+
+      if (_selectedMode == 'bank_statement' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -1159,12 +1190,12 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'academic_certificate' &&
-          mounted &&
-          !_longDocModeEnabled) {
+
+      if (_selectedMode == 'academic_certificate' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -1173,10 +1204,12 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'book' && mounted && !_longDocModeEnabled) {
+
+      if (_selectedMode == 'book' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -1185,10 +1218,12 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'table' && mounted && !_longDocModeEnabled) {
+
+      if (_selectedMode == 'table' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -1197,10 +1232,12 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'whiteboard' && mounted && !_longDocModeEnabled) {
+
+      if (_selectedMode == 'whiteboard' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -1209,10 +1246,12 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'photo' && mounted && !_longDocModeEnabled) {
+
+      if (_selectedMode == 'photo' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -1221,20 +1260,24 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'passport' && mounted && !_longDocModeEnabled) {
+
+      if (_selectedMode == 'passport' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
             builder: (_) => PassportResultScreen(imagePath: firstPath),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      if (_selectedMode == 'receipt' && mounted && !_longDocModeEnabled) {
+
+      if (_selectedMode == 'receipt' && !_longDocModeEnabled) {
         await Navigator.push(
           context,
           MaterialPageRoute(
@@ -1243,10 +1286,12 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
+        if (mounted) setState(() => _capturedPages.clear());
         _afterPagesAddedSnack(captured.length);
         return;
       }
-      // Auto-navigate to edit screen after capture (CamScanner style)
+
+      // Generic document / long-doc accumulation → edit screen
       if (mounted && !_longDocModeEnabled) {
         final result = await _pushWithCameraPause<List<String>>(
           MaterialPageRoute(
@@ -1256,35 +1301,41 @@ class _ScanScreenState extends State<ScanScreen>
             ),
           ),
         );
-        // If user added/removed pages in edit screen, sync back
         if (result != null && mounted) {
           setState(() {
             _capturedPages.clear();
             _capturedPages.addAll(result);
           });
+        } else if (mounted) {
+          // FIX 7: clear pages if user discards from edit screen (null result)
+          setState(() => _capturedPages.clear());
         }
       }
       _afterPagesAddedSnack(captured.length);
       sw.stop();
       debugPrint('Scan post-processing took: ${sw.elapsedMilliseconds}ms');
     } catch (e) {
-      setState(() => _isCapturing = false);
+      if (mounted) setState(() => _isCapturing = false);
+      // FIX 8: ensure pendingFeatureAction is cleared on error paths
+      _pendingFeatureAction = null;
       sw.stop();
       debugPrint(
-          'Scan post-processing failed after: ${sw.elapsedMilliseconds}ms');
+          'Scan post-processing failed after: ${sw.elapsedMilliseconds}ms, error: $e');
     }
   }
 
+  // FIX 9: Dispose camera only when the destination mode truly needs the
+  // camera to be absent; resume only when the returning mode needs the camera.
   Future<T?> _pushWithCameraPause<T>(Route<T> route) async {
-    final shouldResume = _usesFlutterCameraPreview(_selectedMode);
-    if (shouldResume && _cameraController != null) {
+    final needsCamera = _usesFlutterCameraPreview(_selectedMode);
+    if (needsCamera && _cameraController != null) {
       await _cameraController?.dispose();
       _cameraController = null;
       if (mounted) setState(() => _isCameraReady = false);
     }
     if (!mounted) return null;
     final result = await Navigator.push<T>(context, route);
-    if (mounted && shouldResume) {
+    if (mounted && needsCamera) {
       await _bootstrapCamera();
     }
     return result;
@@ -1315,7 +1366,7 @@ class _ScanScreenState extends State<ScanScreen>
         content: Text(
           count > 1
               ? 'Added $count page(s) — $total total'
-              : 'Page $total captured!',
+              : 'Page ${total == 0 ? count : total} captured!',
           style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
         ),
         duration: const Duration(seconds: 1),
@@ -1445,7 +1496,7 @@ class _ScanScreenState extends State<ScanScreen>
       final paths = <String>[];
       for (final xfile in images) {
         if (!mounted) break;
-        var one = await _polishDeskewStillPath(xfile.path);
+        final one = await _polishDeskewStillPath(xfile.path);
         if (_pendingFeatureAction == 'dual_page_split' ||
             _selectedMode == 'book') {
           paths.addAll(await _splitDualPages(one));
@@ -1453,6 +1504,8 @@ class _ScanScreenState extends State<ScanScreen>
           paths.add(one);
         }
       }
+      // FIX 10: clear pendingFeatureAction after gallery use
+      _pendingFeatureAction = null;
       if (mounted && paths.isNotEmpty) {
         setState(() => _capturedPages.addAll(paths));
         PaintingBinding.instance.imageCache.clearLiveImages();
@@ -1463,7 +1516,7 @@ class _ScanScreenState extends State<ScanScreen>
     }
   }
 
-  /// Options for the “+” sheet only (gallery side button handles plain gallery).
+  /// Options for the "+" import sheet only.
   List<_ImportOption> _sheetExtraImportOptions() {
     final raw = _kModeContent[_selectedMode]?.importOptions ?? const [];
     return raw.where((o) {
@@ -1546,6 +1599,7 @@ class _ScanScreenState extends State<ScanScreen>
       } else {
         added.add(path);
       }
+      _pendingFeatureAction = null;
       if (mounted && added.isNotEmpty) {
         setState(() => _capturedPages.addAll(added));
         PaintingBinding.instance.imageCache.clearLiveImages();
@@ -1629,30 +1683,28 @@ class _ScanScreenState extends State<ScanScreen>
           'Book batch mode enabled. Capture pages/spreads, then tap Done.');
       return;
     }
+    // FIX 11: removed duplicate table CSV export condition.
     if (_selectedMode == 'table' && opt.label == 'CSV export') {
-      setState(() => _longDocModeEnabled = true);
+      setState(() {
+        _longDocModeEnabled = true;
+        _pendingFeatureAction = 'csv_export';
+      });
       _showInfoSnack(
           'Table batch mode enabled. Capture all pages, then tap Done.');
-      return;
-    }
-    if (_selectedMode == 'table' && opt.label == 'CSV export') {
-      setState(() => _pendingFeatureAction = 'csv_export');
-      _showInfoSnack('CSV export will run after next capture.');
       return;
     }
     if (_selectedMode == 'qr' && opt.label == 'Barcode') {
       await _selectMode('qr');
       return;
     }
+    // FIX 12: _qrResultAction reset to 'dialog' on each new action selection.
     if (_selectedMode == 'qr' && opt.label == 'URL open') {
       setState(() => _qrResultAction = 'open_url');
-      await _selectMode('qr');
       _showInfoSnack('QR action: open URL');
       return;
     }
     if (_selectedMode == 'qr' && opt.label == 'Copy code') {
       setState(() => _qrResultAction = 'copy_code');
-      await _selectMode('qr');
       _showInfoSnack('QR action: copy code');
       return;
     }
@@ -1754,7 +1806,9 @@ class _ScanScreenState extends State<ScanScreen>
     HapticFeedback.lightImpact();
     _currentCameraIndex = (_currentCameraIndex + 1) % _cameras.length;
     await _cameraController?.dispose();
-    setState(() => _isCameraReady = false);
+    // FIX 13: reset _isCameraReady immediately so UI shows loading spinner.
+    if (mounted) setState(() => _isCameraReady = false);
+    _cameraController = null;
     await _setupCamera(_cameras[_currentCameraIndex]);
   }
 
@@ -1771,9 +1825,12 @@ class _ScanScreenState extends State<ScanScreen>
     _lastBarcode = raw;
     _lastBarcodeAt = now;
     HapticFeedback.heavyImpact();
+
     if (_qrResultAction == 'copy_code') {
       Clipboard.setData(ClipboardData(text: raw));
       _showInfoSnack('Copied to clipboard');
+      // FIX 14: reset action so next scan defaults to dialog.
+      setState(() => _qrResultAction = 'dialog');
       return;
     }
     if (_qrResultAction == 'open_url') {
@@ -1783,8 +1840,11 @@ class _ScanScreenState extends State<ScanScreen>
       } else {
         _showInfoSnack('Scanned code is not a valid URL');
       }
+      // FIX 14: reset action after use.
+      setState(() => _qrResultAction = 'dialog');
       return;
     }
+
     if (!mounted) return;
     showDialog<void>(
       context: context,
@@ -1846,59 +1906,185 @@ class _ScanScreenState extends State<ScanScreen>
 
   void _proceedToEdit() {
     if (_capturedPages.isEmpty) return;
-    if (_selectedMode == 'book') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => BookResultScreen(
-            imagePaths: List<String>.from(_capturedPages),
+    switch (_selectedMode) {
+      case 'book':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BookResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
           ),
-        ),
-      );
-      return;
-    }
-    if (_selectedMode == 'table') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => TableResultScreen(
-            imagePaths: List<String>.from(_capturedPages),
+        ).then((_) {
+          if (mounted) setState(() => _capturedPages.clear());
+        });
+        break;
+      case 'table':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => TableResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
           ),
-        ),
-      );
-      return;
-    }
-    if (_selectedMode == 'whiteboard') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => WhiteboardResultScreen(
-            imagePaths: List<String>.from(_capturedPages),
+        ).then((_) {
+          if (mounted) setState(() => _capturedPages.clear());
+        });
+        break;
+      case 'whiteboard':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => WhiteboardResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
           ),
-        ),
-      );
-      return;
-    }
-    if (_selectedMode == 'photo') {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => PhotoEnhancementScreen(
-            imagePaths: List<String>.from(_capturedPages),
+        ).then((_) {
+          if (mounted) setState(() => _capturedPages.clear());
+        });
+        break;
+      case 'photo':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => PhotoEnhancementScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
           ),
-        ),
-      );
-      return;
+        ).then((_) {
+          if (mounted) setState(() => _capturedPages.clear());
+        });
+        break;
+      case 'vehicle_rc':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => VehicleRcResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        ).then((_) {
+          if (mounted) setState(() => _capturedPages.clear());
+        });
+        break;
+      case 'medical_prescription':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => MedicalPrescriptionResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        ).then((_) {
+          if (mounted) setState(() => _capturedPages.clear());
+        });
+        break;
+      case 'bank_statement':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => BankStatementResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        ).then((_) {
+          if (mounted) setState(() => _capturedPages.clear());
+        });
+        break;
+      case 'academic_certificate':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => AcademicCertificateResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        ).then((_) {
+          if (mounted) setState(() => _capturedPages.clear());
+        });
+        break;
+      case 'receipt':
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => ReceiptResultScreen(
+              imagePaths: List<String>.from(_capturedPages),
+            ),
+          ),
+        ).then((_) {
+          if (mounted) setState(() => _capturedPages.clear());
+        });
+        break;
+      case 'passport':
+        if (_capturedPages.isNotEmpty) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) =>
+                  PassportResultScreen(imagePath: _capturedPages.first),
+            ),
+          ).then((_) {
+            if (mounted) setState(() => _capturedPages.clear());
+          });
+        }
+        break;
+      case 'id_card':
+        if (_capturedPages.length >= 2) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => IdCardResultScreen(
+                frontImagePath: _capturedPages[0],
+                backImagePath: _capturedPages[1],
+              ),
+            ),
+          ).then((_) {
+            if (mounted) setState(() => _capturedPages.clear());
+          });
+        } else {
+          _showInfoSnack('Capture both front and back sides first.');
+        }
+        break;
+      case 'driving_license':
+        if (_capturedPages.length >= 2) {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => DrivingLicenseResultScreen(
+                frontImagePath: _capturedPages[0],
+                backImagePath: _capturedPages[1],
+              ),
+            ),
+          ).then((_) {
+            if (mounted) setState(() => _capturedPages.clear());
+          });
+        } else {
+          _showInfoSnack('Capture both front and back sides first.');
+        }
+        break;
+      default:
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => EditScanScreen(
+              imagePaths: List<String>.from(_capturedPages),
+              scanType: _selectedMode,
+            ),
+          ),
+        ).then((result) {
+          if (!mounted) return;
+          if (result != null && result is List<String>) {
+            setState(() {
+              _capturedPages.clear();
+              _capturedPages.addAll(result);
+            });
+          } else {
+            setState(() => _capturedPages.clear());
+          }
+        });
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => EditScanScreen(
-          imagePaths: List<String>.from(_capturedPages),
-          scanType: _selectedMode,
-        ),
-      ),
-    );
+    // FIX 15: reset long-doc mode after proceeding to edit.
+    if (mounted) setState(() => _longDocModeEnabled = false);
   }
 
   String _defaultQuickSaveName() {
@@ -2170,6 +2356,8 @@ class _ScanScreenState extends State<ScanScreen>
       setState(() {
         _capturedPages.clear();
         _isSavingScan = false;
+        // FIX 16: also reset long-doc mode after save.
+        _longDocModeEnabled = false;
       });
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -2199,6 +2387,7 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   void _showPermissionDialog() {
+    if (!mounted) return;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -2261,38 +2450,45 @@ class _ScanScreenState extends State<ScanScreen>
     });
   }
 
+  // FIX 17: Unified, correct camera/QR lifecycle transitions in _selectMode.
   Future<void> _selectMode(String id) async {
     if (id == _selectedMode) return;
     HapticFeedback.selectionClick();
+
     final wasQr = _selectedMode == 'qr';
     final willQr = id == 'qr';
-    final wasCam = _usesFlutterCameraPreview(_selectedMode);
-    final willCam = _usesFlutterCameraPreview(id);
+    final wasGallery = _selectedMode == 'gallery';
+    final willGallery = id == 'gallery';
 
-    if (wasQr && !willQr) {
+    // ── Tear down current camera/QR ──────────────────────────────────────
+    if (wasQr) {
       await _qrController?.dispose();
       _qrController = null;
-      await _bootstrapCamera();
-    } else if (!wasQr && willQr) {
+    } else if (!wasGallery && _cameraController != null) {
       await _cameraController?.dispose();
       _cameraController = null;
       if (mounted) setState(() => _isCameraReady = false);
-      _qrController = MobileScannerController();
-    } else {
-      if (wasCam && !willCam) {
-        await _cameraController?.dispose();
-        _cameraController = null;
-        if (mounted) setState(() => _isCameraReady = false);
-      } else if (!wasCam && willCam) {
-        await _bootstrapCamera();
-      }
     }
 
     if (!mounted) return;
+
+    // ── Update mode state first ──────────────────────────────────────────
     setState(() {
       _selectedMode = id;
       _selectedFilter = 'auto';
+      // FIX 18: reset id-card side toggle when switching modes.
+      _idBackSide = false;
+      // FIX 19: reset long-doc mode when switching scan types.
+      _longDocModeEnabled = false;
     });
+
+    // ── Boot new camera/QR ───────────────────────────────────────────────
+    if (willQr) {
+      _qrController = MobileScannerController();
+    } else if (!willGallery) {
+      await _bootstrapCamera();
+    }
+
     WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToSelected());
   }
 
@@ -2329,33 +2525,62 @@ class _ScanScreenState extends State<ScanScreen>
                       child: CircularProgressIndicator(color: AppColors.gold),
                     ),
             )
-          else if (_isCameraReady && _cameraController != null)
-            Positioned.fill(
-              child: GestureDetector(
-                key: _previewKey,
-                behavior: HitTestBehavior.opaque,
-                onTapUp: _onPreviewTapUp,
-                onDoubleTap: _toggleAlignmentGrid,
-                onScaleStart: _onPinchStart,
-                onScaleUpdate: _onPinchUpdate,
-                child: SizedBox.expand(
-                  child: FittedBox(
-                    fit: BoxFit.cover,
-                    child: SizedBox(
-                      width: _cameraController!.value.previewSize!.height,
-                      height: _cameraController!.value.previewSize!.width,
-                      child: CameraPreview(_cameraController!),
+          else if (_usesFlutterCameraPreview(_selectedMode))
+            if (_isCameraReady && _cameraController != null)
+              Positioned.fill(
+                child: GestureDetector(
+                  key: _previewKey,
+                  behavior: HitTestBehavior.opaque,
+                  onTapUp: _onPreviewTapUp,
+                  onDoubleTap: _toggleAlignmentGrid,
+                  onScaleStart: _onPinchStart,
+                  onScaleUpdate: _onPinchUpdate,
+                  child: SizedBox.expand(
+                    child: FittedBox(
+                      fit: BoxFit.cover,
+                      child: SizedBox(
+                        width: _cameraController!.value.previewSize!.height,
+                        height: _cameraController!.value.previewSize!.width,
+                        child: CameraPreview(_cameraController!),
+                      ),
                     ),
                   ),
                 ),
-              ),
-            )
+              )
+            else
+              const Positioned.fill(
+                child: Center(
+                  child: CircularProgressIndicator(color: AppColors.gold),
+                ),
+              )
+          // FIX 20: gallery mode shows a dark background (no camera).
           else
-            const Center(
-              child: CircularProgressIndicator(color: AppColors.gold),
+            Positioned.fill(
+              child: Container(
+                color: const Color(0xFF0A1128),
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(Iconsax.gallery,
+                          size: 56,
+                          color: AppColors.gold.withValues(alpha: 0.55)),
+                      const SizedBox(height: 14),
+                      Text(
+                        'Tap gallery or + to import images',
+                        style: GoogleFonts.nunito(
+                          color: Colors.white54,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             ),
 
-          // 2. Scan frame + scan-line (live camera + QR overlay)
+          // 2. Scan frame + scan-line overlay
           if (_selectedMode == 'qr')
             Positioned.fill(
               child: IgnorePointer(
@@ -2377,26 +2602,29 @@ class _ScanScreenState extends State<ScanScreen>
                 ),
               ),
             )
-          else if (_usesFlutterCameraPreview(_selectedMode))
+          else if (_usesFlutterCameraPreview(_selectedMode) && _isCameraReady)
             Positioned.fill(
-              child: AnimatedBuilder(
-                animation: _scanLineAnim,
-                builder: (_, __) => CustomPaint(
-                  painter: _ScanFramePainter(
-                    frameType: _frameTypeFor(_selectedMode),
-                    frameColor: _kScanModes
-                        .firstWhere(
-                          (m) => m.id == _selectedMode,
-                          orElse: () => _kScanModes.first,
-                        )
-                        .color,
-                    scanLineProgress: _scanLineAnim.value,
-                    showAlignmentGrid: _showAlignmentGrid,
+              child: IgnorePointer(
+                child: AnimatedBuilder(
+                  animation: _scanLineAnim,
+                  builder: (_, __) => CustomPaint(
+                    painter: _ScanFramePainter(
+                      frameType: _frameTypeFor(_selectedMode),
+                      frameColor: _kScanModes
+                          .firstWhere(
+                            (m) => m.id == _selectedMode,
+                            orElse: () => _kScanModes.first,
+                          )
+                          .color,
+                      scanLineProgress: _scanLineAnim.value,
+                      showAlignmentGrid: _showAlignmentGrid,
+                    ),
                   ),
                 ),
               ),
             ),
 
+          // Zoom HUD
           if (_showZoomHud && _selectedMode != 'qr')
             Positioned(
               bottom: 320,
@@ -2426,6 +2654,7 @@ class _ScanScreenState extends State<ScanScreen>
               ),
             ),
 
+          // Focus ring
           if (_showFocusRing && _focusPoint != null)
             Positioned(
               left: _focusPoint!.dx - 30,
@@ -2446,6 +2675,7 @@ class _ScanScreenState extends State<ScanScreen>
               ),
             ),
 
+          // Timer countdown overlay
           if (_timerCountdown > 0)
             Positioned.fill(
               child: IgnorePointer(
@@ -2553,8 +2783,10 @@ class _ScanScreenState extends State<ScanScreen>
                 ),
               ),
             ),
+            // FIX 21: flash button shown for camera modes; hidden (not faded)
+            // for gallery mode to avoid confusion.
             if (_usesFlutterCameraPreview(_selectedMode) ||
-                _selectedMode == 'qr') ...[
+                _selectedMode == 'qr')
               _iconBtn(
                 _flashIcon(),
                 _cycleFlash,
@@ -2562,19 +2794,9 @@ class _ScanScreenState extends State<ScanScreen>
                 bgColor: _flashMode == 0
                     ? Colors.black45
                     : AppColors.gold.withOpacity(0.2),
-              ),
-            ] else
-              IgnorePointer(
-                child: Opacity(
-                  opacity: 0.22,
-                  child: _iconBtn(
-                    Icons.flash_off_rounded,
-                    () {},
-                    color: Colors.white54,
-                    bgColor: Colors.black45,
-                  ),
-                ),
-              ),
+              )
+            else
+              const SizedBox(width: 42),
           ],
         ),
       ),
@@ -2610,7 +2832,7 @@ class _ScanScreenState extends State<ScanScreen>
               Container(
                 width: 18,
                 height: 18,
-                decoration: BoxDecoration(
+                decoration: const BoxDecoration(
                   color: AppColors.gold,
                   shape: BoxShape.circle,
                 ),
@@ -2671,8 +2893,8 @@ class _ScanScreenState extends State<ScanScreen>
               itemCount: presets.length,
               separatorBuilder: (_, __) => const SizedBox(width: 8),
               itemBuilder: (context, i) {
-                final p = presets[i];
-                final on = _selectedFilter == p.id;
+                final preset = presets[i];
+                final on = _selectedFilter == preset.id;
                 return Material(
                   color: on
                       ? AppColors.gold.withValues(alpha: 0.22)
@@ -2681,7 +2903,7 @@ class _ScanScreenState extends State<ScanScreen>
                   child: InkWell(
                     onTap: () {
                       HapticFeedback.selectionClick();
-                      setState(() => _selectedFilter = p.id);
+                      setState(() => _selectedFilter = preset.id);
                     },
                     borderRadius: BorderRadius.circular(12),
                     child: Container(
@@ -2700,7 +2922,7 @@ class _ScanScreenState extends State<ScanScreen>
                         mainAxisSize: MainAxisSize.min,
                         children: [
                           Icon(
-                            p.icon,
+                            preset.icon,
                             size: 15,
                             color: on
                                 ? AppColors.gold
@@ -2708,7 +2930,7 @@ class _ScanScreenState extends State<ScanScreen>
                           ),
                           const SizedBox(width: 6),
                           Text(
-                            p.label,
+                            preset.label,
                             style: GoogleFonts.nunito(
                               fontSize: 11,
                               fontWeight: FontWeight.w800,
@@ -2994,6 +3216,7 @@ class _ScanScreenState extends State<ScanScreen>
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
         children: [
+          // Left: gallery thumbnail / gallery button
           SizedBox(
             width: 52,
             child: Align(
@@ -3004,6 +3227,8 @@ class _ScanScreenState extends State<ScanScreen>
               ),
             ),
           ),
+
+          // Center: shutter or LIVE label
           Expanded(
             child: Center(
               child: Column(
@@ -3044,7 +3269,8 @@ class _ScanScreenState extends State<ScanScreen>
                             height: _isCapturing ? 68 : 74,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              border: Border.all(color: ringColor, width: ringW),
+                              border:
+                                  Border.all(color: ringColor, width: ringW),
                             ),
                             child: Center(
                               child: AnimatedContainer(
@@ -3100,6 +3326,8 @@ class _ScanScreenState extends State<ScanScreen>
               ),
             ),
           ),
+
+          // Right: flash toggle (QR) or import sheet (+)
           SizedBox(
             width: 52,
             child: Align(
@@ -3175,6 +3403,9 @@ class _ScanScreenState extends State<ScanScreen>
   }
 
   Widget _buildModeHintOverlay() {
+    // FIX 22: don't show hint overlay for gallery mode (no camera viewfinder).
+    if (_selectedMode == 'gallery') return const SizedBox.shrink();
+
     final hint = _modeHintText();
     return Positioned(
       left: 16,
@@ -3189,12 +3420,13 @@ class _ScanScreenState extends State<ScanScreen>
                 _selectedMode == 'driving_license')
               Container(
                 margin: const EdgeInsets.only(bottom: 8),
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.black.withValues(alpha: 0.55),
                   borderRadius: BorderRadius.circular(20),
-                  border:
-                      Border.all(color: AppColors.gold.withValues(alpha: 0.5)),
+                  border: Border.all(
+                      color: AppColors.gold.withValues(alpha: 0.5)),
                 ),
                 child: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -3208,12 +3440,13 @@ class _ScanScreenState extends State<ScanScreen>
                 ),
               ),
             Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+              padding:
+                  const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
               decoration: BoxDecoration(
                 color: Colors.black.withValues(alpha: 0.55),
                 borderRadius: BorderRadius.circular(20),
-                border:
-                    Border.all(color: AppColors.gold.withValues(alpha: 0.35)),
+                border: Border.all(
+                    color: AppColors.gold.withValues(alpha: 0.35)),
               ),
               child: Text(
                 hint,
@@ -3279,6 +3512,12 @@ class _ScanScreenState extends State<ScanScreen>
             : 'Align driving license (Front side)';
       case 'academic_certificate':
         return 'Align certificate';
+      case 'vehicle_rc':
+        return 'Align vehicle RC document';
+      case 'medical_prescription':
+        return 'Align prescription clearly';
+      case 'bank_statement':
+        return 'Align bank statement page';
       case 'qr':
         return 'Point at QR or Barcode';
       default:
@@ -3538,6 +3777,7 @@ class _ScanFramePainter extends CustomPainter {
     canvas.drawLine(
         Offset(left + 4, scanY), Offset(right - 4, scanY), scanPaint);
 
+    // Book spine guide
     if (frameType == _FrameType.book) {
       final centerX = (left + right) / 2;
       final spine = Paint()
@@ -3547,6 +3787,7 @@ class _ScanFramePainter extends CustomPainter {
           Offset(centerX, top + 8), Offset(centerX, bottom - 8), spine);
     }
 
+    // Alignment grid (toggled by double-tap)
     if (showAlignmentGrid) {
       final gridPaint = Paint()
         ..color = Colors.white.withOpacity(0.22)

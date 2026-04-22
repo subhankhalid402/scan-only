@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:archive/archive.dart';
 import 'package:excel/excel.dart' as excel_lib;
 import 'package:path/path.dart' as path;
 import 'package:path_provider/path_provider.dart';
@@ -20,118 +21,143 @@ class DocumentConversionService {
 
   static DocumentConversionService get instance => _instance;
 
-  /// Convert Word (.docx) to PDF
+  /// Convert Word (.docx) to PDF - extracts text content from the DOCX XML
   Future<String> convertWordToPdf(String wordFilePath) async {
     try {
       final docxFile = File(wordFilePath);
-      if (!docxFile.existsSync()) {
-        throw Exception('Word file not found');
-      }
+      if (!docxFile.existsSync()) throw Exception('Word file not found');
 
-      // Create PDF
+      // Try to extract text from DOCX (ZIP-based XML format)
+      String extractedText = '';
+      try {
+        final bytes = await docxFile.readAsBytes();
+        final archive = ZipDecoder().decodeBytes(bytes);
+        final docXml = archive.findFile('word/document.xml');
+        if (docXml != null) {
+          final xmlStr = utf8.decode(docXml.content as List<int>);
+          // Extract text between <w:t> tags
+          final matches = RegExp(r'<w:t[^>]*>([^<]*)</w:t>').allMatches(xmlStr);
+          extractedText = matches.map((m) => m.group(1) ?? '').join(' ');
+          extractedText = extractedText.replaceAll(RegExp(r'\s+'), ' ').trim();
+        }
+      } catch (_) {}
+
+      final stem = path.basenameWithoutExtension(wordFilePath);
       final pdf = pw.Document();
-      
-      // Add a page with placeholder text
       pdf.addPage(
-        pw.Page(
-          build: (pw.Context context) {
-            return pw.Column(
-              crossAxisAlignment: pw.CrossAxisAlignment.start,
-              children: [
-                pw.Text(
-                  'Word Document Converted to PDF',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
-                  ),
-                ),
-                pw.SizedBox(height: 20),
-                pw.Text(
-                  'File: ${path.basenameWithoutExtension(wordFilePath)}',
-                  style: const pw.TextStyle(fontSize: 12),
-                ),
-                pw.SizedBox(height: 10),
-                pw.Text(
-                  'Converted on: ${DateTime.now()}',
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
-                pw.SizedBox(height: 20),
-                pw.Text(
-                  'Note: For full Word to PDF conversion with all formatting, please use desktop tools like Microsoft Office or LibreOffice.',
-                  style: const pw.TextStyle(fontSize: 11),
-                ),
-              ],
-            );
-          },
+        pw.MultiPage(
+          pageFormat: PdfPageFormat.a4,
+          margin: const pw.EdgeInsets.all(40),
+          build: (ctx) => [
+            pw.Text(stem,
+                style: pw.TextStyle(
+                    fontSize: 18, fontWeight: pw.FontWeight.bold)),
+            pw.SizedBox(height: 16),
+            if (extractedText.isNotEmpty)
+              pw.Text(extractedText,
+                  style: const pw.TextStyle(fontSize: 11, lineSpacing: 2))
+            else ...[
+              pw.Text('Word Document: $stem',
+                  style: const pw.TextStyle(fontSize: 12)),
+              pw.SizedBox(height: 8),
+              pw.Text(
+                'Full formatting requires desktop tools (Microsoft Word / LibreOffice).',
+                style: const pw.TextStyle(fontSize: 10),
+              ),
+            ],
+          ],
         ),
       );
 
-      // Save PDF
       final directory = await getApplicationDocumentsDirectory();
-      final fileName = '${path.basenameWithoutExtension(wordFilePath)}_converted_${DateTime.now().millisecondsSinceEpoch}.pdf';
-      final outputPath = '${directory.path}/$fileName';
-      final outputFile = File(outputPath);
-      await outputFile.writeAsBytes(await pdf.save());
-
+      final outputPath =
+          '${directory.path}/${stem}_converted_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      await File(outputPath).writeAsBytes(await pdf.save());
       return outputPath;
     } catch (e) {
       throw Exception('Word to PDF conversion failed: $e');
     }
   }
 
-  /// Convert PowerPoint (.pptx) to PDF
+  /// Convert PowerPoint (.pptx) to PDF - extracts text from each slide
   Future<String> convertPptToPdf(String pptFilePath) async {
     try {
       final pptFile = File(pptFilePath);
-      if (!pptFile.existsSync()) {
-        throw Exception('PowerPoint file not found');
-      }
+      if (!pptFile.existsSync()) throw Exception('PowerPoint file not found');
 
-      // Create PDF
+      final stem = path.basenameWithoutExtension(pptFilePath);
+      final slideTexts = <String>[];
+
+      try {
+        final bytes = await pptFile.readAsBytes();
+        final archive = ZipDecoder().decodeBytes(bytes);
+        // Find all slide XML files
+        final slideFiles = archive.files
+            .where((f) =>
+                f.name.startsWith('ppt/slides/slide') &&
+                f.name.endsWith('.xml'))
+            .toList()
+          ..sort((a, b) => a.name.compareTo(b.name));
+
+        for (final slideFile in slideFiles) {
+          final xmlStr = utf8.decode(slideFile.content as List<int>);
+          final matches =
+              RegExp(r'<a:t>([^<]*)</a:t>').allMatches(xmlStr);
+          final text =
+              matches.map((m) => m.group(1) ?? '').join(' ').trim();
+          if (text.isNotEmpty) slideTexts.add(text);
+        }
+      } catch (_) {}
+
       final pdf = pw.Document();
-
-      // Add a page with placeholder text
-      pdf.addPage(
-        pw.Page(
-          build: (pw.Context context) {
-            return pw.Column(
+      if (slideTexts.isEmpty) {
+        pdf.addPage(pw.Page(
+          build: (_) => pw.Column(
+            crossAxisAlignment: pw.CrossAxisAlignment.start,
+            children: [
+              pw.Text(stem,
+                  style: pw.TextStyle(
+                      fontSize: 18, fontWeight: pw.FontWeight.bold)),
+              pw.SizedBox(height: 12),
+              pw.Text(
+                  'Full slide rendering requires desktop tools (LibreOffice / PowerPoint).',
+                  style: const pw.TextStyle(fontSize: 11)),
+            ],
+          ),
+        ));
+      } else {
+        for (var i = 0; i < slideTexts.length; i++) {
+          pdf.addPage(pw.Page(
+            pageFormat: PdfPageFormat.a4.landscape,
+            margin: const pw.EdgeInsets.all(40),
+            build: (_) => pw.Column(
               crossAxisAlignment: pw.CrossAxisAlignment.start,
               children: [
-                pw.Text(
-                  'PowerPoint Presentation Converted to PDF',
-                  style: pw.TextStyle(
-                    fontSize: 18,
-                    fontWeight: pw.FontWeight.bold,
+                pw.Container(
+                  padding: const pw.EdgeInsets.symmetric(
+                      horizontal: 10, vertical: 6),
+                  decoration: pw.BoxDecoration(
+                    color: PdfColors.blueGrey800,
+                    borderRadius: pw.BorderRadius.circular(6),
                   ),
+                  child: pw.Text('Slide ${i + 1}',
+                      style: pw.TextStyle(
+                          color: PdfColors.white,
+                          fontWeight: pw.FontWeight.bold)),
                 ),
-                pw.SizedBox(height: 20),
-                pw.Text(
-                  'File: ${path.basenameWithoutExtension(pptFilePath)}',
-                  style: const pw.TextStyle(fontSize: 12),
-                ),
-                pw.SizedBox(height: 10),
-                pw.Text(
-                  'Converted on: ${DateTime.now()}',
-                  style: const pw.TextStyle(fontSize: 10),
-                ),
-                pw.SizedBox(height: 20),
-                pw.Text(
-                  'Note: For full PowerPoint to PDF conversion with all slides and formatting, please use desktop tools like LibreOffice or Microsoft Office.',
-                  style: const pw.TextStyle(fontSize: 11),
-                ),
+                pw.SizedBox(height: 16),
+                pw.Text(slideTexts[i],
+                    style: const pw.TextStyle(fontSize: 14, lineSpacing: 2)),
               ],
-            );
-          },
-        ),
-      );
+            ),
+          ));
+        }
+      }
 
-      // Save PDF
       final directory = await getApplicationDocumentsDirectory();
-      final fileName = '${path.basenameWithoutExtension(pptFilePath)}_converted_${DateTime.now().millisecondsSinceEpoch}.pdf';
-      final outputPath = '${directory.path}/$fileName';
-      final outputFile = File(outputPath);
-      await outputFile.writeAsBytes(await pdf.save());
-
+      final outputPath =
+          '${directory.path}/${stem}_converted_${DateTime.now().millisecondsSinceEpoch}.pdf';
+      await File(outputPath).writeAsBytes(await pdf.save());
       return outputPath;
     } catch (e) {
       throw Exception('PowerPoint to PDF conversion failed: $e');

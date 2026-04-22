@@ -16,7 +16,13 @@ import '../theme.dart';
 
 class DocumentTemplateBuilderScreen extends StatefulWidget {
   final String templateName;
-  const DocumentTemplateBuilderScreen({super.key, required this.templateName});
+  final String scanType;
+
+  const DocumentTemplateBuilderScreen({
+    super.key,
+    required this.templateName,
+    this.scanType = 'document',
+  });
 
   @override
   State<DocumentTemplateBuilderScreen> createState() =>
@@ -28,17 +34,23 @@ class _DocumentTemplateBuilderScreenState
   final _fields = <String, TextEditingController>{};
   final _listRows = <_RowModel>[];
   int _templateStyle = 0;
-  String get _styleName => _templateStyle == 0
-      ? 'Classic'
-      : (_templateStyle == 1 ? 'Modern' : 'Bold');
-  String get _today => DateTime.now().toIso8601String().split('T').first;
+
+  String get _styleName =>
+      _templateStyle == 0 ? 'Classic' : (_templateStyle == 1 ? 'Modern' : 'Bold');
+
+  String get _today =>
+      DateTime.now().toIso8601String().split('T').first;
+
   String get _docLabel {
     final key = widget.templateName.toLowerCase();
     if (key.contains('contract')) return 'LEGAL AGREEMENT';
+    if (key.contains('certificate')) return 'CERTIFICATE OF ACHIEVEMENT';
     if (key.contains('business')) return 'BUSINESS IDENTITY';
     if (key.contains('receipt')) return 'PAYMENT RECORD';
     if (key.contains('whiteboard')) return 'MEETING NOTES';
     if (key.contains('table')) return 'STRUCTURED DATA SHEET';
+    if (key.contains('meeting')) return 'MEETING MINUTES';
+    if (key.contains('resume') || key.contains('cv')) return 'CURRICULUM VITAE';
     return 'PROFESSIONAL DOCUMENT';
   }
 
@@ -65,10 +77,17 @@ class _DocumentTemplateBuilderScreenState
       _addField('Title', 'SERVICE AGREEMENT');
       _addField('Party A', 'Company Name');
       _addField('Party B', 'Client Name');
-      _addField('Start Date', '2026-04-14');
+      _addField('Start Date', _today);
       _addField('End Date', '2026-12-31');
       _addField('Amount', '50000');
       _addField('Terms', 'Both parties agree to terms and conditions.');
+    } else if (name == 'certificate') {
+      _addField('Certificate Title', 'CERTIFICATE OF ACHIEVEMENT');
+      _addField('Awarded To', 'Recipient Name');
+      _addField('Awarded By', 'Organization Name');
+      _addField('Reason', 'Outstanding Performance in 2026');
+      _addField('Date', _today);
+      _addField('Authorized By', 'Director / Principal');
     } else if (name == 'business card') {
       _addField('Full Name', 'John Doe');
       _addField('Designation', 'Sales Manager');
@@ -78,7 +97,7 @@ class _DocumentTemplateBuilderScreenState
       _addField('Address', 'Karachi, Pakistan');
     } else if (name == 'receipt') {
       _addField('Store Name', 'ScanOnly Mart');
-      _addField('Date', '2026-04-14');
+      _addField('Date', _today);
       _addField('Receipt #', 'RCPT-2201');
       _addField('Cashier', 'Counter 02');
       _addField('Tax/GST', '120');
@@ -86,7 +105,7 @@ class _DocumentTemplateBuilderScreenState
       _listRows.add(_RowModel('Item', '1', '500'));
     } else if (name == 'whiteboard notes') {
       _addField('Meeting Title', 'Weekly Planning');
-      _addField('Date', '2026-04-14');
+      _addField('Date', _today);
       _addField('Presenter', 'Team Lead');
       _addField('Main Notes',
           '1) Sprint goals\n2) Risks and blockers\n3) Action items');
@@ -97,6 +116,29 @@ class _DocumentTemplateBuilderScreenState
       _addField('Column 3', 'Remarks');
       _listRows.add(_RowModel('Ali', 'Present', '-'));
       _listRows.add(_RowModel('Sara', 'Absent', 'Sick leave'));
+    } else if (name == 'meeting notes') {
+      _addField('Meeting Title', 'Project Kickoff');
+      _addField('Date', _today);
+      _addField('Location', 'Conference Room A');
+      _addField('Facilitator', 'Team Lead');
+      _addField('Attendees', 'Ali, Sara, Ahmed, Fatima');
+      _addField('Agenda', '1) Project overview\n2) Roles\n3) Timeline');
+      _addField('Action Items', '1) Setup repo\n2) Share docs\n3) Next meeting');
+    } else if (name == 'resume / cv') {
+      _addField('Full Name', 'John Doe');
+      _addField('Email', 'john@example.com');
+      _addField('Phone', '+92 300 0000000');
+      _addField('Address', 'Karachi, Pakistan');
+      _addField('Objective', 'Motivated professional seeking growth opportunities.');
+      _addField('Education', 'BS Computer Science - University of Karachi (2022)');
+      _addField('Experience', 'Software Engineer - ScanOnly Pvt Ltd (2022-Present)');
+      _addField('Skills', 'Flutter, Dart, Firebase, REST APIs, Git');
+    } else {
+      // Generic fallback
+      _addField('Title', widget.templateName.toUpperCase());
+      _addField('Name', 'Your Name');
+      _addField('Date', _today);
+      _addField('Details', 'Add your details here');
     }
   }
 
@@ -104,24 +146,31 @@ class _DocumentTemplateBuilderScreenState
     _fields[key] = TextEditingController(text: initial);
   }
 
+  // ✅ FIXED: toARGB32() crash → .value use karo (stable across all Flutter versions)
+  String _colorToHex(Color color) {
+    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
+  }
+
   Future<Uint8List> _buildPdfBytes() async {
     final pdf = pw.Document();
     final title = widget.templateName.toUpperCase();
-    final accent = _styleAccent(_accentColorForTemplate(), _templateStyle);
-    final accentHex =
-        '#${accent.toARGB32().toRadixString(16).padLeft(8, '0').substring(2)}';
-    final accentPdf = PdfColor.fromHex(accentHex);
+    final accent = _accentColorForTemplate();
+    final styleAccent = _styleAccent(accent, _templateStyle);
+    final accentPdf = PdfColor.fromHex(_colorToHex(styleAccent)); // ✅ FIXED
+
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
         build: (_) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Professional header band
+            // Header band
             pw.Container(
               width: double.infinity,
-              padding:
-                  const pw.EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              padding: const pw.EdgeInsets.symmetric(
+                horizontal: 14,
+                vertical: 10,
+              ),
               decoration: pw.BoxDecoration(
                 color: accentPdf.shade(0.14),
                 borderRadius: pw.BorderRadius.circular(8),
@@ -160,6 +209,7 @@ class _DocumentTemplateBuilderScreenState
               ),
             ),
             pw.SizedBox(height: 10),
+            // Title row
             pw.Row(
               children: [
                 if (_templateStyle == 2)
@@ -185,6 +235,7 @@ class _DocumentTemplateBuilderScreenState
               ],
             ),
             pw.SizedBox(height: 12),
+            // Fields block
             pw.Container(
               width: double.infinity,
               padding: const pw.EdgeInsets.all(10),
@@ -198,26 +249,33 @@ class _DocumentTemplateBuilderScreenState
                     .map(
                       (e) => pw.Padding(
                         padding: const pw.EdgeInsets.only(bottom: 6),
-                        child: pw.Text('${e.key}: ${e.value.text}'),
+                        child: pw.Text(
+                          '${e.key}: ${e.value.text}',
+                          style: const pw.TextStyle(fontSize: 11),
+                        ),
                       ),
                     )
                     .toList(),
               ),
             ),
             pw.SizedBox(height: 8),
+            // Notes bar
             pw.Container(
               width: double.infinity,
-              padding:
-                  const pw.EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+              padding: const pw.EdgeInsets.symmetric(
+                horizontal: 10,
+                vertical: 6,
+              ),
               decoration: pw.BoxDecoration(
                 border: pw.Border.all(color: accentPdf.shade(0.35)),
                 borderRadius: pw.BorderRadius.circular(6),
               ),
               child: pw.Text(
-                'Notes: $_docLabel | Generated from selected "$_styleName" style template.',
+                'Notes: $_docLabel | Generated from "$_styleName" style template.',
                 style: const pw.TextStyle(fontSize: 9),
               ),
             ),
+            // Table (if rows exist)
             if (_listRows.isNotEmpty) ...[
               pw.SizedBox(height: 10),
               pw.TableHelper.fromTextArray(
@@ -225,6 +283,14 @@ class _DocumentTemplateBuilderScreenState
                 data: _listRows
                     .map((r) => [r.a.text, r.b.text, r.c.text])
                     .toList(),
+                headerStyle: pw.TextStyle(
+                  fontWeight: pw.FontWeight.bold,
+                  color: accentPdf,
+                ),
+                headerDecoration: pw.BoxDecoration(
+                  color: accentPdf.shade(0.12),
+                ),
+                cellHeight: 28,
               ),
             ],
             pw.Spacer(),
@@ -257,12 +323,11 @@ class _DocumentTemplateBuilderScreenState
     final outPath = p.join(outDir.path, fileName);
     await File(outPath).writeAsBytes(bytes);
 
-    // Register in library so it appears in Documents tab
     final doc = DocumentModel(
       name: fileName,
       filePath: outPath,
       fileType: 'pdf',
-      scanType: 'document',
+      scanType: widget.scanType, // ✅ FIXED: hardcoded 'document' ki jagah
       pageCount: 1,
       fileSizeMB: bytes.length / (1024 * 1024),
       createdAt: DateTime.now(),
@@ -303,13 +368,12 @@ class _DocumentTemplateBuilderScreenState
           return;
       }
 
-      // Register in library
       final ext = outPath.split('.').last.toLowerCase();
       final doc = DocumentModel(
         name: p.basename(outPath),
         filePath: outPath,
         fileType: ext,
-        scanType: 'document',
+        scanType: widget.scanType, // ✅ FIXED: hardcoded ki jagah dynamic
         pageCount: 1,
         fileSizeMB: File(outPath).lengthSync() / (1024 * 1024),
         createdAt: DateTime.now(),
@@ -320,14 +384,19 @@ class _DocumentTemplateBuilderScreenState
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('Exported as ${format.toUpperCase()}: ${p.basename(outPath)}'),
+          content: Text(
+            'Exported as ${format.toUpperCase()}: ${p.basename(outPath)}',
+          ),
           backgroundColor: AppColors.green,
         ),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.red),
+        SnackBar(
+          content: Text('Export failed: $e'),
+          backgroundColor: AppColors.red,
+        ),
       );
     }
   }
@@ -346,18 +415,42 @@ class _DocumentTemplateBuilderScreenState
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('Export As',
-                  style: GoogleFonts.nunito(
-                      fontWeight: FontWeight.w800, fontSize: 16)),
+              Text(
+                'Export As',
+                style: GoogleFonts.nunito(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 16,
+                ),
+              ),
               const SizedBox(height: 12),
-              _exportTile(Icons.picture_as_pdf, 'PDF', 'pdf',
-                  AppColors.navyDark, _savePdf),
-              _exportTile(Icons.table_chart_rounded, 'Excel (.xlsx)', 'excel',
-                  const Color(0xFF217346), () => _exportAs('excel')),
-              _exportTile(Icons.description_rounded, 'Word (.docx)', 'word',
-                  const Color(0xFF2B579A), () => _exportAs('word')),
-              _exportTile(Icons.slideshow_rounded, 'PowerPoint (.pptx)', 'ppt',
-                  const Color(0xFFD24726), () => _exportAs('ppt')),
+              _exportTile(
+                Icons.picture_as_pdf,
+                'PDF',
+                'pdf',
+                AppColors.navyDark,
+                _savePdf,
+              ),
+              _exportTile(
+                Icons.table_chart_rounded,
+                'Excel (.xlsx)',
+                'excel',
+                const Color(0xFF217346),
+                () => _exportAs('excel'),
+              ),
+              _exportTile(
+                Icons.description_rounded,
+                'Word (.docx)',
+                'word',
+                const Color(0xFF2B579A),
+                () => _exportAs('word'),
+              ),
+              _exportTile(
+                Icons.slideshow_rounded,
+                'PowerPoint (.pptx)',
+                'ppt',
+                const Color(0xFFD24726),
+                () => _exportAs('ppt'),
+              ),
             ],
           ),
         ),
@@ -366,19 +459,26 @@ class _DocumentTemplateBuilderScreenState
   }
 
   Widget _exportTile(
-      IconData icon, String label, String format, Color color, VoidCallback onTap) {
+    IconData icon,
+    String label,
+    String format,
+    Color color,
+    VoidCallback onTap,
+  ) {
     return ListTile(
       leading: Container(
         width: 36,
         height: 36,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12),
+          color: color.withOpacity(0.12), // ✅ FIXED
           borderRadius: BorderRadius.circular(8),
         ),
         child: Icon(icon, color: color, size: 20),
       ),
-      title: Text(label,
-          style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
+      title: Text(
+        label,
+        style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
+      ),
       onTap: () {
         Navigator.pop(context);
         onTap();
@@ -394,8 +494,9 @@ class _DocumentTemplateBuilderScreenState
         builder: (_) => Scaffold(
           appBar: AppBar(
             backgroundColor: AppColors.navyDark,
+            foregroundColor: Colors.white,
             title: Text(
-              '${widget.templateName} PDF Preview',
+              '${widget.templateName} Preview',
               style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
             ),
           ),
@@ -416,22 +517,29 @@ class _DocumentTemplateBuilderScreenState
     return Scaffold(
       appBar: AppBar(
         backgroundColor: AppColors.navyDark,
+        foregroundColor: Colors.white, // ✅ back button bhi white hoga
         title: Text(
           '${widget.templateName} Template',
-          style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+          style: GoogleFonts.nunito(
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
         ),
       ),
       body: ListView(
         padding: const EdgeInsets.all(14),
         children: [
+          // Style selector label
           Text(
-            'Choose style',
+            'Choose Style',
             style: GoogleFonts.nunito(
               color: AppColors.navyDark,
               fontWeight: FontWeight.w800,
+              fontSize: 15,
             ),
           ),
           const SizedBox(height: 8),
+          // Style cards row
           Row(
             children: List.generate(3, (i) {
               final selected = _templateStyle == i;
@@ -441,7 +549,8 @@ class _DocumentTemplateBuilderScreenState
                   padding: EdgeInsets.only(right: i == 2 ? 0 : 8),
                   child: GestureDetector(
                     onTap: () => setState(() => _templateStyle = i),
-                    child: Container(
+                    child: AnimatedContainer( // ✅ smooth selection animation
+                      duration: const Duration(milliseconds: 200),
                       height: 92,
                       decoration: BoxDecoration(
                         color: Colors.white,
@@ -450,6 +559,15 @@ class _DocumentTemplateBuilderScreenState
                           color: selected ? AppColors.gold : Colors.black12,
                           width: selected ? 2 : 1,
                         ),
+                        boxShadow: selected
+                            ? [
+                                BoxShadow(
+                                  color: AppColors.gold.withOpacity(0.18),
+                                  blurRadius: 8,
+                                  offset: const Offset(0, 3),
+                                ),
+                              ]
+                            : [],
                       ),
                       child: Padding(
                         padding: const EdgeInsets.all(8),
@@ -458,7 +576,7 @@ class _DocumentTemplateBuilderScreenState
                             Container(
                               height: 14,
                               decoration: BoxDecoration(
-                                color: styleAccent.withValues(alpha: 0.16),
+                                color: styleAccent.withOpacity(0.16), // ✅ FIXED
                                 borderRadius: BorderRadius.circular(6),
                               ),
                             ),
@@ -466,7 +584,7 @@ class _DocumentTemplateBuilderScreenState
                             Container(
                               height: 7,
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.08),
+                                color: Colors.black.withOpacity(0.08), // ✅ FIXED
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
@@ -475,13 +593,15 @@ class _DocumentTemplateBuilderScreenState
                               height: 7,
                               width: i == 1 ? 70 : double.infinity,
                               decoration: BoxDecoration(
-                                color: Colors.black.withValues(alpha: 0.08),
+                                color: Colors.black.withOpacity(0.08), // ✅ FIXED
                                 borderRadius: BorderRadius.circular(4),
                               ),
                             ),
                             const Spacer(),
                             Text(
-                              i == 0 ? 'Classic' : (i == 1 ? 'Modern' : 'Bold'),
+                              i == 0
+                                  ? 'Classic'
+                                  : (i == 1 ? 'Modern' : 'Bold'),
                               style: GoogleFonts.nunito(
                                 color: styleAccent,
                                 fontSize: 11,
@@ -498,40 +618,38 @@ class _DocumentTemplateBuilderScreenState
             }),
           ),
           const SizedBox(height: 12),
+          // Live preview card
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(
-                color:
-                    _styleAccent(accent, _templateStyle).withValues(alpha: 0.2),
+                color: _styleAccent(accent, _templateStyle).withOpacity(0.2), // ✅ FIXED
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.08),
+                  color: Colors.black.withOpacity(0.08), // ✅ FIXED
                   blurRadius: 14,
                   offset: const Offset(0, 6),
                 ),
               ],
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _canvaPreviewBlock(),
-              ],
-            ),
+            child: _canvaPreviewBlock(),
           ),
           const SizedBox(height: 12),
+          // Fields editor card
           Container(
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
               color: Colors.white,
               borderRadius: BorderRadius.circular(14),
-              border: Border.all(color: accent.withValues(alpha: 0.22)),
+              border: Border.all(
+                color: accent.withOpacity(0.22), // ✅ FIXED
+              ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withValues(alpha: 0.05),
+                  color: Colors.black.withOpacity(0.05), // ✅ FIXED
                   blurRadius: 10,
                   offset: const Offset(0, 4),
                 ),
@@ -546,8 +664,20 @@ class _DocumentTemplateBuilderScreenState
                         controller: e.value,
                         decoration: InputDecoration(
                           labelText: e.key,
-                          prefixIcon:
-                              Icon(Icons.edit_note_rounded, color: accent),
+                          prefixIcon: Icon(
+                            Icons.edit_note_rounded,
+                            color: accent,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(
+                              color: accent.withOpacity(0.3),
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(10),
+                            borderSide: BorderSide(color: accent, width: 1.5),
+                          ),
                         ),
                         onChanged: (_) => setState(() {}),
                       ),
@@ -556,22 +686,35 @@ class _DocumentTemplateBuilderScreenState
                   .toList(),
             ),
           ),
+          // Rows editor (receipt / table sheet)
           if (_listRows.isNotEmpty) ...[
             const SizedBox(height: 12),
-            Text('Rows',
-                style: GoogleFonts.nunito(
-                    color: AppColors.navyDark, fontWeight: FontWeight.w800)),
+            Text(
+              'Rows',
+              style: GoogleFonts.nunito(
+                color: AppColors.navyDark,
+                fontWeight: FontWeight.w800,
+                fontSize: 15,
+              ),
+            ),
             const SizedBox(height: 6),
             ..._listRows.map((r) => _rowEditor(r)),
-            OutlinedButton.icon(
-              onPressed: () {
-                setState(() => _listRows.add(_RowModel('Item', '1', '0')));
-              },
-              icon: const Icon(Icons.add),
-              label: const Text('Add row'),
-            ),
-            const SizedBox(height: 8),
           ],
+          // Add row button (always shown so user can add rows)
+          const SizedBox(height: 6),
+          OutlinedButton.icon(
+            onPressed: () {
+              setState(() => _listRows.add(_RowModel('Item', '1', '0')));
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('Add Row'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: accent,
+              side: BorderSide(color: accent.withOpacity(0.5)),
+            ),
+          ),
+          const SizedBox(height: 12),
+          // Action buttons
           Row(
             children: [
               Expanded(
@@ -579,6 +722,10 @@ class _DocumentTemplateBuilderScreenState
                   onPressed: _previewPdf,
                   icon: const Icon(Icons.preview_outlined),
                   label: const Text('Preview PDF'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.navyDark,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                  ),
                 ),
               ),
               const SizedBox(width: 10),
@@ -596,12 +743,14 @@ class _DocumentTemplateBuilderScreenState
               ),
             ],
           ),
+          const SizedBox(height: 20),
         ],
       ),
     );
   }
 
   Widget _rowEditor(_RowModel r) {
+    final headers = _tableHeaders();
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(10),
@@ -613,41 +762,45 @@ class _DocumentTemplateBuilderScreenState
       child: Row(
         children: [
           Expanded(
-              child: TextField(
-            controller: r.a,
-            decoration: const InputDecoration(
-              labelText: 'Col 1',
-              prefixIcon: Icon(Icons.title_rounded),
+            child: TextField(
+              controller: r.a,
+              decoration: InputDecoration(
+                // ✅ Column headers se label aata hai
+                labelText: headers[0],
+                prefixIcon: const Icon(Icons.title_rounded),
+              ),
+              onChanged: (_) => setState(() {}),
             ),
-            onChanged: (_) => setState(() {}),
-          )),
+          ),
           const SizedBox(width: 8),
           Expanded(
-              child: TextField(
-            controller: r.b,
-            decoration: const InputDecoration(
-              labelText: 'Col 2',
-              prefixIcon: Icon(Icons.numbers_rounded),
+            child: TextField(
+              controller: r.b,
+              decoration: InputDecoration(
+                labelText: headers[1], // ✅
+                prefixIcon: const Icon(Icons.numbers_rounded),
+              ),
+              onChanged: (_) => setState(() {}),
             ),
-            onChanged: (_) => setState(() {}),
-          )),
+          ),
           const SizedBox(width: 8),
           Expanded(
-              child: TextField(
-            controller: r.c,
-            decoration: const InputDecoration(
-              labelText: 'Col 3',
-              prefixIcon: Icon(Icons.notes_rounded),
+            child: TextField(
+              controller: r.c,
+              decoration: InputDecoration(
+                labelText: headers[2], // ✅
+                prefixIcon: const Icon(Icons.notes_rounded),
+              ),
+              onChanged: (_) => setState(() {}),
             ),
-            onChanged: (_) => setState(() {}),
-          )),
+          ),
           IconButton(
             onPressed: () => setState(() {
               r.dispose();
               _listRows.remove(r);
             }),
-            icon: const Icon(Icons.delete_outline),
-          )
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+          ),
         ],
       ),
     );
@@ -659,14 +812,16 @@ class _DocumentTemplateBuilderScreenState
     final previewBg = _templateStyle == 1
         ? const Color(0xFFF7FAFF)
         : (_templateStyle == 2 ? const Color(0xFFF9F4FF) : Colors.white);
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        // Header band
         Container(
           width: double.infinity,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
           decoration: BoxDecoration(
-            color: styleAccent.withValues(alpha: 0.12),
+            color: styleAccent.withOpacity(0.12), // ✅ FIXED
             borderRadius: BorderRadius.circular(10),
           ),
           child: Row(
@@ -693,7 +848,7 @@ class _DocumentTemplateBuilderScreenState
               Text(
                 _today,
                 style: GoogleFonts.nunito(
-                  color: styleAccent.withValues(alpha: 0.85),
+                  color: styleAccent.withOpacity(0.85), // ✅ FIXED
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
                 ),
@@ -702,6 +857,7 @@ class _DocumentTemplateBuilderScreenState
           ),
         ),
         const SizedBox(height: 10),
+        // Live preview label + template badge
         Row(
           children: [
             Text(
@@ -715,7 +871,7 @@ class _DocumentTemplateBuilderScreenState
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
               decoration: BoxDecoration(
-                color: styleAccent.withValues(alpha: 0.14),
+                color: styleAccent.withOpacity(0.14), // ✅ FIXED
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Text(
@@ -730,17 +886,19 @@ class _DocumentTemplateBuilderScreenState
           ],
         ),
         const SizedBox(height: 10),
+        // Document title block
         Container(
           width: double.infinity,
           padding: EdgeInsets.all(_templateStyle == 1 ? 14 : 12),
           decoration: BoxDecoration(
             color: _templateStyle == 0
                 ? previewBg
-                : styleAccent.withValues(
-                    alpha: _templateStyle == 2 ? 0.14 : 0.06),
+                : styleAccent.withOpacity(
+                    _templateStyle == 2 ? 0.14 : 0.06, // ✅ FIXED
+                  ),
             borderRadius: BorderRadius.circular(10),
             border: Border.all(
-              color: styleAccent.withValues(alpha: 0.22),
+              color: styleAccent.withOpacity(0.22), // ✅ FIXED
             ),
           ),
           child: Row(
@@ -758,8 +916,9 @@ class _DocumentTemplateBuilderScreenState
               Expanded(
                 child: Text(
                   '$_styleName ${widget.templateName.toUpperCase()}',
-                  textAlign:
-                      _templateStyle == 1 ? TextAlign.center : TextAlign.start,
+                  textAlign: _templateStyle == 1
+                      ? TextAlign.center
+                      : TextAlign.start,
                   style: GoogleFonts.nunito(
                     color: styleAccent,
                     fontWeight: FontWeight.w900,
@@ -772,6 +931,7 @@ class _DocumentTemplateBuilderScreenState
           ),
         ),
         const SizedBox(height: 10),
+        // Fields preview
         ..._fields.entries.take(6).map(
               (e) => Padding(
                 padding: const EdgeInsets.only(bottom: 4),
@@ -785,6 +945,7 @@ class _DocumentTemplateBuilderScreenState
                         style: GoogleFonts.nunito(
                           color: AppColors.textMuted,
                           fontWeight: FontWeight.w700,
+                          fontSize: 13,
                         ),
                       ),
                     ),
@@ -798,6 +959,7 @@ class _DocumentTemplateBuilderScreenState
                           fontWeight: _templateStyle == 2
                               ? FontWeight.w800
                               : FontWeight.w700,
+                          fontSize: 13,
                         ),
                       ),
                     ),
@@ -805,29 +967,26 @@ class _DocumentTemplateBuilderScreenState
                 ),
               ),
             ),
+        // Table preview (if rows)
         if (_listRows.isNotEmpty) ...[
           const SizedBox(height: 8),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
             decoration: BoxDecoration(
-              color: styleAccent.withValues(alpha: 0.12),
+              color: styleAccent.withOpacity(0.12), // ✅ FIXED
               borderRadius: BorderRadius.circular(8),
             ),
             child: Row(
-              children: [
-                Expanded(
-                    child: Text(_tableHeaders()[0],
-                        style:
-                            GoogleFonts.nunito(fontWeight: FontWeight.w800))),
-                Expanded(
-                    child: Text(_tableHeaders()[1],
-                        style:
-                            GoogleFonts.nunito(fontWeight: FontWeight.w800))),
-                Expanded(
-                    child: Text(_tableHeaders()[2],
-                        style:
-                            GoogleFonts.nunito(fontWeight: FontWeight.w800))),
-              ],
+              children: _tableHeaders()
+                  .map(
+                    (h) => Expanded(
+                      child: Text(
+                        h,
+                        style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
+                      ),
+                    ),
+                  )
+                  .toList(),
             ),
           ),
           const SizedBox(height: 6),
@@ -836,16 +995,31 @@ class _DocumentTemplateBuilderScreenState
                   padding: const EdgeInsets.only(bottom: 4),
                   child: Row(
                     children: [
-                      Expanded(child: Text(r.a.text)),
-                      Expanded(child: Text(r.b.text)),
-                      Expanded(child: Text(r.c.text)),
+                      Expanded(
+                        child: Text(
+                          r.a.text,
+                          style: GoogleFonts.nunito(fontSize: 12),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          r.b.text,
+                          style: GoogleFonts.nunito(fontSize: 12),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          r.c.text,
+                          style: GoogleFonts.nunito(fontSize: 12),
+                        ),
+                      ),
                     ],
                   ),
                 ),
               ),
         ],
         const SizedBox(height: 10),
-        Divider(color: styleAccent.withValues(alpha: 0.25)),
+        Divider(color: styleAccent.withOpacity(0.25)), // ✅ FIXED
         Align(
           alignment: Alignment.centerRight,
           child: Text(
@@ -864,10 +1038,13 @@ class _DocumentTemplateBuilderScreenState
   Color _accentColorForTemplate() {
     final key = widget.templateName.toLowerCase();
     if (key.contains('contract')) return AppColors.navyDark;
+    if (key.contains('certificate')) return const Color(0xFFD4AF37);
     if (key.contains('business')) return AppColors.purple;
     if (key.contains('receipt')) return AppColors.green;
     if (key.contains('whiteboard')) return AppColors.blue;
     if (key.contains('table')) return AppColors.gold;
+    if (key.contains('meeting')) return AppColors.navyMid;
+    if (key.contains('resume') || key.contains('cv')) return AppColors.purple;
     return AppColors.navyMid;
   }
 
@@ -877,11 +1054,22 @@ class _DocumentTemplateBuilderScreenState
     return base;
   }
 
+  // ✅ FIXED: Table Sheet headers ab user ke fields se aate hain
   List<String> _tableHeaders() {
     final key = widget.templateName.toLowerCase();
     if (key.contains('receipt')) return const ['Item', 'Qty', 'Amount'];
     if (key.contains('table')) {
-      return const ['Column A', 'Column B', 'Column C'];
+      return [
+        _fields['Column 1']?.text.isNotEmpty == true
+            ? _fields['Column 1']!.text
+            : 'Col 1',
+        _fields['Column 2']?.text.isNotEmpty == true
+            ? _fields['Column 2']!.text
+            : 'Col 2',
+        _fields['Column 3']?.text.isNotEmpty == true
+            ? _fields['Column 3']!.text
+            : 'Col 3',
+      ];
     }
     if (key.contains('whiteboard')) return const ['Point', 'Owner', 'Status'];
     return const ['Field', 'Value', 'Note'];
@@ -889,15 +1077,14 @@ class _DocumentTemplateBuilderScreenState
 
   String _signatureLabel() {
     final key = widget.templateName.toLowerCase();
-    if (key.contains('contract')) {
-      return 'Authorized Signatories __________________';
-    }
+    if (key.contains('contract')) return 'Authorized Signatories __________________';
+    if (key.contains('certificate')) return 'Authorized By __________________';
     if (key.contains('business')) return 'Card Approved By __________________';
     if (key.contains('receipt')) return 'Cashier Signature __________________';
-    if (key.contains('whiteboard')) {
-      return 'Meeting Lead Signature __________________';
-    }
+    if (key.contains('whiteboard')) return 'Meeting Lead Signature __________________';
     if (key.contains('table')) return 'Reviewed By __________________';
+    if (key.contains('meeting')) return 'Facilitator Signature __________________';
+    if (key.contains('resume') || key.contains('cv')) return 'Applicant Signature __________________';
     return 'Authorized Signature __________________';
   }
 }
@@ -906,10 +1093,12 @@ class _RowModel {
   final TextEditingController a;
   final TextEditingController b;
   final TextEditingController c;
+
   _RowModel(String av, String bv, String cv)
       : a = TextEditingController(text: av),
         b = TextEditingController(text: bv),
         c = TextEditingController(text: cv);
+
   void dispose() {
     a.dispose();
     b.dispose();
