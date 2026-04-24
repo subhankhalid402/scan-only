@@ -336,7 +336,7 @@ class _VehicleRcResultScreenState extends State<VehicleRcResultScreen> {
           child: Row(
             children: [
               SizedBox(width: 150, child: Text(l, style: ScanResultFormStyle.muted())),
-              Text(v, style: GoogleFonts.nunito(color: c, fontWeight: FontWeight.w800)),
+              Expanded(child: Text(v, style: GoogleFonts.nunito(color: c, fontWeight: FontWeight.w800), overflow: TextOverflow.ellipsis)),
             ],
           ),
         );

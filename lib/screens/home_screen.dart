@@ -328,11 +328,11 @@ class _HomeScreenState extends State<HomeScreen> {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
           colors: [
             AppColors.navyDark,
-            AppColors.navyMid,
+            Color(0xFF0F1E5A),
             AppColors.navyLight,
           ],
         ),
@@ -344,16 +344,16 @@ class _HomeScreenState extends State<HomeScreen> {
           children: [
             // Top bar
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
+              padding: const EdgeInsets.fromLTRB(18, 12, 12, 0),
               child: Row(
                 children: [
                   Container(
-                    width: 38,
-                    height: 38,
+                    width: 36,
+                    height: 36,
                     decoration: BoxDecoration(
                       borderRadius: BorderRadius.circular(10),
                       border: Border.all(
-                        color: Colors.white.withValues(alpha: 0.15),
+                        color: Colors.white.withValues(alpha: 0.18),
                       ),
                     ),
                     clipBehavior: Clip.antiAlias,
@@ -361,19 +361,36 @@ class _HomeScreenState extends State<HomeScreen> {
                       borderRadius: BorderRadius.circular(10),
                       child: Image.asset(
                         'assets/images/launcher_icon.png',
-                        width: 38,
-                        height: 38,
+                        width: 36,
+                        height: 36,
                         fit: BoxFit.cover,
                       ),
                     ),
                   ),
                   const SizedBox(width: 10),
-                  Text(
-                    'ScanOnly',
-                    style: GoogleFonts.nunito(
-                      fontSize: 22,
-                      fontWeight: FontWeight.w800,
-                      color: Colors.white,
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          'ScanOnly',
+                          style: GoogleFonts.nunito(
+                            fontSize: 20,
+                            fontWeight: FontWeight.w900,
+                            color: Colors.white,
+                            letterSpacing: -0.3,
+                          ),
+                        ),
+                        Text(
+                          'Scan · Extract · Export',
+                          style: GoogleFonts.nunito(
+                            fontSize: 10.5,
+                            fontWeight: FontWeight.w600,
+                            color: AppColors.gold.withValues(alpha: 0.85),
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
                 ],
@@ -529,28 +546,40 @@ class _HomeScreenState extends State<HomeScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Container(
-              width: 46,
-              height: 46,
+              width: 48,
+              height: 48,
               decoration: BoxDecoration(
-                color: Colors.white,
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Colors.white,
+                    color.withValues(alpha: 0.08),
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(14),
+                border: Border.all(
+                  color: color.withValues(alpha: 0.25),
+                  width: 1,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.10),
-                    blurRadius: 8,
-                    offset: const Offset(0, 2),
+                    color: color.withValues(alpha: 0.18),
+                    blurRadius: 10,
+                    offset: const Offset(0, 3),
                   ),
                 ],
               ),
-              child: Icon(icon, color: color, size: 20),
+              child: Icon(icon, color: color, size: 22),
             ),
             const SizedBox(height: 5),
             Text(
               label,
               style: GoogleFonts.nunito(
-                fontSize: 10,
+                fontSize: 9.5,
                 fontWeight: FontWeight.w700,
                 color: Colors.white,
+                letterSpacing: 0.1,
               ),
               textAlign: TextAlign.center,
               maxLines: 1,
@@ -836,11 +865,15 @@ class _DocCard extends StatelessWidget {
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Text(
-                            '${_formatDate(doc.createdAt)} · ${doc.pageCount} page${doc.pageCount > 1 ? 's' : ''}',
-                            style: GoogleFonts.nunito(
-                              fontSize: 11,
-                              color: subtitleColor,
+                          Expanded(
+                            child: Text(
+                              '${_formatDate(doc.createdAt)} · ${doc.pageCount}p · ${doc.fileType.toUpperCase()}',
+                              style: GoogleFonts.nunito(
+                                fontSize: 11,
+                                color: subtitleColor,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ),
                           const SizedBox(width: 6),
@@ -854,10 +887,10 @@ class _DocCard extends StatelessWidget {
                               borderRadius: BorderRadius.circular(6),
                             ),
                             child: Text(
-                              '${doc.fileSizeMB.toStringAsFixed(1)} MB',
+                              '${doc.fileSizeMB.toStringAsFixed(1)}MB',
                               style: GoogleFonts.nunito(
                                 fontSize: 10,
-                                fontWeight: FontWeight.w600,
+                                fontWeight: FontWeight.w700,
                                 color: subtitleColor,
                               ),
                             ),

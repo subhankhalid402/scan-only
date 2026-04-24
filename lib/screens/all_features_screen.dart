@@ -63,7 +63,7 @@ class AllFeaturesScreen extends StatelessWidget {
 
       // ── Body: vertical list of category sections ────────────
       body: ListView.builder(
-        padding: const EdgeInsets.fromLTRB(0, 6, 0, 24),
+        padding: EdgeInsets.fromLTRB(0, 6, 0, 24 + MediaQuery.viewInsetsOf(context).bottom),
         itemCount: sections.length,
         itemBuilder: (_, i) => _CategorySection(section: sections[i]),
       ),
@@ -237,23 +237,15 @@ class AllFeaturesScreen extends StatelessWidget {
             _item(
               icon: Iconsax.crop,
               title: 'Crop & perspective',
-              subtitle: 'Full editor with pages',
+              subtitle: 'Full editor — crop, rotate & reorder pages',
               color: AppColors.purple,
-              highlights: const ['Corners', 'Reorder pages'],
-              onTap: () => _withImageForEdit(context),
-            ),
-            _item(
-              icon: Iconsax.rotate_left,
-              title: 'Rotate pages',
-              subtitle: '90° steps in editor',
-              color: AppColors.blue,
-              highlights: const ['Per page', 'Batch view'],
+              highlights: const ['Corner handles', 'Rotate 90°', 'Reorder pages'],
               onTap: () => _withImageForEdit(context),
             ),
             _item(
               icon: Iconsax.shield_tick,
               title: 'Watermark',
-              subtitle: 'Open file → ⋮ menu',
+              subtitle: 'Open file → bottom action bar',
               color: AppColors.orange,
               highlights: const ['Text or image stamp', 'Opacity & angle'],
               onTap: () => _withDoc(context,
@@ -383,7 +375,7 @@ class AllFeaturesScreen extends StatelessWidget {
             _item(
               icon: Icons.compress_rounded,
               title: 'Compress PDF',
-              subtitle: 'From document viewer',
+              subtitle: 'Open file → bottom action bar',
               color: AppColors.navyMid,
               highlights: const ['Smaller share size', 'Pick doc first'],
               onTap: () => _withDoc(context,
@@ -394,7 +386,7 @@ class AllFeaturesScreen extends StatelessWidget {
               title: 'Export PDF',
               subtitle: 'Share-ready output',
               color: AppColors.gold,
-              highlights: const ['Viewer share sheet', 'Print-ready'],
+              highlights: const ['Bottom action bar', 'Print-ready'],
               onTap: () => _withDoc(context,
                   (doc) => _go(context, DocumentViewerScreen(document: doc))),
             ),
@@ -435,7 +427,7 @@ class AllFeaturesScreen extends StatelessWidget {
               title: 'Print',
               subtitle: 'System print dialog',
               color: AppColors.navyDark,
-              highlights: const ['From viewer', 'Best for PDF'],
+              highlights: const ['Bottom action bar', 'Best for PDF'],
               onTap: () => _withDoc(context,
                   (doc) => _go(context, DocumentViewerScreen(document: doc))),
             ),
@@ -631,7 +623,7 @@ class _CategorySection extends StatelessWidget {
       children: [
         // ── Section header ──────────────────────────────────────
         Padding(
-          padding: const EdgeInsets.fromLTRB(14, 10, 14, 6),
+          padding: EdgeInsets.fromLTRB(14, 10, 14, 6 + MediaQuery.viewInsetsOf(context).bottom),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

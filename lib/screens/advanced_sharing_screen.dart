@@ -148,7 +148,7 @@ class _AdvancedSharingScreenState extends State<AdvancedSharingScreen> {
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 14, 16, 18),
+          padding: EdgeInsets.fromLTRB(16, 14, 16, 18 + MediaQuery.viewInsetsOf(context).bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

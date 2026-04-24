@@ -825,12 +825,14 @@ class _DocListCard extends StatelessWidget {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '${DateFormat('MMM d, yyyy').format(doc.createdAt)} · ${doc.pageCount} pg · ${doc.fileSizeMB.toStringAsFixed(1)} MB · ${doc.fileType.toUpperCase()}',
+                              '${DateFormat('MMM d').format(doc.createdAt)} · ${doc.pageCount}p · ${doc.fileType.toUpperCase()} · ${doc.fileSizeMB.toStringAsFixed(1)}MB',
                               style: GoogleFonts.nunito(
                                 fontSize: 11.5,
                                 fontWeight: FontWeight.w600,
                                 color: AppColors.textMuted,
                               ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
                         ),
@@ -1032,12 +1034,15 @@ class _DocGridCard extends StatelessWidget {
                           ),
                         ),
                         const SizedBox(width: 5),
-                        Text(
-                          '${doc.fileSizeMB.toStringAsFixed(1)} MB',
-                          style: GoogleFonts.nunito(
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
+                        Expanded(
+                          child: Text(
+                            '${doc.fileSizeMB.toStringAsFixed(1)}MB',
+                            style: GoogleFonts.nunito(
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textMuted,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],

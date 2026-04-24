@@ -668,12 +668,15 @@ class _SmartGalleryScreenState extends State<SmartGalleryScreen> {
                 fontWeight: FontWeight.w700,
               ),
             ),
-            Text(
-              value,
-              style: GoogleFonts.nunito(
-                color: Colors.white,
-                fontSize: 14,
-                fontWeight: FontWeight.w800,
+            Flexible(
+              child: Text(
+                value,
+                style: GoogleFonts.nunito(
+                  color: Colors.white,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w800,
+                ),
+                overflow: TextOverflow.ellipsis,
               ),
             ),
             Icon(Icons.arrow_drop_down_rounded,
@@ -1072,12 +1075,15 @@ class _SmartGalleryScreenState extends State<SmartGalleryScreen> {
                           ),
                         ),
                         const SizedBox(width: 8),
-                        Text(
-                          '${d.pageCount} pg',
-                          style: GoogleFonts.nunito(
-                            fontSize: 12,
-                            fontWeight: FontWeight.w600,
-                            color: AppColors.textMuted,
+                        Flexible(
+                          child: Text(
+                            '${d.pageCount} pg',
+                            style: GoogleFonts.nunito(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppColors.textMuted,
+                            ),
+                            overflow: TextOverflow.ellipsis,
                           ),
                         ),
                       ],

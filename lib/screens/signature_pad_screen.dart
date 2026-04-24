@@ -223,9 +223,10 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
                         Icon(Iconsax.edit, size: 13,
                             color: AppColors.textMuted),
                         const SizedBox(width: 5),
-                        Text('Draw your signature below',
+                        Expanded(child: Text('Draw your signature below',
                             style: GoogleFonts.nunito(
-                                fontSize: 11, color: AppColors.textMuted)),
+                                fontSize: 11, color: AppColors.textMuted),
+                            overflow: TextOverflow.ellipsis)),
                       ],
                     ),
                   ),
@@ -310,7 +311,12 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         child: Row(
           children: [
-            // Color label
+            // Scrollable color + size toolbar
+            Expanded(
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
             Text('Color ',
                 style: GoogleFonts.nunito(
                     fontSize: 12,
@@ -377,6 +383,10 @@ class _SignaturePadScreenState extends State<SignaturePadScreen> {
                                 : AppColors.textMuted)),
                   ),
                 )),
+                  ],
+                ),
+              ),
+            ),
           ],
         ),
       );

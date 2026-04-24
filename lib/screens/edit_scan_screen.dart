@@ -680,7 +680,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setLocal) {
           return Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 18),
+            padding: EdgeInsets.fromLTRB(16, 12, 16, 18 + MediaQuery.viewInsetsOf(context).bottom),
             child: Column(
               mainAxisSize: MainAxisSize.min,
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -813,6 +813,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
   void _showRotateOptions() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: AppColors.navyMid,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -877,6 +879,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
   void _showPageOptions(int pageIndex) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: AppColors.navyMid,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -940,6 +944,8 @@ class _EditScanScreenState extends State<EditScanScreen> {
   void _showEraseOptions() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: AppColors.navyMid,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
@@ -950,7 +956,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
         children: [
           _sheetHandle(),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 4),
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 4 + MediaQuery.viewInsetsOf(context).bottom),
             child: Text(
               'Remove content',
               style: GoogleFonts.nunito(
@@ -961,7 +967,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
             ),
           ),
           Padding(
-            padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
+            padding: EdgeInsets.fromLTRB(20, 0, 20, 12 + MediaQuery.viewInsetsOf(context).bottom),
             child: Text(
               'Choose how to erase — draw a box, or let the app find text.',
               style: GoogleFonts.nunito(
@@ -1185,8 +1191,9 @@ class _EditScanScreenState extends State<EditScanScreen> {
     _saveDraftTags.clear();
     showModalBottomSheet(
       context: context,
-      backgroundColor: AppColors.navyDark,
       isScrollControlled: true,
+      useSafeArea: true,
+      backgroundColor: AppColors.navyDark,
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
       ),
@@ -1463,7 +1470,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
       backgroundColor: Colors.redAccent,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      margin: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
     ));
   }
 
@@ -1475,7 +1482,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
       backgroundColor: AppColors.green,
       behavior: SnackBarBehavior.floating,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      margin: EdgeInsets.fromLTRB(16, 0, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
       duration: const Duration(seconds: 2),
     ));
   }
@@ -1797,7 +1804,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
                 ),
               ],
             ),
-            padding: const EdgeInsets.fromLTRB(10, 10, 10, 10),
+            padding: EdgeInsets.fromLTRB(10, 10, 10, 10 + MediaQuery.viewInsetsOf(context).bottom),
             child: SingleChildScrollView(
               scrollDirection: Axis.horizontal,
               child: Row(
@@ -1848,7 +1855,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
               height: 86,
               child: ListView.builder(
                 scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.fromLTRB(10, 8, 10, 10),
+                padding: EdgeInsets.fromLTRB(10, 8, 10, 10 + MediaQuery.viewInsetsOf(context).bottom),
                 itemCount: _pages.length,
                 itemBuilder: (_, i) {
                   final isSelected = _currentPage == i;
@@ -2031,7 +2038,7 @@ class _EditScanScreenState extends State<EditScanScreen> {
 
     return Container(
       width: double.infinity,
-      padding: const EdgeInsets.fromLTRB(12, 8, 12, 8),
+      padding: EdgeInsets.fromLTRB(12, 8, 12, 8 + MediaQuery.viewInsetsOf(context).bottom),
       decoration: BoxDecoration(
         color: AppColors.navyDark,
         border: Border(

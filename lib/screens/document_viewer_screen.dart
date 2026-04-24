@@ -446,7 +446,7 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
       ),
       builder: (ctx) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
+          padding: EdgeInsets.fromLTRB(20, 16, 20, 8 + MediaQuery.viewInsetsOf(context).bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -717,30 +717,6 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
                 case 'rename':
                   _showRenameDialog();
                   break;
-                case 'share':
-                  _shareDocument();
-                  break;
-                case 'print':
-                  _printDocument();
-                  break;
-                case 'open':
-                  _openWithExternal();
-                  break;
-                case 'pdf':
-                  _generatePdf();
-                  break;
-                case 'convert':
-                  _convertDocument();
-                  break;
-                case 'compress':
-                  _compressPdf();
-                  break;
-                case 'add_wm':
-                  _addWatermark();
-                  break;
-                case 'remove_wm':
-                  _removeWatermark();
-                  break;
                 case 'delete':
                   _deleteDocument();
                   break;
@@ -748,26 +724,6 @@ class _DocumentViewerScreenState extends State<DocumentViewerScreen> {
             },
             itemBuilder: (_) => [
               const PopupMenuItem(value: 'rename', child: Text('Rename')),
-              const PopupMenuItem(value: 'share', child: Text('Share')),
-              if (_canPrint(_doc))
-                const PopupMenuItem(value: 'print', child: Text('Print')),
-              const PopupMenuItem(value: 'open', child: Text('Open with...')),
-              if (_isRasterDoc(_doc))
-                const PopupMenuItem(
-                  value: 'pdf',
-                  child: Text('Generate PDF'),
-                ),
-              if (_canConvert(_doc))
-                const PopupMenuItem(value: 'convert', child: Text('Convert')),
-              if (_isRasterDoc(_doc))
-                const PopupMenuItem(
-                    value: 'add_wm', child: Text('Add Watermark')),
-              if (_isRasterDoc(_doc))
-                const PopupMenuItem(
-                    value: 'remove_wm', child: Text('Remove Watermark')),
-              if (_doc.fileType.toLowerCase() == 'pdf')
-                const PopupMenuItem(
-                    value: 'compress', child: Text('Compress PDF')),
               const PopupMenuItem(
                 value: 'delete',
                 child: Text('Delete', style: TextStyle(color: Colors.red)),

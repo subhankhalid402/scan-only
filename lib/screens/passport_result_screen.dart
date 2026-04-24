@@ -428,9 +428,10 @@ class _PassportResultScreenState extends State<PassportResultScreen> {
                   width: 130,
                   child: Text(k,
                       style: GoogleFonts.nunito(color: AppColors.textMuted))),
-              Text(v,
+              Expanded(child: Text(v,
                   style: GoogleFonts.nunito(
-                      color: c, fontWeight: FontWeight.w800)),
+                      color: c, fontWeight: FontWeight.w800),
+                  overflow: TextOverflow.ellipsis)),
             ],
           ),
         );

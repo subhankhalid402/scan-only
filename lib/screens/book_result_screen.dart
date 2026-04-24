@@ -134,7 +134,7 @@ class _BookResultScreenState extends State<BookResultScreen> {
           : SafeArea(
               top: false,
               child: ListView(
-                padding: const EdgeInsets.fromLTRB(14, 10, 14, 20),
+                padding: EdgeInsets.fromLTRB(14, 10, 14, 20 + MediaQuery.viewInsetsOf(context).bottom),
                 children: [
                   _summaryCard(),
                   const SizedBox(height: 10),

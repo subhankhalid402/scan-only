@@ -259,7 +259,7 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
     final d = _currentData();
     return Scaffold(
       appBar: AppBar(
-        backgroundColor: const Color(0xFF111824),
+        backgroundColor: AppColors.navyDark,
         title: Text('Receipt Intelligence', style: GoogleFonts.nunito(fontWeight: FontWeight.w800)),
       ),
       body: _loading
@@ -335,7 +335,7 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFF111A2D),
+        color: AppColors.navyDark,
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: Colors.white12),
       ),
@@ -407,7 +407,7 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
         return Container(
           padding: const EdgeInsets.all(10),
           decoration: BoxDecoration(
-            color: const Color(0xFF131F34),
+            color: const Color(0xFF0F172A),
             borderRadius: BorderRadius.circular(12),
             border: Border.all(color: Colors.white12),
           ),
@@ -448,7 +448,7 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFF121A2B),
+        color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: color.withValues(alpha: 0.6)),
       ),
@@ -467,7 +467,7 @@ class _ReceiptResultScreenState extends State<ReceiptResultScreen> {
     return Container(
       padding: const EdgeInsets.all(10),
       decoration: BoxDecoration(
-        color: const Color(0xFF162232),
+        color: const Color(0xFF0F172A),
         borderRadius: BorderRadius.circular(12),
         border: Border.all(color: const Color(0xFFBF8A00)),
       ),

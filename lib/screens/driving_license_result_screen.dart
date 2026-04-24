@@ -330,9 +330,10 @@ class _DrivingLicenseResultScreenState
                   width: 140,
                   child: Text(l,
                       style: GoogleFonts.nunito(color: AppColors.textMuted))),
-              Text(v,
+              Expanded(child: Text(v,
                   style: GoogleFonts.nunito(
-                      color: c, fontWeight: FontWeight.w800)),
+                      color: c, fontWeight: FontWeight.w800),
+                  overflow: TextOverflow.ellipsis)),
             ],
           ),
         );

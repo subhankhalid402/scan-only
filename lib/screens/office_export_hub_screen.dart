@@ -64,7 +64,7 @@ class OfficeExportHubScreen extends StatelessWidget {
               onTap: () => _go(
                   context,
                   DocumentTemplateBuilderScreen(
-                      templateName: 'Whiteboard Notes'))),
+                      templateName: 'Whiteboard'))),
           _tile(context,
               icon: Iconsax.element_3,
               title: 'Table Sheet',

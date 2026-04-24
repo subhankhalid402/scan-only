@@ -504,15 +504,18 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
       children: [
         Icon(icon, size: 15, color: AppColors.navyDark),
         const SizedBox(width: 5),
-        Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(value,
-                style: GoogleFonts.nunito(
-                    fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.navyDark)),
-            Text(label,
-                style: GoogleFonts.nunito(fontSize: 9, color: AppColors.textMuted)),
-          ],
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(value,
+                  style: GoogleFonts.nunito(
+                      fontSize: 13, fontWeight: FontWeight.w800, color: AppColors.navyDark),
+                  overflow: TextOverflow.ellipsis),
+              Text(label,
+                  style: GoogleFonts.nunito(fontSize: 9, color: AppColors.textMuted)),
+            ],
+          ),
         ),
       ],
     );
@@ -597,8 +600,9 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
             children: [
               Icon(Iconsax.edit_2, size: 14, color: AppColors.navyDark.withOpacity(0.6)),
               const SizedBox(width: 6),
-              Text('Edit mode - your changes can be saved',
-                  style: GoogleFonts.nunito(fontSize: 11, color: AppColors.navyDark.withOpacity(0.6))),
+              Expanded(child: Text('Edit mode — your changes can be saved',
+                  style: GoogleFonts.nunito(fontSize: 11, color: AppColors.navyDark.withOpacity(0.6)),
+                  overflow: TextOverflow.ellipsis)),
               const Spacer(),
               GestureDetector(
                 onTap: _applyEdits,
@@ -643,7 +647,7 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
     }
 
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.06), blurRadius: 12, offset: const Offset(0, -3))],
@@ -685,7 +689,7 @@ class _TextExtractionScreenState extends State<TextExtractionScreen> {
 
   Widget _buildEditActionBar() {
     return Container(
-      padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
+      padding: EdgeInsets.fromLTRB(16, 10, 16, 16 + MediaQuery.viewInsetsOf(context).bottom),
       color: Colors.white,
       child: Row(
         children: [

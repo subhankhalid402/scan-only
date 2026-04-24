@@ -136,31 +136,38 @@ class _AnnotationScreenState extends State<AnnotationScreen> {
                     Text('Color:',
                         style: GoogleFonts.nunito(fontWeight: FontWeight.w700)),
                     const SizedBox(width: 10),
-                    ...[
-                      Colors.red,
-                      Colors.blue,
-                      Colors.green,
-                      Colors.yellow,
-                      Colors.black,
-                      Colors.white,
-                    ].map((color) => GestureDetector(
-                          onTap: () => setState(() => _selectedColor = color),
-                          child: Container(
-                            width: 40,
-                            height: 40,
-                            margin: const EdgeInsets.symmetric(horizontal: 4),
-                            decoration: BoxDecoration(
-                              color: color,
-                              border: Border.all(
-                                color: _selectedColor == color
-                                    ? AppColors.gold
-                                    : Colors.grey,
-                                width: 2,
-                              ),
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                          ),
-                        )),
+                    Expanded(
+                      child: SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            Colors.red,
+                            Colors.blue,
+                            Colors.green,
+                            Colors.yellow,
+                            Colors.black,
+                            Colors.white,
+                          ].map((color) => GestureDetector(
+                                onTap: () => setState(() => _selectedColor = color),
+                                child: Container(
+                                  width: 36,
+                                  height: 36,
+                                  margin: const EdgeInsets.symmetric(horizontal: 3),
+                                  decoration: BoxDecoration(
+                                    color: color,
+                                    border: Border.all(
+                                      color: _selectedColor == color
+                                          ? AppColors.gold
+                                          : Colors.grey,
+                                      width: 2,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                ),
+                              )).toList(),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
                 const SizedBox(height: 12),

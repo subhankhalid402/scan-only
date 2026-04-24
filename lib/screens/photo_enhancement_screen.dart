@@ -211,7 +211,9 @@ class _PhotoEnhancementScreenState extends State<PhotoEnhancementScreen> {
               children: [
                 Text('Quality', style: GoogleFonts.nunito(color: Colors.white70)),
                 const SizedBox(width: 10),
-                DropdownButton<PhotoQualityPreset>(
+                Expanded(
+                  child: DropdownButton<PhotoQualityPreset>(
+                    isExpanded: true,
                   value: _quality,
                   dropdownColor: const Color(0xFF1A2438),
                   items: const [
@@ -221,7 +223,8 @@ class _PhotoEnhancementScreenState extends State<PhotoEnhancementScreen> {
                   ],
                   onChanged: (v) => setState(() => _quality = v ?? PhotoQualityPreset.high),
                 ),
-                const Spacer(),
+                ),  // Expanded
+                const SizedBox(width: 10),
                 ElevatedButton.icon(
                   style: ElevatedButton.styleFrom(
                     backgroundColor: AppColors.gold,

@@ -349,7 +349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   icon: Iconsax.element_3,
                   color: AppColors.blue,
                   title: 'Grid view',
-                  subtitle: 'Library layout on home',
+                  subtitle: 'Layout in Docs tab (grid vs list)',
                   value: _gridView,
                   onChanged: (v) {
                     setState(() => _gridView = v);
@@ -577,7 +577,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Widget _buildHeader() => Container(
         decoration: const BoxDecoration(
           gradient: LinearGradient(
-            colors: [AppColors.navyDark, AppColors.navyMid],
+            colors: [AppColors.navyDark, Color(0xFF0F1E5A), AppColors.navyLight],
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
           ),
@@ -585,19 +585,37 @@ class _SettingsScreenState extends State<SettingsScreen> {
         child: SafeArea(
           bottom: false,
           child: Padding(
-            padding: const EdgeInsets.fromLTRB(16, 12, 16, 14),
+            padding: EdgeInsets.fromLTRB(18, 14, 18, 18 + MediaQuery.viewInsetsOf(context).bottom),
             child: Row(
               children: [
-                Text('Settings',
-                    style: GoogleFonts.nunito(
-                        fontSize: 22,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white)),
-                const Spacer(),
-                Icon(
-                  Iconsax.setting_2,
-                  color: Colors.white.withValues(alpha: 0.6),
-                  size: 22,
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.white.withValues(alpha: 0.15)),
+                  ),
+                  child: const Icon(Iconsax.setting_2, color: AppColors.gold, size: 22),
+                ),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Settings',
+                          style: GoogleFonts.nunito(
+                              fontSize: 22,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                              letterSpacing: -0.3)),
+                      Text('Preferences & configuration',
+                          style: GoogleFonts.nunito(
+                              fontSize: 11,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.white54)),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -620,12 +638,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
               child: Icon(icon, color: color, size: 14),
             ),
             const SizedBox(width: 8),
-            Text(title,
-                style: GoogleFonts.nunito(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w800,
-                    color: AppColors.navyDark,
-                    letterSpacing: 0.3)),
+            Expanded(
+              child: Text(title,
+                  style: GoogleFonts.nunito(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w800,
+                      color: AppColors.navyDark,
+                      letterSpacing: 0.3),
+                  overflow: TextOverflow.ellipsis),
+            ),
           ],
         ),
       );
@@ -853,6 +874,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       void Function(String) onChanged) {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(22))),

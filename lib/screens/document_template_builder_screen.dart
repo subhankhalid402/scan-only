@@ -3,6 +3,7 @@ import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:iconsax/iconsax.dart';
 import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:pdf/pdf.dart';
@@ -30,16 +31,17 @@ class DocumentTemplateBuilderScreen extends StatefulWidget {
 }
 
 class _DocumentTemplateBuilderScreenState
-    extends State<DocumentTemplateBuilderScreen> {
+    extends State<DocumentTemplateBuilderScreen>
+    with SingleTickerProviderStateMixin {
   final _fields = <String, TextEditingController>{};
   final _listRows = <_RowModel>[];
   int _templateStyle = 0;
+  late final TabController _tabController;
 
   String get _styleName =>
       _templateStyle == 0 ? 'Classic' : (_templateStyle == 1 ? 'Modern' : 'Bold');
 
-  String get _today =>
-      DateTime.now().toIso8601String().split('T').first;
+  String get _today => DateTime.now().toIso8601String().split('T').first;
 
   String get _docLabel {
     final key = widget.templateName.toLowerCase();
@@ -54,20 +56,37 @@ class _DocumentTemplateBuilderScreenState
     return 'PROFESSIONAL DOCUMENT';
   }
 
+  Color _accentColorForTemplate() {
+    final key = widget.templateName.toLowerCase();
+    if (key.contains('contract')) return AppColors.navyDark;
+    if (key.contains('certificate')) return const Color(0xFFD4AF37);
+    if (key.contains('business')) return AppColors.navyLight;
+    if (key.contains('receipt')) return const Color(0xFF4CAF50);
+    if (key.contains('whiteboard')) return const Color(0xFF2196F3);
+    if (key.contains('table')) return const Color(0xFFFF9800);
+    if (key.contains('meeting')) return const Color(0xFF1565C0);
+    if (key.contains('resume') || key.contains('cv')) return const Color(0xFF9C27B0);
+    return AppColors.navyDark;
+  }
+
+  Color _styleAccent(Color base, int style) {
+    if (style == 1) return AppColors.navyLight;
+    if (style == 2) return const Color(0xFF6C3FC5);
+    return base;
+  }
+
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _initTemplate();
   }
 
   @override
   void dispose() {
-    for (final c in _fields.values) {
-      c.dispose();
-    }
-    for (final r in _listRows) {
-      r.dispose();
-    }
+    _tabController.dispose();
+    for (final c in _fields.values) c.dispose();
+    for (final r in _listRows) r.dispose();
     super.dispose();
   }
 
@@ -103,12 +122,11 @@ class _DocumentTemplateBuilderScreenState
       _addField('Tax/GST', '120');
       _addField('Payment Method', 'Cash');
       _listRows.add(_RowModel('Item', '1', '500'));
-    } else if (name == 'whiteboard notes') {
+    } else if (name == 'whiteboard' || name == 'whiteboard notes') {
       _addField('Meeting Title', 'Weekly Planning');
       _addField('Date', _today);
       _addField('Presenter', 'Team Lead');
-      _addField('Main Notes',
-          '1) Sprint goals\n2) Risks and blockers\n3) Action items');
+      _addField('Main Notes', '1) Sprint goals\n2) Risks and blockers\n3) Action items');
     } else if (name == 'table sheet') {
       _addField('Sheet Title', 'Attendance Table');
       _addField('Column 1', 'Name');
@@ -134,7 +152,6 @@ class _DocumentTemplateBuilderScreenState
       _addField('Experience', 'Software Engineer - ScanOnly Pvt Ltd (2022-Present)');
       _addField('Skills', 'Flutter, Dart, Firebase, REST APIs, Git');
     } else {
-      // Generic fallback
       _addField('Title', widget.templateName.toUpperCase());
       _addField('Name', 'Your Name');
       _addField('Date', _today);
@@ -146,87 +163,91 @@ class _DocumentTemplateBuilderScreenState
     _fields[key] = TextEditingController(text: initial);
   }
 
-  // ✅ FIXED: toARGB32() crash → .value use karo (stable across all Flutter versions)
-  String _colorToHex(Color color) {
-    return '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
-  }
+  String _colorToHex(Color color) =>
+      '#${color.value.toRadixString(16).padLeft(8, '0').substring(2)}';
 
   Future<Uint8List> _buildPdfBytes() async {
     final pdf = pw.Document();
-    final title = widget.templateName.toUpperCase();
     final accent = _accentColorForTemplate();
     final styleAccent = _styleAccent(accent, _templateStyle);
-    final accentPdf = PdfColor.fromHex(_colorToHex(styleAccent)); // ✅ FIXED
+    final accentPdf = PdfColor.fromHex(_colorToHex(styleAccent));
 
     pdf.addPage(
       pw.Page(
         pageFormat: PdfPageFormat.a4,
+        margin: const pw.EdgeInsets.all(36),
         build: (_) => pw.Column(
           crossAxisAlignment: pw.CrossAxisAlignment.start,
           children: [
-            // Header band
+            // ── Header band ──
             pw.Container(
               width: double.infinity,
-              padding: const pw.EdgeInsets.symmetric(
-                horizontal: 14,
-                vertical: 10,
-              ),
+              padding: const pw.EdgeInsets.symmetric(horizontal: 16, vertical: 14),
               decoration: pw.BoxDecoration(
-                color: accentPdf.shade(0.14),
-                borderRadius: pw.BorderRadius.circular(8),
+                color: accentPdf.shade(0.12),
+                borderRadius: pw.BorderRadius.circular(10),
               ),
               child: pw.Row(
                 children: [
                   pw.Container(
-                    width: 8,
-                    height: 34,
+                    width: 5,
+                    height: 38,
                     decoration: pw.BoxDecoration(
                       color: accentPdf,
-                      borderRadius: pw.BorderRadius.circular(4),
+                      borderRadius: pw.BorderRadius.circular(3),
                     ),
                   ),
-                  pw.SizedBox(width: 10),
+                  pw.SizedBox(width: 12),
                   pw.Expanded(
-                    child: pw.Text(
-                      'SCANONLY $_styleName $_docLabel',
-                      style: pw.TextStyle(
-                        color: accentPdf,
-                        fontSize: 10,
-                        fontWeight: pw.FontWeight.bold,
-                        letterSpacing: 0.8,
-                      ),
+                    child: pw.Column(
+                      crossAxisAlignment: pw.CrossAxisAlignment.start,
+                      children: [
+                        pw.Text('SCANONLY',
+                            style: pw.TextStyle(
+                              color: accentPdf,
+                              fontSize: 7,
+                              fontWeight: pw.FontWeight.bold,
+                              letterSpacing: 2,
+                            )),
+                        pw.Text('$_styleName · $_docLabel',
+                            style: pw.TextStyle(
+                              color: accentPdf,
+                              fontSize: 11,
+                              fontWeight: pw.FontWeight.bold,
+                            )),
+                      ],
                     ),
                   ),
-                  pw.Text(
-                    _today,
-                    style: pw.TextStyle(
-                      color: accentPdf,
-                      fontSize: 9,
-                      fontWeight: pw.FontWeight.bold,
-                    ),
+                  pw.Column(
+                    crossAxisAlignment: pw.CrossAxisAlignment.end,
+                    children: [
+                      pw.Text('Date', style: pw.TextStyle(color: accentPdf, fontSize: 7)),
+                      pw.Text(_today,
+                          style: pw.TextStyle(
+                              color: accentPdf, fontSize: 10, fontWeight: pw.FontWeight.bold)),
+                    ],
                   ),
                 ],
               ),
             ),
-            pw.SizedBox(height: 10),
-            // Title row
+            pw.SizedBox(height: 18),
+            // ── Document Title ──
             pw.Row(
               children: [
                 if (_templateStyle == 2)
                   pw.Container(
-                    width: 6,
-                    height: 30,
-                    margin: const pw.EdgeInsets.only(right: 8),
-                    decoration: pw.BoxDecoration(color: accentPdf),
+                    width: 5,
+                    height: 32,
+                    margin: const pw.EdgeInsets.only(right: 10),
+                    decoration: pw.BoxDecoration(
+                        color: accentPdf, borderRadius: pw.BorderRadius.circular(3)),
                   ),
                 pw.Expanded(
                   child: pw.Text(
-                    title,
-                    textAlign: _templateStyle == 1
-                        ? pw.TextAlign.center
-                        : pw.TextAlign.left,
+                    widget.templateName.toUpperCase(),
+                    textAlign: _templateStyle == 1 ? pw.TextAlign.center : pw.TextAlign.left,
                     style: pw.TextStyle(
-                      fontSize: 24,
+                      fontSize: 26,
                       fontWeight: pw.FontWeight.bold,
                       color: accentPdf,
                     ),
@@ -234,77 +255,67 @@ class _DocumentTemplateBuilderScreenState
                 ),
               ],
             ),
-            pw.SizedBox(height: 12),
-            // Fields block
+            pw.SizedBox(height: 18),
+            // ── Fields block ──
             pw.Container(
               width: double.infinity,
-              padding: const pw.EdgeInsets.all(10),
+              padding: const pw.EdgeInsets.all(14),
               decoration: pw.BoxDecoration(
-                color: accentPdf.shade(_templateStyle == 2 ? 0.16 : 0.08),
+                color: accentPdf.shade(_templateStyle == 2 ? 0.16 : 0.06),
                 borderRadius: pw.BorderRadius.circular(8),
+                border: pw.Border.all(color: accentPdf.shade(0.25), width: 0.5),
               ),
               child: pw.Column(
                 crossAxisAlignment: pw.CrossAxisAlignment.start,
                 children: _fields.entries
-                    .map(
-                      (e) => pw.Padding(
-                        padding: const pw.EdgeInsets.only(bottom: 6),
-                        child: pw.Text(
-                          '${e.key}: ${e.value.text}',
-                          style: const pw.TextStyle(fontSize: 11),
-                        ),
-                      ),
-                    )
+                    .map((e) => pw.Padding(
+                          padding: const pw.EdgeInsets.only(bottom: 8),
+                          child: pw.Row(
+                            crossAxisAlignment: pw.CrossAxisAlignment.start,
+                            children: [
+                              pw.SizedBox(
+                                width: 110,
+                                child: pw.Text(e.key,
+                                    style: pw.TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: pw.FontWeight.bold,
+                                        color: accentPdf)),
+                              ),
+                              pw.Text(': ',
+                                  style: pw.TextStyle(fontSize: 10, color: accentPdf)),
+                              pw.Expanded(
+                                  child: pw.Text(e.value.text,
+                                      style: const pw.TextStyle(fontSize: 10))),
+                            ],
+                          ),
+                        ))
                     .toList(),
               ),
             ),
-            pw.SizedBox(height: 8),
-            // Notes bar
-            pw.Container(
-              width: double.infinity,
-              padding: const pw.EdgeInsets.symmetric(
-                horizontal: 10,
-                vertical: 6,
-              ),
-              decoration: pw.BoxDecoration(
-                border: pw.Border.all(color: accentPdf.shade(0.35)),
-                borderRadius: pw.BorderRadius.circular(6),
-              ),
-              child: pw.Text(
-                'Notes: $_docLabel | Generated from "$_styleName" style template.',
-                style: const pw.TextStyle(fontSize: 9),
-              ),
-            ),
-            // Table (if rows exist)
+            // ── Table rows ──
             if (_listRows.isNotEmpty) ...[
-              pw.SizedBox(height: 10),
+              pw.SizedBox(height: 14),
               pw.TableHelper.fromTextArray(
                 headers: _tableHeaders(),
-                data: _listRows
-                    .map((r) => [r.a.text, r.b.text, r.c.text])
-                    .toList(),
+                data: _listRows.map((r) => [r.a.text, r.b.text, r.c.text]).toList(),
                 headerStyle: pw.TextStyle(
-                  fontWeight: pw.FontWeight.bold,
-                  color: accentPdf,
-                ),
-                headerDecoration: pw.BoxDecoration(
-                  color: accentPdf.shade(0.12),
-                ),
-                cellHeight: 28,
+                    fontWeight: pw.FontWeight.bold, color: PdfColors.white, fontSize: 10),
+                headerDecoration: pw.BoxDecoration(color: accentPdf),
+                cellHeight: 26,
+                cellStyle: const pw.TextStyle(fontSize: 10),
               ),
             ],
             pw.Spacer(),
-            pw.Divider(color: accentPdf.shade(0.35)),
-            pw.Align(
-              alignment: pw.Alignment.centerRight,
-              child: pw.Text(
-                _signatureLabel(),
-                style: pw.TextStyle(
-                  fontSize: 10,
-                  color: accentPdf,
-                  fontWeight: pw.FontWeight.bold,
-                ),
-              ),
+            pw.Divider(color: accentPdf.shade(0.3), thickness: 0.5),
+            pw.Row(
+              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+              children: [
+                pw.Text('Generated by ScanOnly',
+                    style: pw.TextStyle(fontSize: 8, color: PdfColors.grey600)),
+                pw.Text(_signatureLabel(),
+                    style: pw.TextStyle(
+                        fontSize: 9, color: accentPdf, fontWeight: pw.FontWeight.bold)),
+              ],
             ),
           ],
         ),
@@ -327,7 +338,7 @@ class _DocumentTemplateBuilderScreenState
       name: fileName,
       filePath: outPath,
       fileType: 'pdf',
-      scanType: widget.scanType, // ✅ FIXED: hardcoded 'document' ki jagah
+      scanType: widget.scanType,
       pageCount: 1,
       fileSizeMB: bytes.length / (1024 * 1024),
       createdAt: DateTime.now(),
@@ -336,11 +347,11 @@ class _DocumentTemplateBuilderScreenState
     await DatabaseService.instance.insertDocument(doc);
 
     if (!mounted) return;
+    Navigator.pop(context);
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
-        content: Text('Saved to library: ${p.basename(outPath)}'),
-        backgroundColor: AppColors.green,
-      ),
+          content: Text('Saved: ${p.basename(outPath)}'),
+          backgroundColor: AppColors.green),
     );
   }
 
@@ -348,7 +359,6 @@ class _DocumentTemplateBuilderScreenState
     final fields = _fields.map((k, v) => MapEntry(k, v.text));
     final rows = _listRows.map((r) => [r.a.text, r.b.text, r.c.text]).toList();
     final stem = widget.templateName.replaceAll(' ', '_').toLowerCase();
-
     try {
       String outPath;
       switch (format) {
@@ -367,36 +377,29 @@ class _DocumentTemplateBuilderScreenState
         default:
           return;
       }
-
       final ext = outPath.split('.').last.toLowerCase();
       final doc = DocumentModel(
         name: p.basename(outPath),
         filePath: outPath,
         fileType: ext,
-        scanType: widget.scanType, // ✅ FIXED: hardcoded ki jagah dynamic
+        scanType: widget.scanType,
         pageCount: 1,
         fileSizeMB: File(outPath).lengthSync() / (1024 * 1024),
         createdAt: DateTime.now(),
         tags: const [],
       );
       await DatabaseService.instance.insertDocument(doc);
-
       if (!mounted) return;
+      Navigator.pop(context);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text(
-            'Exported as ${format.toUpperCase()}: ${p.basename(outPath)}',
-          ),
-          backgroundColor: AppColors.green,
-        ),
+            content: Text('Exported: ${p.basename(outPath)}'),
+            backgroundColor: AppColors.green),
       );
     } catch (e) {
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('Export failed: $e'),
-          backgroundColor: AppColors.red,
-        ),
+        SnackBar(content: Text('Export failed: $e'), backgroundColor: AppColors.red),
       );
     }
   }
@@ -404,53 +407,50 @@ class _DocumentTemplateBuilderScreenState
   void _showExportSheet() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
+      useSafeArea: true,
       backgroundColor: Colors.white,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (_) => SafeArea(
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: EdgeInsets.fromLTRB(20, 20, 20, 8 + MediaQuery.viewInsetsOf(context).bottom),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
-                'Export As',
-                style: GoogleFonts.nunito(
-                  fontWeight: FontWeight.w800,
-                  fontSize: 16,
+              Row(children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                      color: AppColors.navyDark.withOpacity(0.08),
+                      borderRadius: BorderRadius.circular(10)),
+                  child: const Icon(Iconsax.export, color: AppColors.navyDark, size: 20),
                 ),
-              ),
-              const SizedBox(height: 12),
-              _exportTile(
-                Icons.picture_as_pdf,
-                'PDF',
-                'pdf',
-                AppColors.navyDark,
-                _savePdf,
-              ),
-              _exportTile(
-                Icons.table_chart_rounded,
-                'Excel (.xlsx)',
-                'excel',
-                const Color(0xFF217346),
-                () => _exportAs('excel'),
-              ),
-              _exportTile(
-                Icons.description_rounded,
-                'Word (.docx)',
-                'word',
-                const Color(0xFF2B579A),
-                () => _exportAs('word'),
-              ),
-              _exportTile(
-                Icons.slideshow_rounded,
-                'PowerPoint (.pptx)',
-                'ppt',
-                const Color(0xFFD24726),
-                () => _exportAs('ppt'),
-              ),
+                const SizedBox(width: 12),
+                Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('Export Document',
+                      style: GoogleFonts.nunito(
+                          fontWeight: FontWeight.w900,
+                          fontSize: 17,
+                          color: AppColors.navyDark)),
+                  Text('Choose your preferred format',
+                      style: GoogleFonts.nunito(
+                          color: AppColors.textMuted,
+                          fontSize: 12,
+                          fontWeight: FontWeight.w600)),
+                ]),
+              ]),
+              const SizedBox(height: 16),
+              _exportTile(Icons.picture_as_pdf, 'PDF Document', const Color(0xFFE53935), _savePdf),
+              _exportTile(Icons.table_chart_rounded, 'Excel Spreadsheet (.xlsx)',
+                  const Color(0xFF217346), () => _exportAs('excel')),
+              _exportTile(Icons.description_rounded, 'Word Document (.docx)',
+                  const Color(0xFF2B579A), () => _exportAs('word')),
+              _exportTile(Icons.slideshow_rounded, 'PowerPoint (.pptx)',
+                  const Color(0xFFD24726), () => _exportAs('ppt')),
+              const SizedBox(height: 8),
             ],
           ),
         ),
@@ -458,27 +458,20 @@ class _DocumentTemplateBuilderScreenState
     );
   }
 
-  Widget _exportTile(
-    IconData icon,
-    String label,
-    String format,
-    Color color,
-    VoidCallback onTap,
-  ) {
+  Widget _exportTile(IconData icon, String label, Color color, VoidCallback onTap) {
     return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 0, vertical: 2),
       leading: Container(
-        width: 36,
-        height: 36,
+        width: 40,
+        height: 40,
         decoration: BoxDecoration(
-          color: color.withOpacity(0.12), // ✅ FIXED
-          borderRadius: BorderRadius.circular(8),
-        ),
+            color: color.withOpacity(0.10), borderRadius: BorderRadius.circular(10)),
         child: Icon(icon, color: color, size: 20),
       ),
-      title: Text(
-        label,
-        style: GoogleFonts.nunito(fontWeight: FontWeight.w700),
-      ),
+      title: Text(label,
+          style: GoogleFonts.nunito(fontWeight: FontWeight.w700, fontSize: 14)),
+      trailing: const Icon(Icons.arrow_forward_ios_rounded,
+          size: 14, color: AppColors.textMuted),
       onTap: () {
         Navigator.pop(context);
         onTap();
@@ -486,589 +479,14 @@ class _DocumentTemplateBuilderScreenState
     );
   }
 
-  Future<void> _previewPdf() async {
-    if (!mounted) return;
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => Scaffold(
-          appBar: AppBar(
-            backgroundColor: AppColors.navyDark,
-            foregroundColor: Colors.white,
-            title: Text(
-              '${widget.templateName} Preview',
-              style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
-            ),
-          ),
-          body: PdfPreview(
-            build: (_) => _buildPdfBytes(),
-            canDebug: false,
-            allowPrinting: true,
-            allowSharing: true,
-          ),
-        ),
-      ),
-    );
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final accent = _accentColorForTemplate();
-    return Scaffold(
-      appBar: AppBar(
-        backgroundColor: AppColors.navyDark,
-        foregroundColor: Colors.white, // ✅ back button bhi white hoga
-        title: Text(
-          '${widget.templateName} Template',
-          style: GoogleFonts.nunito(
-            fontWeight: FontWeight.w800,
-            color: Colors.white,
-          ),
-        ),
-      ),
-      body: ListView(
-        padding: const EdgeInsets.all(14),
-        children: [
-          // Style selector label
-          Text(
-            'Choose Style',
-            style: GoogleFonts.nunito(
-              color: AppColors.navyDark,
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 8),
-          // Style cards row
-          Row(
-            children: List.generate(3, (i) {
-              final selected = _templateStyle == i;
-              final styleAccent = _styleAccent(accent, i);
-              return Expanded(
-                child: Padding(
-                  padding: EdgeInsets.only(right: i == 2 ? 0 : 8),
-                  child: GestureDetector(
-                    onTap: () => setState(() => _templateStyle = i),
-                    child: AnimatedContainer( // ✅ smooth selection animation
-                      duration: const Duration(milliseconds: 200),
-                      height: 92,
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: selected ? AppColors.gold : Colors.black12,
-                          width: selected ? 2 : 1,
-                        ),
-                        boxShadow: selected
-                            ? [
-                                BoxShadow(
-                                  color: AppColors.gold.withOpacity(0.18),
-                                  blurRadius: 8,
-                                  offset: const Offset(0, 3),
-                                ),
-                              ]
-                            : [],
-                      ),
-                      child: Padding(
-                        padding: const EdgeInsets.all(8),
-                        child: Column(
-                          children: [
-                            Container(
-                              height: 14,
-                              decoration: BoxDecoration(
-                                color: styleAccent.withOpacity(0.16), // ✅ FIXED
-                                borderRadius: BorderRadius.circular(6),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Container(
-                              height: 7,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.08), // ✅ FIXED
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            const SizedBox(height: 4),
-                            Container(
-                              height: 7,
-                              width: i == 1 ? 70 : double.infinity,
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.08), // ✅ FIXED
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                            ),
-                            const Spacer(),
-                            Text(
-                              i == 0
-                                  ? 'Classic'
-                                  : (i == 1 ? 'Modern' : 'Bold'),
-                              style: GoogleFonts.nunito(
-                                color: styleAccent,
-                                fontSize: 11,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              );
-            }),
-          ),
-          const SizedBox(height: 12),
-          // Live preview card
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: _styleAccent(accent, _templateStyle).withOpacity(0.2), // ✅ FIXED
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.08), // ✅ FIXED
-                  blurRadius: 14,
-                  offset: const Offset(0, 6),
-                ),
-              ],
-            ),
-            child: _canvaPreviewBlock(),
-          ),
-          const SizedBox(height: 12),
-          // Fields editor card
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(14),
-              border: Border.all(
-                color: accent.withOpacity(0.22), // ✅ FIXED
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.05), // ✅ FIXED
-                  blurRadius: 10,
-                  offset: const Offset(0, 4),
-                ),
-              ],
-            ),
-            child: Column(
-              children: _fields.entries
-                  .map(
-                    (e) => Padding(
-                      padding: const EdgeInsets.only(bottom: 10),
-                      child: TextField(
-                        controller: e.value,
-                        decoration: InputDecoration(
-                          labelText: e.key,
-                          prefixIcon: Icon(
-                            Icons.edit_note_rounded,
-                            color: accent,
-                          ),
-                          border: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(
-                              color: accent.withOpacity(0.3),
-                            ),
-                          ),
-                          focusedBorder: OutlineInputBorder(
-                            borderRadius: BorderRadius.circular(10),
-                            borderSide: BorderSide(color: accent, width: 1.5),
-                          ),
-                        ),
-                        onChanged: (_) => setState(() {}),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-          // Rows editor (receipt / table sheet)
-          if (_listRows.isNotEmpty) ...[
-            const SizedBox(height: 12),
-            Text(
-              'Rows',
-              style: GoogleFonts.nunito(
-                color: AppColors.navyDark,
-                fontWeight: FontWeight.w800,
-                fontSize: 15,
-              ),
-            ),
-            const SizedBox(height: 6),
-            ..._listRows.map((r) => _rowEditor(r)),
-          ],
-          // Add row button (always shown so user can add rows)
-          const SizedBox(height: 6),
-          OutlinedButton.icon(
-            onPressed: () {
-              setState(() => _listRows.add(_RowModel('Item', '1', '0')));
-            },
-            icon: const Icon(Icons.add),
-            label: const Text('Add Row'),
-            style: OutlinedButton.styleFrom(
-              foregroundColor: accent,
-              side: BorderSide(color: accent.withOpacity(0.5)),
-            ),
-          ),
-          const SizedBox(height: 12),
-          // Action buttons
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: _previewPdf,
-                  icon: const Icon(Icons.preview_outlined),
-                  label: const Text('Preview PDF'),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: AppColors.navyDark,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: _showExportSheet,
-                  icon: const Icon(Icons.download_rounded),
-                  label: const Text('Export'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.gold,
-                    foregroundColor: AppColors.navyDark,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                  ),
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 20),
-        ],
-      ),
-    );
-  }
-
-  Widget _rowEditor(_RowModel r) {
-    final headers = _tableHeaders();
-    return Container(
-      margin: const EdgeInsets.only(bottom: 8),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        border: Border.all(color: Colors.black12),
-        borderRadius: BorderRadius.circular(10),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: TextField(
-              controller: r.a,
-              decoration: InputDecoration(
-                // ✅ Column headers se label aata hai
-                labelText: headers[0],
-                prefixIcon: const Icon(Icons.title_rounded),
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: r.b,
-              decoration: InputDecoration(
-                labelText: headers[1], // ✅
-                prefixIcon: const Icon(Icons.numbers_rounded),
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: TextField(
-              controller: r.c,
-              decoration: InputDecoration(
-                labelText: headers[2], // ✅
-                prefixIcon: const Icon(Icons.notes_rounded),
-              ),
-              onChanged: (_) => setState(() {}),
-            ),
-          ),
-          IconButton(
-            onPressed: () => setState(() {
-              r.dispose();
-              _listRows.remove(r);
-            }),
-            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _canvaPreviewBlock() {
-    final accent = _accentColorForTemplate();
-    final styleAccent = _styleAccent(accent, _templateStyle);
-    final previewBg = _templateStyle == 1
-        ? const Color(0xFFF7FAFF)
-        : (_templateStyle == 2 ? const Color(0xFFF9F4FF) : Colors.white);
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        // Header band
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-          decoration: BoxDecoration(
-            color: styleAccent.withOpacity(0.12), // ✅ FIXED
-            borderRadius: BorderRadius.circular(10),
-          ),
-          child: Row(
-            children: [
-              Container(
-                width: 7,
-                height: 26,
-                decoration: BoxDecoration(
-                  color: styleAccent,
-                  borderRadius: BorderRadius.circular(4),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: Text(
-                  '$_docLabel Layout',
-                  style: GoogleFonts.nunito(
-                    color: styleAccent,
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: 0.4,
-                  ),
-                ),
-              ),
-              Text(
-                _today,
-                style: GoogleFonts.nunito(
-                  color: styleAccent.withOpacity(0.85), // ✅ FIXED
-                  fontSize: 11,
-                  fontWeight: FontWeight.w700,
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        // Live preview label + template badge
-        Row(
-          children: [
-            Text(
-              'Live Preview',
-              style: GoogleFonts.nunito(
-                color: AppColors.navyDark,
-                fontWeight: FontWeight.w800,
-              ),
-            ),
-            const Spacer(),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-              decoration: BoxDecoration(
-                color: styleAccent.withOpacity(0.14), // ✅ FIXED
-                borderRadius: BorderRadius.circular(20),
-              ),
-              child: Text(
-                widget.templateName,
-                style: GoogleFonts.nunito(
-                  color: styleAccent,
-                  fontWeight: FontWeight.w800,
-                  fontSize: 11,
-                ),
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        // Document title block
-        Container(
-          width: double.infinity,
-          padding: EdgeInsets.all(_templateStyle == 1 ? 14 : 12),
-          decoration: BoxDecoration(
-            color: _templateStyle == 0
-                ? previewBg
-                : styleAccent.withOpacity(
-                    _templateStyle == 2 ? 0.14 : 0.06, // ✅ FIXED
-                  ),
-            borderRadius: BorderRadius.circular(10),
-            border: Border.all(
-              color: styleAccent.withOpacity(0.22), // ✅ FIXED
-            ),
-          ),
-          child: Row(
-            children: [
-              if (_templateStyle == 2)
-                Container(
-                  width: 6,
-                  height: 36,
-                  margin: const EdgeInsets.only(right: 8),
-                  decoration: BoxDecoration(
-                    color: styleAccent,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                ),
-              Expanded(
-                child: Text(
-                  '$_styleName ${widget.templateName.toUpperCase()}',
-                  textAlign: _templateStyle == 1
-                      ? TextAlign.center
-                      : TextAlign.start,
-                  style: GoogleFonts.nunito(
-                    color: styleAccent,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 20,
-                    letterSpacing: 0.8,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-        const SizedBox(height: 10),
-        // Fields preview
-        ..._fields.entries.take(6).map(
-              (e) => Padding(
-                padding: const EdgeInsets.only(bottom: 4),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    SizedBox(
-                      width: _templateStyle == 1 ? 95 : 110,
-                      child: Text(
-                        e.key,
-                        style: GoogleFonts.nunito(
-                          color: AppColors.textMuted,
-                          fontWeight: FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                    Expanded(
-                      child: Text(
-                        e.value.text,
-                        textAlign: _templateStyle == 1
-                            ? TextAlign.right
-                            : TextAlign.left,
-                        style: GoogleFonts.nunito(
-                          fontWeight: _templateStyle == 2
-                              ? FontWeight.w800
-                              : FontWeight.w700,
-                          fontSize: 13,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-        // Table preview (if rows)
-        if (_listRows.isNotEmpty) ...[
-          const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
-            decoration: BoxDecoration(
-              color: styleAccent.withOpacity(0.12), // ✅ FIXED
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
-              children: _tableHeaders()
-                  .map(
-                    (h) => Expanded(
-                      child: Text(
-                        h,
-                        style: GoogleFonts.nunito(fontWeight: FontWeight.w800),
-                      ),
-                    ),
-                  )
-                  .toList(),
-            ),
-          ),
-          const SizedBox(height: 6),
-          ..._listRows.take(4).map(
-                (r) => Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          r.a.text,
-                          style: GoogleFonts.nunito(fontSize: 12),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          r.b.text,
-                          style: GoogleFonts.nunito(fontSize: 12),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          r.c.text,
-                          style: GoogleFonts.nunito(fontSize: 12),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-        ],
-        const SizedBox(height: 10),
-        Divider(color: styleAccent.withOpacity(0.25)), // ✅ FIXED
-        Align(
-          alignment: Alignment.centerRight,
-          child: Text(
-            _signatureLabel(),
-            style: GoogleFonts.nunito(
-              color: styleAccent,
-              fontWeight: FontWeight.w800,
-              fontSize: 12,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  Color _accentColorForTemplate() {
-    final key = widget.templateName.toLowerCase();
-    if (key.contains('contract')) return AppColors.navyDark;
-    if (key.contains('certificate')) return const Color(0xFFD4AF37);
-    if (key.contains('business')) return AppColors.purple;
-    if (key.contains('receipt')) return AppColors.green;
-    if (key.contains('whiteboard')) return AppColors.blue;
-    if (key.contains('table')) return AppColors.gold;
-    if (key.contains('meeting')) return AppColors.navyMid;
-    if (key.contains('resume') || key.contains('cv')) return AppColors.purple;
-    return AppColors.navyMid;
-  }
-
-  Color _styleAccent(Color base, int style) {
-    if (style == 1) return AppColors.blue;
-    if (style == 2) return AppColors.purple;
-    return base;
-  }
-
-  // ✅ FIXED: Table Sheet headers ab user ke fields se aate hain
   List<String> _tableHeaders() {
     final key = widget.templateName.toLowerCase();
     if (key.contains('receipt')) return const ['Item', 'Qty', 'Amount'];
     if (key.contains('table')) {
       return [
-        _fields['Column 1']?.text.isNotEmpty == true
-            ? _fields['Column 1']!.text
-            : 'Col 1',
-        _fields['Column 2']?.text.isNotEmpty == true
-            ? _fields['Column 2']!.text
-            : 'Col 2',
-        _fields['Column 3']?.text.isNotEmpty == true
-            ? _fields['Column 3']!.text
-            : 'Col 3',
+        _fields['Column 1']?.text.isNotEmpty == true ? _fields['Column 1']!.text : 'Col 1',
+        _fields['Column 2']?.text.isNotEmpty == true ? _fields['Column 2']!.text : 'Col 2',
+        _fields['Column 3']?.text.isNotEmpty == true ? _fields['Column 3']!.text : 'Col 3',
       ];
     }
     if (key.contains('whiteboard')) return const ['Point', 'Owner', 'Status'];
@@ -1079,26 +497,427 @@ class _DocumentTemplateBuilderScreenState
     final key = widget.templateName.toLowerCase();
     if (key.contains('contract')) return 'Authorized Signatories __________________';
     if (key.contains('certificate')) return 'Authorized By __________________';
-    if (key.contains('business')) return 'Card Approved By __________________';
+    if (key.contains('business')) return 'Approved By __________________';
     if (key.contains('receipt')) return 'Cashier Signature __________________';
-    if (key.contains('whiteboard')) return 'Meeting Lead Signature __________________';
+    if (key.contains('whiteboard')) return 'Meeting Lead __________________';
     if (key.contains('table')) return 'Reviewed By __________________';
-    if (key.contains('meeting')) return 'Facilitator Signature __________________';
-    if (key.contains('resume') || key.contains('cv')) return 'Applicant Signature __________________';
+    if (key.contains('meeting')) return 'Facilitator __________________';
+    if (key.contains('resume') || key.contains('cv'))
+      return 'Applicant Signature __________________';
     return 'Authorized Signature __________________';
+  }
+
+  Widget _rowEditor(_RowModel r) {
+    final accent = _accentColorForTemplate();
+    final headers = _tableHeaders();
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        border: Border.all(color: accent.withOpacity(0.15)),
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.03), blurRadius: 6)],
+      ),
+      child: Row(
+        children: [
+          Expanded(child: _miniField(r.a, headers[0], accent)),
+          const SizedBox(width: 8),
+          Expanded(child: _miniField(r.b, headers[1], accent)),
+          const SizedBox(width: 8),
+          Expanded(child: _miniField(r.c, headers[2], accent)),
+          const SizedBox(width: 4),
+          IconButton(
+            onPressed: () => setState(() {
+              r.dispose();
+              _listRows.remove(r);
+            }),
+            icon: const Icon(Icons.delete_outline_rounded, color: Colors.redAccent, size: 20),
+            padding: EdgeInsets.zero,
+            constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniField(TextEditingController c, String label, Color accent) {
+    return TextField(
+      controller: c,
+      style: GoogleFonts.nunito(fontSize: 12),
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: GoogleFonts.nunito(fontSize: 11, color: AppColors.textMuted),
+        contentPadding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        border: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: accent.withOpacity(0.2))),
+        focusedBorder: OutlineInputBorder(
+            borderRadius: BorderRadius.circular(8),
+            borderSide: BorderSide(color: accent, width: 1.5)),
+      ),
+      onChanged: (_) => setState(() {}),
+    );
+  }
+
+  // ─── Build ───────────────────────────────────────────────────────────────
+
+  @override
+  Widget build(BuildContext context) {
+    final accent = _accentColorForTemplate();
+
+    return Scaffold(
+      backgroundColor: AppColors.background,
+      appBar: AppBar(
+        backgroundColor: AppColors.navyDark,
+        foregroundColor: Colors.white,
+        elevation: 0,
+        title: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('${widget.templateName} Template',
+              style: GoogleFonts.nunito(
+                  fontWeight: FontWeight.w900, color: Colors.white, fontSize: 16)),
+          Text(_docLabel,
+              style: GoogleFonts.nunito(
+                  color: Colors.white60, fontSize: 10, fontWeight: FontWeight.w600)),
+        ]),
+        actions: [
+          TextButton.icon(
+            onPressed: _showExportSheet,
+            icon: const Icon(Icons.download_rounded, color: AppColors.gold, size: 18),
+            label: Text('Export',
+                style: GoogleFonts.nunito(
+                    color: AppColors.gold, fontWeight: FontWeight.w800, fontSize: 13)),
+          ),
+        ],
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(44),
+          child: Container(
+            color: AppColors.navyDark,
+            child: TabBar(
+              controller: _tabController,
+              labelColor: AppColors.gold,
+              unselectedLabelColor: Colors.white54,
+              indicatorColor: AppColors.gold,
+              indicatorWeight: 3,
+              labelStyle: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 13),
+              unselectedLabelStyle:
+                  GoogleFonts.nunito(fontWeight: FontWeight.w600, fontSize: 13),
+              tabs: const [
+                Tab(icon: Icon(Icons.edit_note_rounded, size: 16), text: 'Edit'),
+                Tab(
+                    icon: Icon(Icons.picture_as_pdf_rounded, size: 16),
+                    text: 'PDF Preview'),
+              ],
+            ),
+          ),
+        ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [_buildFormTab(accent), _buildPdfTab()],
+      ),
+    );
+  }
+
+  // ─── TAB 1: Edit Form ────────────────────────────────────────────────────
+
+  Widget _buildFormTab(Color accent) {
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: [
+        // Style selector
+        _sectionLabel('Choose Style', Iconsax.paintbucket),
+        const SizedBox(height: 10),
+        Row(
+          children: List.generate(3, (i) {
+            final selected = _templateStyle == i;
+            final sa = _styleAccent(accent, i);
+            final names = ['Classic', 'Modern', 'Bold'];
+            return Expanded(
+              child: Padding(
+                padding: EdgeInsets.only(right: i == 2 ? 0 : 10),
+                child: GestureDetector(
+                  onTap: () => setState(() => _templateStyle = i),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: selected ? sa.withOpacity(0.07) : Colors.white,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                          color: selected ? sa : Colors.black12,
+                          width: selected ? 2 : 1),
+                      boxShadow: selected
+                          ? [BoxShadow(color: sa.withOpacity(0.18), blurRadius: 10)]
+                          : [],
+                    ),
+                    child: Column(children: [
+                      _styleMiniDoc(sa, i),
+                      const SizedBox(height: 6),
+                      Text(names[i],
+                          style: GoogleFonts.nunito(
+                              color: selected ? sa : AppColors.textMuted,
+                              fontSize: 11,
+                              fontWeight: FontWeight.w800)),
+                    ]),
+                  ),
+                ),
+              ),
+            );
+          }),
+        ),
+        const SizedBox(height: 20),
+
+        // Fields card
+        _sectionLabel('Document Details', Iconsax.edit),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: accent.withOpacity(0.15)),
+            boxShadow: [
+              BoxShadow(color: Colors.black.withOpacity(0.04), blurRadius: 12, offset: const Offset(0, 4))
+            ],
+          ),
+          child: Column(
+            children: _fields.entries
+                .map((e) => Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: TextField(
+                        controller: e.value,
+                        maxLines: e.value.text.contains('\n') ? null : 1,
+                        style: GoogleFonts.nunito(fontSize: 13.5, fontWeight: FontWeight.w600),
+                        decoration: InputDecoration(
+                          labelText: e.key,
+                          labelStyle: GoogleFonts.nunito(
+                              fontSize: 12,
+                              color: AppColors.textMuted,
+                              fontWeight: FontWeight.w600),
+                          prefixIcon: Icon(Icons.edit_note_rounded, color: accent, size: 20),
+                          filled: true,
+                          fillColor: AppColors.background,
+                          contentPadding:
+                              const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: accent.withOpacity(0.2))),
+                          enabledBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: accent.withOpacity(0.15))),
+                          focusedBorder: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              borderSide: BorderSide(color: accent, width: 1.5)),
+                        ),
+                        onChanged: (_) => setState(() {}),
+                      ),
+                    ))
+                .toList(),
+          ),
+        ),
+
+        // Rows
+        if (_listRows.isNotEmpty) ...[
+          const SizedBox(height: 20),
+          _sectionLabel('Table Rows', Icons.table_chart_rounded),
+          const SizedBox(height: 10),
+          ..._listRows.map((r) => _rowEditor(r)),
+        ],
+        const SizedBox(height: 10),
+        OutlinedButton.icon(
+          onPressed: () => setState(() => _listRows.add(_RowModel('Item', '1', '0'))),
+          icon: Icon(Icons.add_rounded, color: accent, size: 18),
+          label: Text('Add Row',
+              style: GoogleFonts.nunito(
+                  color: accent, fontWeight: FontWeight.w700, fontSize: 13)),
+          style: OutlinedButton.styleFrom(
+            padding: const EdgeInsets.symmetric(vertical: 12),
+            side: BorderSide(color: accent.withOpacity(0.4)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
+        const SizedBox(height: 20),
+
+        Row(children: [
+          Expanded(
+            child: OutlinedButton.icon(
+              onPressed: () => _tabController.animateTo(1),
+              icon: const Icon(Icons.picture_as_pdf_rounded, size: 18),
+              label: Text('View PDF',
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 14)),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.navyDark,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                side: const BorderSide(color: AppColors.navyDark),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: ElevatedButton.icon(
+              onPressed: _showExportSheet,
+              icon: const Icon(Icons.download_rounded, size: 18),
+              label: Text('Export',
+                  style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 14)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.gold,
+                foregroundColor: AppColors.navyDark,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+              ),
+            ),
+          ),
+        ]),
+        const SizedBox(height: 24),
+      ],
+    );
+  }
+
+  // ─── TAB 2: Inline PDF Preview ──────────────────────────────────────────
+
+  Widget _buildPdfTab() {
+    return Column(children: [
+      Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+        color: Colors.white,
+        child: Row(children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+                color: const Color(0xFFE53935).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10)),
+            child: const Icon(Icons.picture_as_pdf_rounded,
+                color: Color(0xFFE53935), size: 20),
+          ),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('${widget.templateName} · PDF',
+                  style: GoogleFonts.nunito(
+                      fontWeight: FontWeight.w800,
+                      fontSize: 13,
+                      color: AppColors.navyDark)),
+              Text('Updates automatically as you edit',
+                  style: GoogleFonts.nunito(
+                      color: AppColors.textMuted, fontSize: 11, fontWeight: FontWeight.w600)),
+            ]),
+          ),
+          ElevatedButton.icon(
+            onPressed: _showExportSheet,
+            icon: const Icon(Icons.download_rounded, size: 15),
+            label: Text('Export',
+                style: GoogleFonts.nunito(fontWeight: FontWeight.w800, fontSize: 12)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.gold,
+              foregroundColor: AppColors.navyDark,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              elevation: 0,
+            ),
+          ),
+        ]),
+      ),
+      const Divider(height: 1),
+      Expanded(
+        child: PdfPreview(
+          key: ValueKey(
+            _fields.entries.map((e) => e.value.text).join('|') +
+                _listRows.map((r) => r.a.text + r.b.text + r.c.text).join('|') +
+                _templateStyle.toString(),
+          ),
+          build: (_) => _buildPdfBytes(),
+          canDebug: false,
+          allowPrinting: true,
+          allowSharing: true,
+          useActions: true,
+          initialPageFormat: PdfPageFormat.a4,
+          pdfPreviewPageDecoration: BoxDecoration(
+            color: Colors.white,
+            boxShadow: [
+              BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 12,
+                  offset: const Offset(0, 4)),
+            ],
+          ),
+        ),
+      ),
+    ]);
+  }
+
+  // ─── Helpers ─────────────────────────────────────────────────────────────
+
+  Widget _sectionLabel(String title, IconData icon) {
+    return Row(children: [
+      Icon(icon, size: 16, color: AppColors.navyDark),
+      const SizedBox(width: 7),
+      Expanded(child: Text(title,
+          style: GoogleFonts.nunito(
+              color: AppColors.navyDark, fontWeight: FontWeight.w900, fontSize: 15),
+          overflow: TextOverflow.ellipsis)),
+    ]);
+  }
+
+  Widget _styleMiniDoc(Color sa, int i) {
+    return Container(
+      height: 52,
+      decoration: BoxDecoration(
+          color: sa.withOpacity(0.08), borderRadius: BorderRadius.circular(6)),
+      padding: const EdgeInsets.all(6),
+      child: Column(
+        crossAxisAlignment:
+            i == 1 ? CrossAxisAlignment.center : CrossAxisAlignment.start,
+        children: [
+          if (i == 2)
+            Row(children: [
+              Container(
+                  width: 3,
+                  height: 14,
+                  decoration:
+                      BoxDecoration(color: sa, borderRadius: BorderRadius.circular(2))),
+              const SizedBox(width: 4),
+              Expanded(
+                  child: Container(
+                      height: 6,
+                      decoration: BoxDecoration(
+                          color: sa.withOpacity(0.5),
+                          borderRadius: BorderRadius.circular(3)))),
+            ])
+          else
+            Container(
+              height: 6,
+              width: i == 1 ? 55 : double.infinity,
+              decoration: BoxDecoration(
+                  color: sa.withOpacity(0.5), borderRadius: BorderRadius.circular(3)),
+            ),
+          const SizedBox(height: 4),
+          Container(
+              height: 4,
+              decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(3))),
+          const SizedBox(height: 3),
+          Container(
+              height: 4,
+              width: 50,
+              decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.07),
+                  borderRadius: BorderRadius.circular(3))),
+        ],
+      ),
+    );
   }
 }
 
 class _RowModel {
-  final TextEditingController a;
-  final TextEditingController b;
-  final TextEditingController c;
-
+  final TextEditingController a, b, c;
   _RowModel(String av, String bv, String cv)
       : a = TextEditingController(text: av),
         b = TextEditingController(text: bv),
         c = TextEditingController(text: cv);
-
   void dispose() {
     a.dispose();
     b.dispose();
